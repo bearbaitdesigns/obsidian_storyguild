@@ -49,12 +49,12 @@ wk = patch(wk, 'wk:ms-readers', `    if (MS_READERS.has(m.kind)) {
       readers = h('div', { class: 'ms-f' }, h('label', {}, 'Readers'), h('span', { class: 'cs-hint' }, \`Synced from Draftsmith → Readers (\${(m.readers || []).length} readers). Edit them there.\`));
     } else if (MS_READERS.has(m.kind)) {
       m.readers = m.readers || [];`);
-// Home banner: Plot Weaver and Draftsmith pills under the book info; Encyclopedia
-// and World Atlas pills move to the lower-left corner; a Books & series button.
+// Home banner: one row of pills under the book info — Plot Weaver and Draftsmith on
+// the left, Encyclopedia and World Atlas at the right edge; a Books & series button.
 wk = patch(wk, 'wk:hero-sections', `daysLeft != null ? h('span', {}, \`\${daysLeft} days left\`) : null)),`,
-  `daysLeft != null ? h('span', {}, \`\${daysLeft} days left\`) : null), HOST.sectionPills()),`);
+  `daysLeft != null ? h('span', {}, \`\${daysLeft} days left\`) : null), HOST.sectionPills(enc, atlas)),`);
 wk = patch(wk, 'wk:hero-corner', `h('small', {}, 'of goal'))), h('div', { class: 'hd-pills' }, enc, atlas)));`,
-  `h('small', {}, 'of goal')))), h('div', { class: 'hd-corner' }, enc, atlas));`);
+  `h('small', {}, 'of goal')))));`);
 wk = patch(wk, 'wk:hero-books', `pencilToggle(), changeBanner, renameTab);`, `pencilToggle(), changeBanner, renameTab, HOST.booksButton());`);
 // Expose a few helpers to the host.
 wk += `

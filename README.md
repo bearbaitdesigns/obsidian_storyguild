@@ -3,7 +3,7 @@
 Write, plan and build your novel in one Obsidian plugin. Storyguild has three sections:
 
 - **Draftsmith** — your manuscript: chapter notes, draft numbers, book details, alpha/beta reader rounds with questions and answers, publishing checklists, and publishing to PDF, Word, EPUB or Markdown.
-- **Worldkeeper** — worldbuilding sheets, dashboards, encyclopedia, Home, milestones and to-do list. The Home banner has Plot Weaver and Draftsmith pills under the book's details, and Encyclopedia and World Atlas pills in its lower-left corner.
+- **Worldkeeper** — worldbuilding sheets, dashboards, encyclopedia, Home, milestones and to-do list. The Home banner has Plot Weaver and Draftsmith pills under the book's details, and Encyclopedia and World Atlas pills on the same row at the right edge.
 - **Plot Weaver** — plotlines × chapters board, POVs, off-screen events, cause and effect.
 
 All three sections share **books and series**. The current book is the same everywhere. You can start a new book, create a series, or add an existing book to a series from **📚 Books & series**. It's on the ribbon, in the Draftsmith header, on the Worldkeeper Home banner and in the command palette (**New book…**, **New series…**, **Add a book to a series…**, **Switch book…**). A novel created in Plot Weaver becomes a book automatically, and switching novels in Plot Weaver switches the book everywhere.

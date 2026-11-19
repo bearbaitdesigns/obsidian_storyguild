@@ -164,12 +164,13 @@ class BookSwitcher extends FuzzySuggestModal {
 const openLibrary = () => new LibraryModal().open();
 
 /* ---------- pills on Worldkeeper Home ---------- */
-function sectionPills() {
+function sectionPills(...right) {
   const p = activeProject(); const n = linkedNovel(p);
   const wrap = document.createElement('div'); wrap.className = 'hd-sections';
   const mk = (icon, label, count, onclick, title) => el('button', { class: 'apill hd-enc hd-sec', onclick, title }, el('span', {}, icon), label, count != null ? el('b', {}, String(count)) : null);
   if (HOST.plot) wrap.append(mk('🧵', 'Plot Weaver', n ? (n.beats || []).filter((b) => b.chapterId && (!b.status || b.status === 'active')).length : null, () => (n ? HOST.plot.openBoard(n.id) : HOST.plot.activateView()), n ? `Open the board for “${n.title}”` : 'Open Plot Weaver'));
   wrap.append(mk('✒️', 'Draftsmith', p ? 'D' + p.draft : null, () => SG.openDraftsmith(), 'Open the manuscript, readers, checklist and publishing'));
+  const r = document.createElement('div'); r.className = 'hd-sections-right'; r.append(...right.filter(Boolean)); wrap.append(r);
   return wrap;
 }
 function booksButton() { return el('button', { title: 'Switch book, start a new book or manage series', onclick: () => openLibrary() }, '📚 Books & series'); }

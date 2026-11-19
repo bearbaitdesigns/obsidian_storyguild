@@ -40,7 +40,6 @@ function buildDocx(book) {
     const q = book.questions; body.push(wp('Heading1', wrun(q.title)), q.intro ? wp('NoInd', wrun(q.intro, '<w:i/>')) : '');
     q.items.forEach((it, i) => {
       body.push(wp('Question', wrun(`${i + 1}. ${it.text}`)));
-      for (let k = 0; k < 4; k++) body.push(wp('AnswerLine', ''));
     });
   }
   if (msf) body.push(wp('Center', wrun('THE END'), '<w:spacing w:before="480"/>'));
@@ -69,7 +68,6 @@ ${style('TOCHeading', 'TOC Heading', '<w:ind w:firstLine="0"/><w:jc w:val="cente
 ${style('Sub', 'Subheading', '<w:keepNext/><w:ind w:firstLine="0"/><w:jc w:val="center"/><w:spacing w:before="240" w:after="120"/>', '<w:b/>', 'NoInd')}
 ${style('SceneBreak', 'Scene Break', '<w:keepNext/><w:ind w:firstLine="0"/><w:jc w:val="center"/><w:spacing w:before="120" w:after="120"/>', '', 'NoInd')}
 ${style('Question', 'Reader Question', '<w:keepNext/><w:ind w:firstLine="0"/><w:jc w:val="left"/><w:spacing w:before="360" w:after="120"/>', '<w:b/>', 'NoInd')}
-${style('AnswerLine', 'Answer Line', '<w:ind w:firstLine="0"/><w:spacing w:before="200"/><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="999999"/></w:pBdr>', '', 'AnswerLine')}
 </w:styles>`;
   const rels = [header ? '<Relationship Id="rIdHdr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>' : '', footer ? '<Relationship Id="rIdFtr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>' : '',
     '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>', '<Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>'].join('');

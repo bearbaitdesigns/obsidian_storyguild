@@ -132,9 +132,8 @@ function buildPdf(book) {
     const q = book.questions; chapterStart(q.title, 'back');
     if (q.intro) { para([{ text: q.intro, i: true }], true); y -= lead * 0.5; }
     q.items.forEach((it, i) => {
-      const lines = 4; ensure(lead * (2 + lines)); y -= lead * 0.4;
+      ensure(lead * 2); y -= lead * 0.4;
       para([{ text: `${i + 1}. ${it.text}`, b: true }], true, { noIndent: true });
-      for (let k = 0; k < lines; k++) { y -= lead; cur.ops.push(`0.4 w 0.6 G ${left} ${y.toFixed(2)} m ${right} ${y.toFixed(2)} l S 0 G`); } y -= lead * 0.3;
     });
   }
 

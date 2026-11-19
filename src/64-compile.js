@@ -30,7 +30,7 @@ async function gatherBook(p) {
   let questions = null;
   if (o.includeQuestions) {
     const r = roundsForPublish(p).find((x) => x.id === o.questionsRound) || roundsForPublish(p).slice(-1)[0];
-    if (r) questions = { title: o.questionsTitle || 'Questions for Readers', intro: r.focus ? `Thank you for reading! ${r.focus}` : 'Thank you for reading! When you finish, please answer these questions.', items: r.questions.filter((q) => q.text.trim()) };
+    if (r) questions = { title: o.questionsTitle || 'Questions for Readers', intro: r.focus ? `Thank you for reading! ${r.focus}` : 'Thank you for reading! Please keep these questions in mind as you read.', items: r.questions.filter((q) => q.text.trim()) };
   }
   const author = p.penName || p.author || 'Author';
   return {

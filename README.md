@@ -69,7 +69,7 @@ Edit a shared field anywhere and it changes everywhere.
 - **Publishing checklist** — three tabs: **Drafting & Revision**, **Traditional** and **Self-publishing**. Steps marked ⚡ tick themselves from your data. You can add, remove or date any step, and send dated steps to the Worldkeeper to-do list.
 - **Publish** — PDF (book layout or standard manuscript format), Word (.docx), EPUB 3 or one Markdown note.
   - Options: title page, contents, front and back matter, chapter heading template (`{n}`, `{N}`, `{title}`), scene-break mark, page size and curly quotes.
-  - Reader questions can be added at the end of a copy.
+  - A round's questions can be added at the end of a reader copy as a plain list, with no space for answers (readers answer separately).
 
 ### Publishing limits
 

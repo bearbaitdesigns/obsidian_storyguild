@@ -50,18 +50,18 @@ class DraftsmithView extends ItemView {
 
 /* ---------------- Manuscript tab ---------------- */
 function renderManuscript(view, p, body) {
-  const chs = listChapters(p); const tw = chs.reduce((a, c) => a + (c.words || 0), 0); const pct = p.targetWords ? Math.min(100, Math.round((tw / p.targetWords) * 100)) : 0;
+  const chs = listChapters(p); const tw = chs.filter((c) => !isIdea(c)).reduce((a, c) => a + (c.words || 0), 0); const pct = p.targetWords ? Math.min(100, Math.round((tw / p.targetWords) * 100)) : 0;
   const cur = p.rounds[p.rounds.length - 1]; const next = nextDatedStep(p); const novel = linkedNovel(p);
-  const counts = {}; for (const c of chs) { const d = statusDef(c.status); const k = d ? d.name : c.status || 'No status'; counts[k] = (counts[k] || 0) + 1; }
+  const counts = {}; for (const c of chs.filter((x) => !isIdea(x))) { const d = statusDef(c.status); const k = d ? d.name : c.status || 'No status'; counts[k] = (counts[k] || 0) + 1; }
   body.append(el('div', { class: 'ds-stats' },
     el('div', { class: 'ds-stat' }, el('small', {}, 'Words'), el('b', {}, fmtN(tw)), el('span', {}, `of ${fmtN(p.targetWords)} · ${pct}%`), el('div', { class: 'ds-bar' }, el('i', { style: { width: pct + '%' } }))),
-    el('div', { class: 'ds-stat' }, el('small', {}, 'Chapters'), el('b', {}, String(chs.filter((c) => c.kind === 'chapter').length)), el('span', {}, [chs.filter((c) => c.kind !== 'chapter').map((c) => c.label.toLowerCase()).join(', '), Object.entries(counts).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(' · ')].filter(Boolean).join(' · ') || 'none yet')),
+    el('div', { class: 'ds-stat' }, el('small', {}, 'Chapters'), el('b', {}, String(chs.filter((c) => c.kind === 'chapter').length)), el('span', {}, [chs.filter((c) => !['chapter', 'idea'].includes(c.kind)).map((c) => c.label.toLowerCase()).join(', '), chs.some(isIdea) ? `${chs.filter(isIdea).length} idea${chs.filter(isIdea).length === 1 ? '' : 's'}` : '', Object.entries(counts).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(' · ')].filter(Boolean).join(' · ') || 'none yet')),
     el('div', { class: 'ds-stat is-click', onclick: () => { if (cur) DS().ui.round = cur.id; view.setTab('readers'); } }, el('small', {}, cur ? `${cur.name} · ${cur.version}` : 'Readers'), el('b', {}, cur ? `${cur.sends.filter((s) => s.status === 'Feedback in').length}/${cur.sends.length}` : '—'), el('span', {}, cur ? `feedback in · ${p.comments.filter((c) => c.round === cur.id && !c.resolved).length} open notes` : 'no reader rounds yet')),
     el('div', { class: 'ds-stat is-click', onclick: () => { if (next) p.checklistTab = next.list; view.setTab('checklist'); } }, el('small', {}, next ? `Next step · ${CHECKLIST_NAMES[next.list]}` : 'Next step'), el('b', { class: 'is-text' }, next ? next.it.t : 'Nothing dated'), el('span', {}, next ? `${next.it.due} · ${daysText(next.it.due)}` : 'add target dates in the checklist'))));
 
   const plotOrder = DSS().followPlotOrder && novel;
   const tools = el('div', { class: 'ds-row' }, el('h2', { class: 'ds-grow' }, 'Chapters'),
-    btn('+ New chapter', () => newChapterModal(p)),
+    btn('+ New chapter', () => newChapterModal(p)), btn('💡 New idea', () => newChapterModal(p, 'idea')),
     novel ? btn('↻ Chapters from Plot Weaver', async () => { const n = await chaptersFromPlot(p); notice(n ? `Created ${n} chapter note${n === 1 ? '' : 's'} from Plot Weaver.` : 'Every Plot Weaver chapter already has a note.'); setTimeout(() => view.render(), 400); }, '', 'Create a note for each Plot Weaver chapter that has none') : null,
     btn('⇪ Import chapter notes', () => new ImportChaptersModal(p).open(), '', 'Turn notes you already have into chapters'),
     btn('Draft history', () => draftHistoryModal(p)),
@@ -84,7 +84,7 @@ function renderManuscript(view, p, body) {
     st.addEventListener('change', () => setFm(c.file, (fm) => { fm[sk] = st.value; }));
     const cards = cardsForChapter(p, c); const open = p.comments.filter((x) => x.ch === c.file.path && !x.resolved).length;
     const moveTo = async (j) => { if (j < 0 || j >= chs.length || j === i) return; const a = chs.slice(); const [x] = a.splice(i, 1); a.splice(j, 0, x); await reorderChapters(p, a); };
-    const kind = el('select', { class: 'dropdown ds-kind' }, SCENE_KINDS.map((k) => el('option', { value: k, selected: c.kind === k }, KIND_LABEL[k])));
+    const kind = el('select', { class: 'dropdown ds-kind' }, DS_KINDS.map((k) => el('option', { value: k, selected: c.kind === k }, (k === 'idea' ? '💡 ' : '') + KIND_LABEL[k])));
     kind.addEventListener('change', () => setChapterKind(p, c, kind.value));
     const tr = el('tr', { class: 'ds-drag-row is-' + c.kind, draggable: 'true' },
       el('td', { class: 'ds-grip', title: 'Drag to reorder' }, '⋮⋮'),
@@ -93,8 +93,8 @@ function renderManuscript(view, p, body) {
       el('td', {}, el('a', { class: 'ds-link', onclick: () => openFile(c.file) }, c.title)),
       el('td', {}, kind),
       el('td', {}, pill('D' + c.draft, 'is-draft'), el('a', { class: 'ds-mini', title: 'Save this version and start the next chapter draft', onclick: async () => { await bumpChapterDraft(p, c); } }, '+')),
-      el('td', {}, st), el('td', { class: 'ds-r' }, c.words == null ? '—' : fmtN(c.words)), el('td', {}, c.pov || '—'),
-      el('td', {}, cards.length ? cards.slice(0, 4).map((x) => el('span', { class: 'ds-pw', title: `${x.plotline ? x.plotline.name + ': ' : ''}${x.b.title}${x.pov ? ' · POV ' + x.pov.name : ''} — open on the board`, onclick: () => HOST.plot.openBoard(novel.id, x.b.id) }, el('i', { style: { background: (x.plotline && x.plotline.color) || '#888' } }), x.b.title.length > 28 ? x.b.title.slice(0, 27) + '…' : x.b.title)) : c.pwChapter ? hint('no cards') : el('a', { class: 'ds-mini', onclick: () => linkChapterToPlot(p, c) }, novel ? 'link…' : '—')),
+      el('td', {}, st), el('td', { class: 'ds-r', title: isIdea(c) ? 'Ideas don’t count toward the manuscript’s words' : null }, c.words == null ? '—' : isIdea(c) ? `(${fmtN(c.words)})` : fmtN(c.words)), el('td', {}, c.pov || '—'),
+      el('td', {}, isIdea(c) ? hint('idea · not linked') : cards.length ? cards.slice(0, 4).map((x) => el('span', { class: 'ds-pw', title: `${x.plotline ? x.plotline.name + ': ' : ''}${x.b.title}${x.pov ? ' · POV ' + x.pov.name : ''} — open on the board`, onclick: () => HOST.plot.openBoard(novel.id, x.b.id) }, el('i', { style: { background: (x.plotline && x.plotline.color) || '#888' } }), x.b.title.length > 28 ? x.b.title.slice(0, 27) + '…' : x.b.title)) : c.pwChapter ? hint('no cards') : el('a', { class: 'ds-mini', onclick: () => linkChapterToPlot(p, c) }, novel ? 'link…' : '—')),
       el('td', {}, open ? pill(`${open} open`, 'is-warn') : '—'),
       el('td', {}, el('a', { class: 'ds-mini', title: 'Open', onclick: () => openFile(c.file) }, '↗')));
     tr.addEventListener('dragstart', (e) => { dragFrom = i; tr.addClass('is-dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(i)); } catch (x) { /* */ } });
@@ -118,10 +118,10 @@ function draftHistoryModal(p) {
     hint(`Snapshots of earlier drafts are in ${projectSub(p, 'snapshotFolder')}/.`));
   m.open();
 }
-function newChapterModal(p) {
-  new FormModal('New chapter', [
+function newChapterModal(p, preset = 'chapter') {
+  new FormModal(preset === 'idea' ? 'New idea' : 'New chapter', [
     { key: 'title', label: 'Title', required: true },
-    { key: 'kind', label: 'Type', type: 'select', options: SCENE_KINDS.map((k) => [k, KIND_LABEL[k]]), value: 'chapter' },
+    { key: 'kind', label: 'Type', type: 'select', options: DS_KINDS.map((k) => [k, KIND_LABEL[k]]), value: preset, desc: 'An Idea isn’t numbered or linked to Plot Weaver and doesn’t count toward words. Put it anywhere; turn it into a chapter later.' },
     { key: 'pov', label: 'POV (optional)' },
   ], 'Create', async (v) => {
     const f = await createChapter(p, v.title.trim(), { pov: v.pov, kind: v.kind });
@@ -133,5 +133,6 @@ function newChapterModal(p) {
 function linkChapterToPlot(p, c) {
   const n = linkedNovel(p); if (!n) return;
   const secs = (n.chapters || []).filter((x) => SCENE_KINDS.includes(x.kind || 'chapter'));
-  new FormModal(`Link “${c.title}” to Plot Weaver`, [{ key: 'id', label: 'Plot Weaver chapter', type: 'select', options: secs.map((x) => [x.id, x.title]) }], 'Link', (v) => setFm(c.file, (fm) => { fm[DSS().keys.pwChapter] = v.id; })).open();
+  const used = new Set(listChapters(p).map((x) => x.pwChapter).filter(Boolean));
+  new FormModal(`Link “${c.title}” to Plot Weaver`, [{ key: 'id', label: 'Plot Weaver chapter', type: 'select', options: [['__new', `+ New board chapter “${titleFromName(c.title)}” here`], ...secs.filter((x) => !used.has(x.id)).map((x) => [x.id, `${x.title} (${KIND_LABEL[x.kind || 'chapter']})`])] }], 'Link', (v) => linkToPlot(p, c, v.id)).open();
 }

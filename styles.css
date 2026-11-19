@@ -165,6 +165,9 @@
 .ds-drag-row:not(.is-chapter) .ds-link { font-style: italic; }
 .ds-kind { font-size: 12px; }
 .ds-move a { visibility: hidden; } .ds-drag-row:hover .ds-move a { visibility: visible; }
+.ds-drag-row.is-idea td { background: color-mix(in srgb, #e0b04f 6%, transparent); }
+.ds-drag-row.is-idea .ds-kindlabel { color: #e0b04f; }
+.ds-drag-row.is-idea .ds-link { color: var(--text-muted); }
 
 /* ---- Worldkeeper ---- */
 /* ==========================================================================

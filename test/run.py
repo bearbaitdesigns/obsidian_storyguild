@@ -136,6 +136,26 @@ async def main():
         print('4c. types & order:', json.dumps(r, ensure_ascii=False))
         assert r['after'][0].startswith('Prologue|01 - Prologue') and r['after'][1].startswith('1|Low Water')
         assert r['pw'].index('Prologue:prologue') < r['pw'].index('Low Water:chapter') and 'Spring Tide:interlude' in r['pw']
+        # Idea: unlinked, unnumbered, placeable anywhere, convertible back and linkable
+        r = await ev("""async () => { const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view; const wait = (ms) => new Promise(r => setTimeout(r, ms));
+          const rows = () => [...document.querySelectorAll('.ds-chtable tbody tr')].map(tr => tr.children[1].textContent.replace(/[↑↓]/g, '') + '|' + tr.children[2].textContent);
+          const row = (t) => [...document.querySelectorAll('.ds-chtable tbody tr')].find(tr => tr.children[2].textContent === t);
+          let ks = row('02 - Ballast').querySelector('.ds-kind'); ks.value = 'idea'; ks.dispatchEvent(new Event('change')); await wait(500); v.render(); await wait(100);
+          const fm = () => app.metadataCache.getFileCache(app.vault.getMarkdownFiles().find(f => f.basename === '02 - Ballast')).frontmatter;
+          const asIdea = { rows: rows(), fm: Object.assign({}, fm()) };
+          // drag the idea to just after the Prologue
+          const trs = [...document.querySelectorAll('.ds-chtable tbody tr')]; const dt = new DataTransfer();
+          row('02 - Ballast').dispatchEvent(new DragEvent('dragstart', { dataTransfer: dt })); trs[1].dispatchEvent(new DragEvent('drop', { dataTransfer: dt, cancelable: true })); await wait(700); v.render(); await wait(100);
+          const moved = rows();
+          // convert back to a chapter and put it on the board as a new chapter
+          ks = row('02 - Ballast').querySelector('.ds-kind'); ks.value = 'chapter'; ks.dispatchEvent(new Event('change')); await wait(500); v.render(); await wait(100);
+          [...row('02 - Ballast').querySelectorAll('a')].find(a => a.textContent === 'link…').click(); await wait(100);
+          const m = __modals[__modals.length - 1]; [...m.contentEl.querySelectorAll('button')].find(b => b.textContent === 'Link').click(); await wait(600); v.render(); await wait(100);
+          return { asIdea, moved, final: rows(), fm: fm(), pw: SGP.sections.plot.data.novels[0].chapters.map(c => c.title + ':' + c.kind) }; }""")
+        print('4d. idea:', json.dumps(r, ensure_ascii=False))
+        assert 'plotweaver-chapter' not in r['asIdea']['fm'] and any(x.startswith('Idea|02 - Ballast') for x in r['asIdea']['rows'])
+        assert r['moved'][1].startswith('Idea|02 - Ballast') and r['moved'][2].startswith('1|Low Water')
+        assert r['final'][1].startswith('1|02 - Ballast') and r['fm'].get('plotweaver-chapter') and r['pw'].index('Ballast:chapter') < r['pw'].index('Low Water:chapter')
         await page.wait_for_timeout(500)
         await page.screenshot(path=f'{OUT}/02-manuscript.png', full_page=True)
 

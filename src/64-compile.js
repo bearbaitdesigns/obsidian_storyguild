@@ -7,7 +7,7 @@ function sectionHeading(c) {
   return t ? `${label}: ${t}` : label;
 }
 function compileChapters(p) {
-  const o = p.compile; const all = listChapters(p);
+  const o = p.compile; const all0 = listChapters(p); const all = o.chapters === 'pick' || o.includeIdeas ? all0 : all0.filter((c) => !isIdea(c));
   if (o.chapters === 'status' && o.statusFilter) return all.filter((c) => statusDef(c.status)?.name === o.statusFilter);
   if (o.chapters === 'pick') { const set = new Set(o.picked || []); return all.filter((c) => set.has(c.file.path)); }
   return all;
@@ -20,8 +20,8 @@ async function gatherBook(p) {
   let words = 0;
   let num = 0;
   for (let i = 0; i < chs.length; i++) {
-    const c = chs[i]; const md = await app().vault.cachedRead(c.file); words += countWords(md);
-    const heading = c.kind === 'chapter' ? chapterHeading(o.heading, ++num, titleFromName(c.title)) : sectionHeading(c);
+    const c = chs[i]; const md = await app().vault.cachedRead(c.file); if (!isIdea(c)) words += countWords(md);
+    const heading = c.kind === 'chapter' ? chapterHeading(o.heading, ++num, titleFromName(c.title)) : isIdea(c) ? titleFromName(c.title) : sectionHeading(c);
     chapters.push({ title: c.title, kind: c.kind, heading, blocks: mdToBlocks(md, c.title, { smart }) });
   }
   let cover = null;

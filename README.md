@@ -61,6 +61,11 @@ Edit a shared field anywhere and it changes everywhere.
   - Each entry has a **type**: Chapter, Prologue, Interlude or Epilogue. Only chapters are numbered: a prologue shows as “Prologue” in the # column, and the first real chapter is Chapter 1.
     - In Publish, headings follow the type, for example “Prologue: The Drowning” or “Chapter 1: Low Water”.
     - For chapters linked to Plot Weaver, the type is shared with the board's section.
+  - **Idea** is a fifth type, for a scene or fragment you want to keep with the manuscript.
+    - It isn't numbered, isn't linked to Plot Weaver, doesn't count toward the word count or the checklist, and can sit anywhere in the list.
+    - Turning a linked chapter into an idea removes its link to Plot Weaver. The board's section is left as it is.
+    - In Publish, ideas are left out unless you turn on **Include ideas**. They're then printed in place under their own title.
+    - To promote an idea, change its type, then use **link…** to tie it to an existing Plot Weaver chapter or add a new one to the board in the right place.
   - **Reorder** by dragging rows or with ↑ ↓. When the book is linked to Plot Weaver, the board's chapters are reordered to match. Parts and Planning sections stay where they are.
   - **Chapters from Plot Weaver** creates a note for each chapter on the board.
   - **⇪ Import chapter notes** turns notes you already have into chapters.

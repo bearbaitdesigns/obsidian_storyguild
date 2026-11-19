@@ -113,7 +113,7 @@ function sharedWords(fallback) {
   if (src === 'world') return fallback;
   const p = activeProject(); if (!p) return fallback;
   const ch = listChapters(p); if (!ch.length && src === 'auto') return fallback;
-  return ch.reduce((a, c) => a + (c.words || 0), 0);
+  return ch.filter((c) => !isIdea(c)).reduce((a, c) => a + (c.words || 0), 0);
 }
 function coverPath() { const p = activeProject(); return p && p.cover ? p.cover : ''; }
 

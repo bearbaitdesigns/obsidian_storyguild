@@ -18,6 +18,7 @@ function renderCompile(view, p, body) {
   left.append(card(`Chapters · ${sel.length} of ${chs.length}`,
     select('chapters', 'Include', [['all', 'All chapters'], ['status', 'Chapters with a status…'], ['pick', 'Let me pick']]),
     o.chapters === 'status' ? select('statusFilter', 'Status', [['', '—'], ...statusDefs().map((d) => d.name)]) : null, pick,
+    o.chapters !== 'pick' && chs.some(isIdea) ? toggle('includeIdeas', `Include ideas (${chs.filter(isIdea).length})`, 'Printed where they sit in the list, under their own title, without a number') : null,
     textOpt('heading', 'Chapter heading', '{n} number · {N} in words · {title}'), select('sceneBreak', 'Scene break', ['* * *', '#', '~', '⁂', '❧', '§'])));
   const msfAllowed = o.format === 'pdf' || o.format === 'docx';
   left.append(card('Layout',
@@ -53,7 +54,7 @@ function previewPage(p, sel) {
   if (o.format === 'epub' && p.cover && resourceUrl(p.cover)) page.append(el('img', { class: 'ds-page-cover', src: resourceUrl(p.cover) }));
   if (o.titlePage || msf) page.append(el('div', { class: 'ds-page-title' }, el('b', {}, msf ? p.title.toUpperCase() : p.title), p.subtitle ? el('i', {}, p.subtitle) : null, el('span', {}, (msf ? 'by ' : '') + (p.penName || p.author || 'Author'))));
   if (first) {
-    page.append(el('h4', {}, first.kind === 'chapter' ? chapterHeading(o.heading, 1, first.title) : sectionHeading(first)));
+    page.append(el('h4', {}, first.kind === 'chapter' ? chapterHeading(o.heading, 1, titleFromName(first.title)) : isIdea(first) ? titleFromName(first.title) : sectionHeading(first)));
     const holder = el('div', { class: 'ds-page-text' }); page.append(holder);
     app().vault.cachedRead(first.file).then((md) => { const bl = mdToBlocks(md, first.title, { smart: o.smartQuotes !== false }).slice(0, 6);
       for (const b of bl) holder.append(b.t === 'break' ? el('div', { class: 'ds-page-brk' }, o.sceneBreak) : b.t === 'h' ? el('b', {}, b.text) : el('p', { class: b.first ? 'is-first' : '' }, b.runs.map((r) => (r.i ? el('em', {}, r.text) : r.b ? el('b', {}, r.text) : r.text)))); });

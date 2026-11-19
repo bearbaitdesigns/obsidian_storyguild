@@ -9,10 +9,14 @@ const fmOf = (f) => (app().metadataCache.getFileCache(f) || {}).frontmatter || {
 const chaptersFolder = (p) => normalizePath(p.chaptersFolder || `${p.folder}/Chapters`);
 const projectSub = (p, key) => normalizePath(`${p.folder}/${DSS()[key]}`);
 const SCENE_KINDS = ['prologue', 'chapter', 'interlude', 'epilogue'];
-const KIND_LABEL = { chapter: 'Chapter', prologue: 'Prologue', interlude: 'Interlude', epilogue: 'Epilogue' };
-const normKind = (v) => { const k = String(v || '').trim().toLowerCase(); return SCENE_KINDS.includes(k) ? k : ''; };
+/** Draftsmith types: the four Plot Weaver section types, plus Idea — a note kept with the
+    manuscript that isn't numbered, isn't linked to Plot Weaver and doesn't count toward words. */
+const DS_KINDS = [...SCENE_KINDS, 'idea'];
+const KIND_LABEL = { chapter: 'Chapter', prologue: 'Prologue', interlude: 'Interlude', epilogue: 'Epilogue', idea: 'Idea' };
+const normKind = (v) => { const k = String(v || '').trim().toLowerCase(); return DS_KINDS.includes(k) ? k : ''; };
+const isIdea = (c) => c.kind === 'idea';
 /** Guess a section type from a note name: "Prologue", "00 - Epilogue: After", "Interlude II"… */
-const guessKind = (name) => { const m = String(name || '').toLowerCase().match(/\b(prologue|epilogue|interlude)\b/); return m ? m[1] : 'chapter'; };
+const guessKind = (name) => { const m = String(name || '').toLowerCase().match(/\b(prologue|epilogue|interlude|idea)\b/); return m ? m[1] : 'chapter'; };
 /** The label in the # column and the number used in “Chapter {n}”: only true chapters are counted. */
 const chapterLabel = (c) => (c.kind === 'chapter' ? String(c.num) : KIND_LABEL[c.kind]);
 
@@ -30,24 +34,26 @@ function listChapters(p) {
       status: status == null ? '' : String(status), words: w, pov: fm[K.pov] == null ? '' : String(fm[K.pov]), pwChapter: fm[K.pwChapter] ? String(fm[K.pwChapter]) : '',
       pwIndex: fm[K.pwChapter] && pwIndex.has(String(fm[K.pwChapter])) ? pwIndex.get(String(fm[K.pwChapter])) : null,
       // A Plot Weaver section's type wins (it is shared); otherwise the note's own property.
-      kind: normKind(fm[K.pwChapter] && pwSec.has(String(fm[K.pwChapter])) ? pwSec.get(String(fm[K.pwChapter])).kind || 'chapter' : fm[K.kind]) || 'chapter',
+      kind: normKind(fm[K.kind]) === 'idea' ? 'idea' : normKind(fm[K.pwChapter] && pwSec.has(String(fm[K.pwChapter])) ? pwSec.get(String(fm[K.pwChapter])).kind || 'chapter' : fm[K.kind]) || 'chapter',
     };
   });
-  const byPlot = DSS().followPlotOrder && novel;
-  out.sort((a, b) => {
-    if (byPlot && a.pwIndex != null && b.pwIndex != null) return a.pwIndex - b.pwIndex;
-    if (byPlot && (a.pwIndex != null) !== (b.pwIndex != null)) return a.pwIndex != null ? -1 : 1;
-    const ao = Number.isFinite(a.order) ? a.order : 1e9, bo = Number.isFinite(b.order) ? b.order : 1e9;
-    return ao - bo || a.file.basename.localeCompare(b.file.basename, undefined, { numeric: true });
-  });
+  // Order: the order property first (so ideas and unlinked notes sit wherever you put them);
+  // then, if following Plot Weaver, linked chapters are re-sorted into board order within their own slots.
+  out.sort((a, b) => { const ao = Number.isFinite(a.order) ? a.order : 1e9, bo = Number.isFinite(b.order) ? b.order : 1e9; return ao - bo || a.file.basename.localeCompare(b.file.basename, undefined, { numeric: true }); });
+  if (DSS().followPlotOrder && novel) {
+    for (const c of out) if (c.kind === 'idea') c.pwIndex = null;
+    const slots = out.map((c, i) => (c.pwIndex != null ? i : -1)).filter((i) => i >= 0);
+    const linked = slots.map((i) => out[i]).sort((a, b) => a.pwIndex - b.pwIndex);
+    slots.forEach((slot, k) => { out[slot] = linked[k]; });
+  }
   let num = 0; out.forEach((c, i) => { c.n = i + 1; c.num = c.kind === 'chapter' ? ++num : null; c.label = chapterLabel(c); });
   return out;
 }
-const totalWords = (p) => listChapters(p).reduce((a, c) => a + (c.words || 0), 0);
+const totalWords = (p) => listChapters(p).filter((c) => !isIdea(c)).reduce((a, c) => a + (c.words || 0), 0);
 
 /** Plot Weaver cards placed in a chapter's column. */
 function cardsForChapter(p, c) {
-  const n = linkedNovel(p); if (!n || !c.pwChapter) return [];
+  const n = linkedNovel(p); if (!n || !c.pwChapter || isIdea(c)) return [];
   return (n.beats || []).filter((b) => b.chapterId === c.pwChapter && (!b.status || b.status === 'active'))
     .map((b) => ({ b, plotline: (n.plotlines || []).find((x) => x.id === b.plotlineId), pov: (n.povs || []).find((x) => x.id === b.povId) }));
 }
@@ -111,7 +117,7 @@ async function reorderChapters(p, list) {
   list.forEach((c, i) => { c.n = i + 1; });
   const n = linkedNovel(p);
   if (n) {
-    const linked = list.filter((c) => c.pwChapter && n.chapters.some((s) => s.id === c.pwChapter));
+    const linked = list.filter((c) => !isIdea(c) && c.pwChapter && n.chapters.some((s) => s.id === c.pwChapter));
     const slots = n.chapters.map((s, i) => (linked.some((c) => c.pwChapter === s.id) ? i : -1)).filter((i) => i >= 0);
     const secs = linked.map((c) => n.chapters.find((s) => s.id === c.pwChapter));
     const before = n.chapters.map((s) => s.id).join();
@@ -123,9 +129,28 @@ async function reorderChapters(p, list) {
 }
 /** Change a chapter's type (chapter/prologue/interlude/epilogue); also on its Plot Weaver section. */
 async function setChapterKind(p, c, kind) {
-  const n = linkedNovel(p); const sec = n && c.pwChapter && n.chapters.find((s) => s.id === c.pwChapter);
-  if (sec && sec.kind !== kind) { sec.kind = kind; if (HOST.plot) HOST.plot._sgCommit(); }
-  await setFm(c.file, (fm) => { fm[DSS().keys.kind] = kind; });
+  const K = DSS().keys; const n = linkedNovel(p); const sec = n && c.pwChapter && n.chapters.find((s) => s.id === c.pwChapter);
+  if (kind === 'idea') {
+    // An idea links to nothing: drop the Plot Weaver link (the board's section is left as it is).
+    await setFm(c.file, (fm) => { fm[K.kind] = 'idea'; delete fm[K.pwChapter]; });
+    if (sec) notice(`“${c.title}” is now an idea and no longer linked to Plot Weaver. Its board section “${sec.title}” was left as it is.`, 8000);
+  } else {
+    if (sec && sec.kind !== kind) { sec.kind = kind; if (HOST.plot) HOST.plot._sgCommit(); }
+    await setFm(c.file, (fm) => { fm[K.kind] = kind; });
+    if (isIdea(c) && n) notice(`“${c.title}” is now a ${KIND_LABEL[kind].toLowerCase()}. Use “link…” in the Plot Weaver column to put it on the board.`, 6000);
+  }
+  SG.refreshDraftsmithSoon();
+}
+/** Link a chapter to a Plot Weaver section — an existing one, or a new one placed after the previous linked chapter. */
+async function linkToPlot(p, c, secId) {
+  const n = linkedNovel(p); if (!n) return; const K = DSS().keys;
+  if (secId === '__new') {
+    const chs = listChapters(p); const prev = chs.slice(0, chs.indexOf(chs.find((x) => x.file.path === c.file.path))).reverse().find((x) => x.pwChapter && !isIdea(x));
+    const at = prev ? n.chapters.findIndex((s) => s.id === prev.pwChapter) + 1 : n.chapters.findIndex((s) => SCENE_KINDS.includes(s.kind || 'chapter'));
+    const sec = { id: Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4), title: titleFromName(c.title), kind: isIdea(c) ? 'chapter' : c.kind };
+    n.chapters.splice(at < 0 ? n.chapters.length : at, 0, sec); secId = sec.id; if (HOST.plot) HOST.plot._sgCommit();
+  }
+  await setFm(c.file, (fm) => { fm[K.pwChapter] = secId; if (fm[K.kind] === 'idea') fm[K.kind] = 'chapter'; });
   SG.refreshDraftsmithSoon();
 }
 
@@ -188,7 +213,8 @@ async function importChapters(p, files, opts = {}) {
     if (!pwId && novel && opts.matchPlot) {
       const want = [f.basename, titleFromName(f.basename), fm0.title].filter(Boolean).map((x) => String(x).toLowerCase());
       const hit = secs.find((c) => !taken.has(c.id) && want.includes(String(c.title || '').toLowerCase()));
-      if (hit) { pwId = hit.id; linked++; }
+      if (guessKind(f.basename) === 'idea') { /* ideas are never linked */ }
+      else if (hit) { pwId = hit.id; linked++; }
       else if (opts.createPlot) { const sec = { id: Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4), title: titleFromName(f.basename), kind: normKind(fm0[K.kind]) || guessKind(f.basename) }; novel.chapters.push(sec); pwId = sec.id; made++; }
       if (pwId) taken.add(pwId);
     }

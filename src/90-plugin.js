@@ -16,7 +16,7 @@ class StoryguildPlugin extends Plugin {
     adoptLegacySeries();
 
     /** A small public API (also used by the tests). */
-    this.api = { activeBook: () => activeProject(), books: () => DS().projects, series: () => allSeries(), createBook, createSeries, addToSeries, removeFromSeries, setActiveProject, openLibrary, newBookModal, newSeriesModal };
+    this.api = { importChapters: (files, opts) => importChapters(ensureProject(), files, opts), activeBook: () => activeProject(), books: () => DS().projects, series: () => allSeries(), createBook, createSeries, addToSeries, removeFromSeries, setActiveProject, openLibrary, newBookModal, newSeriesModal };
     this.registerView(VIEW_DS, (leaf) => new DraftsmithView(leaf));
     this.addRibbonIcon('feather', 'Open Draftsmith', () => this.openDraftsmith());
     const cmd = (id, name, fn) => this.addCommand({ id, name, callback: fn });
@@ -24,6 +24,8 @@ class StoryguildPlugin extends Plugin {
     cmd('new-chapter', 'Draftsmith: new chapter', () => new FormModal('New chapter', [{ key: 'title', label: 'Title', required: true }], 'Create', async (v) => openFile(await createChapter(ensureProject(), v.title.trim()))).open());
     cmd('start-draft', 'Draftsmith: start a new manuscript draft', () => { const p = ensureProject(); new ConfirmModal(`Start draft #${p.draft + 1}?`, 'A copy of every chapter note is saved as a snapshot first.', 'Start draft', () => startManuscriptDraft(p, '', false)).open(); });
     cmd('publish', 'Draftsmith: publish with the current settings', () => compileProject(ensureProject()));
+    cmd('import-chapters', 'Draftsmith: import existing chapter notes…', () => new ImportChaptersModal(ensureProject()).open());
+    this.addCommand({ id: 'add-note-as-chapter', name: 'Draftsmith: add this note as a chapter', checkCallback: (check) => { const f = this.app.workspace.getActiveFile(); if (!f || f.extension !== 'md' || isChapterFile(f)) return false; if (!check) new ConfirmModal(`Add “${f.basename}” as a chapter?`, `It moves into ${chaptersFolder(ensureProject())} of “${ensureProject().title}” (links stay intact) and becomes the last chapter.`, 'Add chapter', async () => { await importChapters(ensureProject(), [f], { mode: 'move', matchPlot: true, append: true }); notice(`“${f.basename}” is now a chapter.`); }).open(); return true; } });
     cmd('chapters-from-plot', 'Draftsmith: create chapter notes from Plot Weaver', async () => { const n = await chaptersFromPlot(ensureProject()); notice(`Created ${n} chapter notes.`); });
     cmd('open-readers', 'Draftsmith: open readers', () => { DS().ui.tab = 'readers'; this.openDraftsmith(); });
     cmd('open-checklist', 'Draftsmith: open publishing checklist', () => { DS().ui.tab = 'checklist'; this.openDraftsmith(); });

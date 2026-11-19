@@ -1,5 +1,6 @@
-/* Worldkeeper Home banner (Storyguild): one row of pills under the book info */
+/* Worldkeeper Home banner (Storyguild) */
 .wk .hd-hero > div:has(> .hd-sections) { flex: 1; min-width: 0; }
 .wk .hd-hero .hd-sections { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
-.wk .hd-hero .hd-sections-right { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
 .wk .hd-hero .hd-sec { cursor: pointer; font: inherit; font-size: .88em; height: auto; box-shadow: none; }
+.wk .hd-hero .hd-side { justify-content: flex-end; }
+.wk .hd-hero .hd-side-pills { display: flex; gap: 8px; flex-wrap: nowrap; justify-content: center; }

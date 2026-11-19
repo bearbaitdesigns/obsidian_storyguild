@@ -63,13 +63,15 @@ function renderManuscript(view, p, body) {
   const tools = el('div', { class: 'ds-row' }, el('h2', { class: 'ds-grow' }, 'Chapters'),
     btn('+ New chapter', () => new FormModal('New chapter', [{ key: 'title', label: 'Title', required: true }, { key: 'pov', label: 'POV (optional)' }], 'Create', async (v) => { const f = await createChapter(p, v.title.trim(), { pov: v.pov }); openFile(f); }).open()),
     novel ? btn('↻ Chapters from Plot Weaver', async () => { const n = await chaptersFromPlot(p); notice(n ? `Created ${n} chapter note${n === 1 ? '' : 's'} from Plot Weaver.` : 'Every Plot Weaver chapter already has a note.'); setTimeout(() => view.render(), 400); }, '', 'Create a note for each Plot Weaver chapter that has none') : null,
+    btn('⇪ Import chapter notes', () => new ImportChaptersModal(p).open(), '', 'Turn notes you already have into chapters'),
     btn('Draft history', () => draftHistoryModal(p)),
     btn(`Start draft #${p.draft + 1}`, () => new FormModal(`Start manuscript draft #${p.draft + 1}`, [{ key: 'note', label: 'What is this draft for?', placeholder: 'e.g. Post-beta revision' }, { key: 'bump', label: 'Also add 1 to every chapter’s draft number', type: 'checkbox', value: false }], 'Start draft', (v) => startManuscriptDraft(p, v.note, v.bump),
       `A read-only copy of all ${chs.length} chapter notes is saved to ${projectSub(p, 'snapshotFolder')}/Draft ${p.draft}/ first.`).open(), 'mod-cta'));
   body.append(tools);
   if (!chs.length) {
     body.append(card(null, el('p', {}, `No chapter notes yet. Draftsmith looks for notes in `, el('code', {}, chaptersFolder(p)), '.'),
-      hint('Create chapters here, move existing chapter notes into that folder, or point the project at another folder in Book details → Project.')));
+      el('div', { class: 'ds-row' }, btn('⇪ Import existing chapter notes…', () => new ImportChaptersModal(p).open(), 'mod-cta'), novel ? btn('↻ Chapters from Plot Weaver', async () => { await chaptersFromPlot(p); setTimeout(() => view.render(), 400); }) : null, btn('+ New chapter', () => new FormModal('New chapter', [{ key: 'title', label: 'Title', required: true }], 'Create', async (v) => openFile(await createChapter(p, v.title.trim()))).open())),
+      hint('Already writing in Obsidian? Import moves your chapter notes into this book (links stay intact) or uses their folder as is.')));
     return;
   }
   const K = DSS().keys; const sk = statusKey();

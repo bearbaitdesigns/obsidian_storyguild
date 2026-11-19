@@ -131,3 +131,93 @@ async function recount(f) {
   }
   SG.refreshDraftsmithSoon();
 }
+
+/* ---------- bring existing notes in as chapters ----------
+   Two ways: move the notes into the book's chapters folder (Obsidian updates
+   every link to them), or make their current folder the chapters folder (nothing
+   moves). Draftsmith only adds properties a note is missing, plus the chapter
+   order you chose; your text and other properties are left alone. */
+const naturalSort = (a, b) => a.basename.localeCompare(b.basename, undefined, { numeric: true, sensitivity: 'base' });
+const titleFromName = (name) => name.replace(/^\s*(?:ch(?:apter)?\.?\s*)?\d+[\s.)_:–—-]*/i, '').trim() || name;
+async function importChapters(p, files, opts = {}) {
+  const K = DSS().keys; const novel = linkedNovel(p); let moved = 0, linked = 0, made = 0;
+  if (opts.mode === 'folder' && opts.folder) p.chaptersFolder = normalizePath(opts.folder);
+  const dest = chaptersFolder(p); if (opts.mode === 'move') await ensureFolder(dest);
+  const secs = novel ? (novel.chapters || []).filter((c) => SCENE_KINDS.includes(c.kind || 'chapter')) : [];
+  const taken = new Set(listChapters(p).map((c) => c.pwChapter).filter(Boolean));
+  const start = opts.append ? listChapters(p).filter((c) => !files.includes(c.file)).length : 0;
+  for (let i = 0; i < files.length; i++) {
+    let f = files[i];
+    if (opts.mode === 'move' && !f.path.startsWith(dest + '/')) { const to = await uniquePath(`${dest}/${f.name}`); await app().fileManager.renameFile(f, to); f = app().vault.getAbstractFileByPath(to) || f; moved++; }
+    const text = await app().vault.read(f); const words = countWords(text); SG.wordCache.set(f.path, words);
+    const fm0 = fmOf(f); let pwId = fm0[K.pwChapter] ? String(fm0[K.pwChapter]) : '';
+    if (!pwId && novel && opts.matchPlot) {
+      const want = [f.basename, titleFromName(f.basename), fm0.title].filter(Boolean).map((x) => String(x).toLowerCase());
+      const hit = secs.find((c) => !taken.has(c.id) && want.includes(String(c.title || '').toLowerCase()));
+      if (hit) { pwId = hit.id; linked++; }
+      else if (opts.createPlot) { const sec = { id: Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4), title: titleFromName(f.basename), kind: 'chapter' }; novel.chapters.push(sec); pwId = sec.id; made++; }
+      if (pwId) taken.add(pwId);
+    }
+    await setFm(f, (fm) => {
+      const put = (k, v) => { if (k && (fm[k] === undefined || fm[k] === null || fm[k] === '')) fm[k] = v; };
+      put(K.project, `[[${p.title}]]`); fm[K.chapter] = start + i + 1; put(K.draft, 1); put(statusKey(), statusDefs()[0].name); fm[wordsKey()] = words;
+      if (pwId) fm[K.pwChapter] = pwId;
+    });
+  }
+  if (made && HOST.plot) HOST.plot._sgCommit();
+  SG.saveSoon(); SG.refreshAll();
+  return { count: files.length, moved, linked, made };
+}
+
+class ImportChaptersModal extends Modal {
+  constructor(p) { super(SG.app); this.p = p; this.folder = ''; this.files = []; this.on = new Set(); this.mode = 'move'; this.matchPlot = true; this.createPlot = false; this.sub = false; }
+  onOpen() { this.modalEl.addClass('ds-lib-modal'); this.draw(); }
+  onClose() { this.contentEl.empty(); }
+  folders() {
+    const dest = chaptersFolder(this.p); const set = new Map();
+    for (const f of app().vault.getMarkdownFiles()) { const d = f.path.split('/').slice(0, -1).join('/'); if (d.startsWith(app().vault.configDir) || d === dest) continue; set.set(d, (set.get(d) || 0) + 1); }
+    return [...set.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }
+  load() {
+    const d = this.folder; const deep = this.sub;
+    this.files = app().vault.getMarkdownFiles().filter((f) => { const dir = f.path.split('/').slice(0, -1).join('/'); return deep ? (d ? f.path.startsWith(d + '/') : true) : dir === d; })
+      .filter((f) => !f.path.startsWith(chaptersFolder(this.p) + '/')).sort(naturalSort);
+    this.on = new Set(this.files.map((f) => f.path));
+  }
+  draw() {
+    const c = this.contentEl; c.empty(); c.addClass('ds-modal', 'ds-import'); const p = this.p; const novel = linkedNovel(p); const dest = chaptersFolder(p);
+    c.append(el('h2', {}, 'Bring in existing chapter notes'), el('p', { class: 'ds-hint' }, `Turn notes you already have into chapters of “${p.title}”. Your text and properties are kept; Draftsmith only adds what’s missing (chapter number, draft, status, word count).`));
+    const fsel = el('select', { class: 'dropdown' }, el('option', { value: '' }, 'Choose the folder your chapters are in…'), this.folders().map(([d, n]) => el('option', { value: d || '/', selected: (this.folder || null) === d || (d === '' && this.folder === '/') }, `${d || '(vault root)'} — ${n} note${n === 1 ? '' : 's'}`)));
+    fsel.addEventListener('change', () => { this.folder = fsel.value === '/' ? '' : fsel.value; this.picked = !!fsel.value; this.load(); this.draw(); });
+    const sub = el('input', { type: 'checkbox', checked: this.sub }); sub.addEventListener('change', () => { this.sub = sub.checked; if (this.picked) this.load(); this.draw(); });
+    c.append(el('div', { class: 'ds-field' }, el('label', {}, 'Source folder'), fsel), el('label', { class: 'ds-toggle' }, sub, ' Include notes in sub-folders'),
+      el('div', { class: 'ds-row' }, el('span', { class: 'ds-hint ds-grow' }, 'Or add notes one at a time:'), btn('+ Add a note…', () => new FilePick((f) => f.extension === 'md' && !this.files.includes(f) && !f.path.startsWith(dest + '/'), (f) => { this.files.push(f); this.on.add(f.path); this.picked = true; this.draw(); }, 'Add a note as a chapter…').open(), 'ds-sm')));
+    if (!this.files.length) { c.append(el('p', { class: 'ds-hint' }, this.picked ? 'No notes there that aren’t chapters already.' : '')); return; }
+    const list = el('div', { class: 'ds-import-list' });
+    this.files.forEach((f, i) => {
+      const cb = el('input', { type: 'checkbox', checked: this.on.has(f.path) }); cb.addEventListener('change', () => { cb.checked ? this.on.add(f.path) : this.on.delete(f.path); this.draw(); });
+      const mv = (d) => () => { const j = i + d; if (j < 0 || j >= this.files.length) return; [this.files[i], this.files[j]] = [this.files[j], this.files[i]]; this.draw(); };
+      const n = [...this.files.slice(0, i + 1)].filter((x) => this.on.has(x.path)).length;
+      list.append(el('div', { class: 'ds-import-row' + (this.on.has(f.path) ? '' : ' is-off') }, cb, el('span', { class: 'ds-lib-no' }, this.on.has(f.path) ? String(n) : '–'),
+        el('span', { class: 'ds-grow' }, f.basename, el('small', { class: 'ds-hint' }, `  ${f.path.split('/').slice(0, -1).join('/') || '/'}`)), btn('↑', mv(-1), 'clickable-icon ds-sm'), btn('↓', mv(1), 'clickable-icon ds-sm')));
+    });
+    c.append(el('div', { class: 'ds-row' }, el('b', { class: 'ds-grow' }, `Chapter order (${this.on.size} selected)`), el('span', { class: 'ds-hint' }, 'Sorted by file name; use ↑ ↓ to change.')), list);
+    const oneFolder = new Set(this.files.filter((f) => this.on.has(f.path)).map((f) => f.path.split('/').slice(0, -1).join('/')));
+    const canUse = oneFolder.size === 1 && !this.sub && listChapters(p).length === 0;
+    if (!canUse && this.mode === 'folder') this.mode = 'move';
+    const radio = (v, label, desc, disabled) => { const r = el('input', { type: 'radio', name: 'ds-imp-mode', checked: this.mode === v, disabled }); r.addEventListener('change', () => { this.mode = v; this.draw(); }); return el('label', { class: 'ds-radio' + (disabled ? ' is-off' : '') }, r, el('div', {}, el('b', {}, label), el('div', { class: 'ds-hint' }, desc))); };
+    c.append(el('div', { class: 'ds-field' }, el('label', {}, 'How'),
+      radio('move', `Move them into ${dest}`, 'Obsidian updates every link to these notes, so nothing breaks.', false),
+      radio('folder', `Keep them where they are`, canUse ? `“${[...oneFolder][0] || '/'}” becomes this book’s chapters folder. Nothing moves.` : 'Only when all chosen notes are in one folder (no sub-folders) and this book has no chapters yet.', !canUse)));
+    if (novel) {
+      const m = el('input', { type: 'checkbox', checked: this.matchPlot }); m.addEventListener('change', () => { this.matchPlot = m.checked; this.draw(); });
+      const cp = el('input', { type: 'checkbox', checked: this.createPlot, disabled: !this.matchPlot }); cp.addEventListener('change', () => { this.createPlot = cp.checked; });
+      c.append(el('label', { class: 'ds-toggle' }, m, ` Link to Plot Weaver chapters with the same title (“${novel.title}”)`), el('br'), el('label', { class: 'ds-toggle' }, cp, ' Add a Plot Weaver chapter for any note without a match'));
+    }
+    const chosen = this.files.filter((f) => this.on.has(f.path));
+    c.append(el('div', { class: 'ds-modal-actions' }, btn('Cancel', () => this.close()), el('button', { class: 'mod-cta', disabled: !chosen.length, onclick: async () => {
+      this.close(); const r = await importChapters(p, chosen, { mode: this.mode, folder: [...oneFolder][0], matchPlot: this.matchPlot, createPlot: this.createPlot, append: true });
+      notice(`Imported ${r.count} chapter${r.count === 1 ? '' : 's'}${r.moved ? ` (moved ${r.moved})` : ''}${r.linked ? ` · linked ${r.linked} to Plot Weaver` : ''}${r.made ? ` · ${r.made} new Plot Weaver chapters` : ''}.`, 8000);
+    } }, `Import ${chosen.length} chapter${chosen.length === 1 ? '' : 's'}`)));
+  }
+}

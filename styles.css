@@ -153,6 +153,11 @@
 .ds-lib-book.is-current { background: color-mix(in srgb, var(--interactive-accent) 10%, transparent); border-radius: 6px; }
 .ds-lib-no { width: 28px; color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
 .ds-lib .ds-lib-book select { width: auto !important; }
+.ds-import-list { max-height: 300px; overflow: auto; border: 1px solid var(--background-modifier-border); border-radius: 6px; margin: 6px 0 12px; }
+.ds-import-row { display: flex; gap: 8px; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--background-modifier-border-hover); }
+.ds-import-row.is-off { opacity: .5; }
+.ds-radio { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; } .ds-radio.is-off { opacity: .5; }
+.ds-modal .ds-radio input, .ds-modal .ds-toggle input, .ds-modal .ds-import-row input { width: auto; }
 
 /* ---- Worldkeeper ---- */
 /* ==========================================================================
@@ -2062,8 +2067,9 @@ body.wk-white-links a.internal-link:not(.is-unresolved), body.wk-white-links .cm
 }
 
 /* ---- Storyguild additions to Worldkeeper ---- */
-/* Worldkeeper Home banner (Storyguild): one row of pills under the book info */
+/* Worldkeeper Home banner (Storyguild) */
 .wk .hd-hero > div:has(> .hd-sections) { flex: 1; min-width: 0; }
 .wk .hd-hero .hd-sections { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
-.wk .hd-hero .hd-sections-right { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
 .wk .hd-hero .hd-sec { cursor: pointer; font: inherit; font-size: .88em; height: auto; box-shadow: none; }
+.wk .hd-hero .hd-side { justify-content: flex-end; }
+.wk .hd-hero .hd-side-pills { display: flex; gap: 8px; flex-wrap: nowrap; justify-content: center; }

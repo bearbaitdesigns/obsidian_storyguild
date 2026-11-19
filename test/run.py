@@ -102,6 +102,25 @@ async def main():
             return fs.map(f => [f.basename, app.metadataCache.getFileCache(f).frontmatter]); }""")
         print('4. chapter props:', json.dumps(r, ensure_ascii=False))
         assert any(x[1].get('words', 0) > 50 for x in r), 'word count property should update'
+        # Import existing chapter notes through the dialog
+        r = await ev("""async () => {
+          await app.vault.create('Manuscript/01 - Prologue.md', 'The harbor remembers.\\n');
+          await app.vault.create('Manuscript/02 - Ballast.md', '---\\nstatus: Revising\\npov: Teodor\\n---\\nTeodor counted crates.\\n');
+          await app.vault.create('Manuscript/10 - Spring Tide.md', 'The water came back.\\n');
+          const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view; v.setTab('manuscript'); await new Promise(r => setTimeout(r, 200));
+          [...document.querySelectorAll('.ds-root button')].find(b => b.textContent.includes('Import chapter notes')).click(); await new Promise(r => setTimeout(r, 100));
+          const m = __modals[__modals.length - 1]; const sel = m.contentEl.querySelector('select'); sel.value = 'Manuscript'; sel.dispatchEvent(new Event('change'));
+          await new Promise(r => setTimeout(r, 50));
+          const order = [...m.contentEl.querySelectorAll('.ds-import-row')].map(x => x.textContent.slice(0, 30));
+          const boxes = m.contentEl.querySelectorAll('input[type=checkbox]'); const create = [...m.contentEl.querySelectorAll('label.ds-toggle')].find(l => l.textContent.includes('Add a Plot Weaver chapter')).querySelector('input'); create.checked = true; create.dispatchEvent(new Event('change'));
+          [...m.contentEl.querySelectorAll('button')].find(b => b.textContent.startsWith('Import 3')).click(); await new Promise(r => setTimeout(r, 900));
+          const fs = app.vault.getMarkdownFiles().filter(f => f.path.startsWith('Novels/The Salt Lantern/Chapters/'));
+          return { order, files: fs.map(f => [f.basename, app.metadataCache.getFileCache(f).frontmatter]), pwChapters: SGP.sections.plot.data.novels[0].chapters.map(c => c.title), notice: __notices[__notices.length - 1], left: app.vault.getMarkdownFiles().filter(f => f.path.startsWith('Manuscript/')).length };
+        }""")
+        print('4b. import chapters:', json.dumps(r, ensure_ascii=False))
+        assert r['left'] == 0 and len(r['files']) == 6 and 'Prologue' in r['pwChapters']
+        ball = [f for f in r['files'] if f[0] == '02 - Ballast'][0][1]
+        assert ball['status'] == 'Revising' and ball['pov'] == 'Teodor' and ball['chapter'] == 5
         await page.wait_for_timeout(500)
         await page.screenshot(path=f'{OUT}/02-manuscript.png', full_page=True)
 

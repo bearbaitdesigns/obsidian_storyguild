@@ -3,7 +3,7 @@
 Write, plan and build your novel in one Obsidian plugin. Storyguild has three sections:
 
 - **Draftsmith** — your manuscript: chapter notes, draft numbers, book details, alpha/beta reader rounds with questions and answers, publishing checklists, and publishing to PDF, Word, EPUB or Markdown.
-- **Worldkeeper** — worldbuilding sheets, dashboards, encyclopedia, Home, milestones and to-do list. The Home banner has Plot Weaver and Draftsmith pills under the book's details, and Encyclopedia and World Atlas pills on the same row at the right edge.
+- **Worldkeeper** — worldbuilding sheets, dashboards, encyclopedia, Home, milestones and to-do list. The Home banner has Plot Weaver and Draftsmith pills under the book's details. On the right, the goal ring sits above the Encyclopedia and World Atlas pills.
 - **Plot Weaver** — plotlines × chapters board, POVs, off-screen events, cause and effect.
 
 All three sections share **books and series**. The current book is the same everywhere. You can start a new book, create a series, or add an existing book to a series from **📚 Books & series**. It's on the ribbon, in the Draftsmith header, on the Worldkeeper Home banner and in the command palette (**New book…**, **New series…**, **Add a book to a series…**, **Switch book…**). A novel created in Plot Weaver becomes a book automatically, and switching novels in Plot Weaver switches the book everywhere.
@@ -59,6 +59,11 @@ Edit a shared field anywhere and it changes everywhere.
   - **Start draft #N** saves a copy of every chapter to `Drafts/Draft N/` before the new draft begins.
   - Word counts are written to the `words` property as you type. You can turn this off.
   - **Chapters from Plot Weaver** creates a note for each chapter on the board.
+  - **⇪ Import chapter notes** turns notes you already have into chapters.
+    - Pick a folder (or single notes) and set the order. Then either move the notes into the book's chapters folder, where Obsidian keeps every link working, or keep them where they are and use that folder as the chapters folder.
+    - Your text and properties are kept. Draftsmith only adds the chapter number, draft, status and word count.
+    - Notes can be matched to Plot Weaver chapters with the same title, or get a new Plot Weaver chapter.
+    - The command **Add this note as a chapter** does the same for the note you have open.
 - **Book details** — cover, title, subtitle, series, author and pen name, genre, audience, logline, blurb, short and full synopsis, comps, keywords, ISBNs, imprint, dates, dedication, acknowledgments and bio. You can add your own fields, and all property names are configurable.
 - **Readers** — Run any number of alpha and beta rounds.
   - Each send records the date it was sent, the format, the manuscript version, the due date and its status.

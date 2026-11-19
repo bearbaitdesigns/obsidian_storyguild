@@ -1,9 +1,13 @@
 {
   "name": "obsidian-storyguild",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Storyguild for Obsidian: Draftsmith, Worldkeeper and Plot Weaver in one plugin",
   "private": true,
   "author": "bearbaitdesigns",
   "license": "MIT",
-  "scripts": { "build": "node scripts/build.mjs", "test": "node scripts/build.mjs && python3 test/run.py", "bump": "node scripts/bump.mjs" }
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs && python3 test/run.py",
+    "bump": "node scripts/bump.mjs"
+  }
 }

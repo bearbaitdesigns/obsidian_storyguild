@@ -3,7 +3,7 @@
    ===================================================================== */
 class StoryguildPlugin extends Plugin {
   async onload() {
-    SG = this; HOST.plugin = this; HOST.sharedWords = sharedWords; HOST.coverPath = coverPath;
+    SG = this; HOST.plugin = this; HOST.sharedWords = sharedWords; HOST.coverPath = coverPath; HOST.sectionPills = sectionPills; HOST.booksButton = booksButton;
     this.wordCache = new Map(); this.sections = {}; this._timers = {};
     const raw = (await this.loadData()) || {};
     this.data = Object.assign(clone(DEFAULT_DATA), raw);
@@ -12,8 +12,11 @@ class StoryguildPlugin extends Plugin {
     const ms = this.data.manuscript = Object.assign(clone(DEFAULT_DATA.manuscript), raw.manuscript || {});
     ms.settings = Object.assign(clone(DEFAULT_DS_SETTINGS), ms.settings || {}); ms.settings.keys = Object.assign(clone(DEFAULT_DS_SETTINGS.keys), (raw.manuscript && raw.manuscript.settings && raw.manuscript.settings.keys) || {});
     ms.ui = Object.assign({ tab: 'manuscript', round: '' }, ms.ui || {});
-    ms.projects = (ms.projects || []).map(normalizeProject);
+    ms.projects = (ms.projects || []).map(normalizeProject); ms.series = Array.isArray(ms.series) ? ms.series : [];
+    adoptLegacySeries();
 
+    /** A small public API (also used by the tests). */
+    this.api = { activeBook: () => activeProject(), books: () => DS().projects, series: () => allSeries(), createBook, createSeries, addToSeries, removeFromSeries, setActiveProject, openLibrary, newBookModal, newSeriesModal };
     this.registerView(VIEW_DS, (leaf) => new DraftsmithView(leaf));
     this.addRibbonIcon('feather', 'Open Draftsmith', () => this.openDraftsmith());
     const cmd = (id, name, fn) => this.addCommand({ id, name, callback: fn });
@@ -24,6 +27,12 @@ class StoryguildPlugin extends Plugin {
     cmd('chapters-from-plot', 'Draftsmith: create chapter notes from Plot Weaver', async () => { const n = await chaptersFromPlot(ensureProject()); notice(`Created ${n} chapter notes.`); });
     cmd('open-readers', 'Draftsmith: open readers', () => { DS().ui.tab = 'readers'; this.openDraftsmith(); });
     cmd('open-checklist', 'Draftsmith: open publishing checklist', () => { DS().ui.tab = 'checklist'; this.openDraftsmith(); });
+    cmd('new-book', 'New book…', () => newBookModal());
+    cmd('new-series', 'New series…', () => newSeriesModal());
+    cmd('add-book-to-series', 'Add a book to a series…', () => addBookToSeriesModal(null));
+    cmd('books-and-series', 'Books & series…', () => openLibrary());
+    cmd('switch-book', 'Switch book…', () => new BookSwitcher().open());
+    this.addRibbonIcon('library-big', 'Books & series', () => openLibrary());
     cmd('import-old', 'Import from Worldkeeper / Plot Weaver…', async () => { const f = await detectOld(); if (!f.world && !f.plot) notice('Worldkeeper and Plot Weaver were not found in this vault.'); else new MigrationModal(f, true).open(); });
     this.addSettingTab(new StoryguildSettingTab(this));
 
@@ -58,6 +67,9 @@ class StoryguildPlugin extends Plugin {
       if (sub) {
         HOST.plot = sub; sub._sgCommit = sub.commit.bind(sub);
         sub.commit = () => { sub._sgCommit(); try { onPlotCommit(); } catch (e) { console.error(e); } };
+        const addNovel = sub.addNovel.bind(sub); sub.addNovel = (n) => { addNovel(n); try { adoptPlotNovel(n); } catch (e) { console.error(e); } };
+        const delNovel = sub.deleteNovel.bind(sub); sub.deleteNovel = (id) => { delNovel(id); for (const p of DS().projects) if (p.pwNovelId === id) p.pwNovelId = ''; SG.saveSoon(); SG.refreshDraftsmith(); };
+        this._pwActive = sub.data.activeNovelId;
         for (const p of DS().projects) if (!p.pwNovelId && plotNovels().length && this.data.migration.mode !== 'fresh') { const n = plotNovels().find((x) => x.title === p.title); if (n) p.pwNovelId = n.id; }
       }
     }
@@ -65,6 +77,9 @@ class StoryguildPlugin extends Plugin {
       const sub = await this.loadSection('world', WorldkeeperModule, 'Worldkeeper');
       if (sub) { HOST.world = sub; bindWorldNovel(sub); syncRoundsToWorld(); }
     }
+    syncSeries();
+    const cur = activeProject(); const n = cur && linkedNovel(cur);
+    if (n && HOST.plot && HOST.plot.data.activeNovelId !== n.id) { HOST.plot.data.activeNovelId = n.id; this._pwActive = n.id; HOST.plot._sgCommit(); }
     this.refreshAll();
   }
   async loadSection(key, Cls, name) {

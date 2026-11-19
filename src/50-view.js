@@ -22,18 +22,22 @@ class DraftsmithView extends ItemView {
     const root = this.contentEl; const scroll = root.scrollTop; root.empty(); root.addClass('ds-root');
     const p = ensureProject(); const ui = DS().ui; if (!DS_TABS.some((t) => t[0] === ui.tab)) ui.tab = 'manuscript';
     // header
-    const sel = el('select', { class: 'dropdown ds-proj' }, DS().projects.map((x) => el('option', { value: x.id, selected: x.id === p.id }, x.title)), el('option', { value: '__new' }, '+ New project…'));
+    const opt = (x) => el('option', { value: x.id, selected: x.id === p.id }, (x.seriesNo ? `${x.seriesNo}. ` : '') + x.title);
+    const sel = el('select', { class: 'dropdown ds-proj' },
+      allSeries().filter((s) => s.books.length).map((s) => el('optgroup', { label: s.name }, s.books.map((id) => projectById(id)).filter(Boolean).map(opt))),
+      DS().projects.some((x) => !seriesOf(x)) ? el('optgroup', { label: 'Standalone' }, DS().projects.filter((x) => !seriesOf(x)).map(opt)) : null,
+      el('option', { value: '__new' }, '+ New book…'));
     sel.addEventListener('change', () => {
-      if (sel.value === '__new') { sel.value = p.id; new FormModal('New project', [{ key: 'title', label: 'Title', required: true }], 'Create', (v) => { const np = makeProject(v.title.trim()); DS().projects.push(np); DS().activeId = np.id; SG.saveSoon(); SG.refreshAll(); }).open(); return; }
-      DS().activeId = sel.value; SG.saveSoon(); SG.refreshAll(); syncRoundsToWorld();
+      if (sel.value === '__new') { sel.value = p.id; newBookModal(); return; }
+      setActiveProject(sel.value);
     });
     const stage = el('select', { class: 'dropdown' }, STAGES.map((s) => el('option', { selected: s === p.stage }, s)));
     stage.addEventListener('change', () => setProjectField(p, 'stage', stage.value));
     const cov = resourceUrl(p.cover);
     root.append(el('div', { class: 'ds-head' },
       el('div', { class: 'ds-cover-sm', onclick: () => this.setTab('details'), title: 'Book details' }, cov ? el('img', { src: cov }) : el('span', {}, p.title.slice(0, 1))),
-      el('div', { class: 'ds-head-main' }, el('div', { class: 'ds-row' }, sel, linkedNovel(p) ? pill('🧵 ' + linkedNovel(p).title, 'is-pw', null) : null),
-        el('h1', {}, p.title), el('div', { class: 'ds-sub' }, [p.series ? `${p.series}${p.seriesNo ? ' #' + p.seriesNo : ''}` : '', p.genre, p.penName || p.author].filter(Boolean).join(' · '))),
+      el('div', { class: 'ds-head-main' }, el('div', { class: 'ds-row' }, sel, btn('📚 Books & series', () => openLibrary(), 'ds-sm'), linkedNovel(p) ? pill('🧵 ' + linkedNovel(p).title, 'is-pw', null) : null),
+        el('h1', {}, p.title), el('div', { class: 'ds-sub' }, [seriesLine(p), p.genre, p.penName || p.author].filter(Boolean).join(' · '))),
       el('div', { class: 'ds-draftbox' }, el('small', {}, 'Manuscript draft'), el('b', {}, '#' + p.draft), stage)));
     root.append(el('div', { class: 'ds-tabs' }, DS_TABS.map(([k, l]) => el('button', { class: ui.tab === k ? 'is-on' : '', onclick: () => this.setTab(k) }, l))));
     const body = el('div', { class: 'ds-body' }); root.append(body);

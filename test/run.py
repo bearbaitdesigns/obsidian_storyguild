@@ -143,6 +143,24 @@ async def main():
         await ev("""async () => { app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view.setTab('details'); await new Promise(r => setTimeout(r, 200)); }""")
         await page.screenshot(path=f'{OUT}/05-details.png', full_page=True)
 
+        # Books & series across all sections
+        r = await ev("""async () => { const A = SGP.api; const b1 = A.activeBook();
+          const s = A.createSeries('Tidebound', [b1.id]);
+          const b2 = A.createBook({ title: 'The Ninth Bell', seriesId: s.id }); await new Promise(r => setTimeout(r, 300));
+          const pw = SGP.sections.plot.data; const n2 = pw.novels.find(n => n.id === b2.pwNovelId);
+          const out = { b1: [b1.series, b1.seriesNo], b2: [b2.series, b2.seriesNo], n2links: n2.links, active: A.activeBook().title, pwActive: pw.activeNovelId === n2.id, wkSeries: SGP.sections.world.settings.novel.series, wkTitle: SGP.sections.world.settings.novel.title };
+          pw.activeNovelId = 'n1'; SGP.sections.plot.commit(); await new Promise(r => setTimeout(r, 100));
+          out.afterPwSwitch = A.activeBook().title;
+          SGP.sections.plot.addNovel({ id: 'side', title: 'Side Story', plotlines: [], povs: [], slots: [], chapters: [], beats: [], manuscriptOrder: [], links: [] });
+          out.adopted = A.books().map(b => b.title); A.setActiveProject(b1.id);
+          SGP.openLibrary = null; A.openLibrary(); await new Promise(r => setTimeout(r, 100)); out.lib = __modals[__modals.length-1].contentEl.textContent.slice(0, 160);
+          return out; }""")
+        print('6b. books & series:', json.dumps(r, ensure_ascii=False))
+        assert r['b2'] == ['Tidebound', '2'] and 'n1' in r['n2links'] and r['active'] == 'The Ninth Bell' and r['pwActive'] and r['wkSeries'] == 'Tidebound · Book 2'
+        assert r['afterPwSwitch'] == 'The Salt Lantern (rev)' and 'Side Story' in r['adopted']
+        await page.screenshot(path=f'{OUT}/07-library.png')
+        await ev("() => { const m = __modals[__modals.length-1]; m.close(); }")
+
         # Publish all formats
         outs = {}
         for fmt, extra in [('pdf', {}), ('docx', {}), ('epub', {}), ('md', {}), ('pdf', {'manuscriptFormat': True}), ('docx', {'manuscriptFormat': True})]:
@@ -162,8 +180,11 @@ async def main():
           const home = document.querySelector('.wk-home'); const t = home ? home.querySelector('h1').textContent : null;
           const ms = home ? home.textContent.includes('Beta readers') : false;
           app.commands.executeCommandById('plot-weaver:open-board'); await new Promise(r => setTimeout(r, 600));
-          return { homeTitle: t, milestones: ms, board: !!document.querySelector('.workspace-leaf-content [class*=pw]'), cmds: Object.keys(app.commands.commands).length }; }""")
+          window.__homeShot = true; return { homeTitle: t, milestones: ms, board: !!document.querySelector('.workspace-leaf-content [class*=pw]'), cmds: Object.keys(app.commands.commands).length }; }""")
         print('8. other sections:', r)
+        await ev("async () => { app.commands.executeCommandById('worldkeeper:open-home'); await new Promise(r => setTimeout(r, 600)); document.querySelector('.wk-home').scrollIntoView(); }")
+        el = await page.query_selector('.wk-home .hd-hero')
+        await el.screenshot(path=f'{OUT}/08-wk-banner.png')
         assert r['homeTitle'] == 'The Salt Lantern (rev)'
 
         # Unload cleanly

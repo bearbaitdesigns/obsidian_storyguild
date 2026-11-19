@@ -52,12 +52,11 @@ const STAGES = ['Planning', 'First draft', 'Second draft', 'Revising', 'Editing'
 const FORMATS = ['PDF', 'Word (.docx)', 'EPUB', 'Google Doc', 'Print copy', 'Other'];
 const SEND_STATUS = ['Not sent', 'Sent', 'Reading', 'Finished', 'Feedback in', 'Dropped'];
 const NOTE_TYPES = ['Big picture', 'Praise', 'Confusion', 'Pacing', 'Character', 'Plot hole', 'Line', 'Other'];
-const Q_TYPES = { text: 'Written answer', scale: 'Scale 1–5', yesno: 'Yes / No', choice: 'Multiple choice' };
 const READER_COLORS = ['#a882ff', '#5aa6e0', '#e0b04f', '#5fb98a', '#e06c6c', '#c78bd6', '#6fc1d9', '#d9a46f'];
 
 const DEFAULT_QUESTIONS = {
   alpha: ['Did the premise hook you? Where did you start to care?', 'Were there places you were confused about what was happening or why?', 'Which characters felt most and least real?', 'Where did the story drag?', 'Did the ending feel earned?'],
-  beta: ['Where (if anywhere) did you put the book down?', 'Rate the pacing overall', 'Did any scene or reveal feel unbelievable?', 'Who was your favourite character, and why?', 'Would you recommend this book to a friend?'],
+  beta: ['Where (if anywhere) did you put the book down?', 'How did the pacing feel overall?', 'Did any scene or reveal feel unbelievable?', 'Who was your favourite character, and why?', 'Would you recommend this book to a friend? Why or why not?'],
 };
 
 /** Publishing checklists. [text, auto-check key?, due?, done?] */
@@ -111,7 +110,7 @@ function makeProject(title) {
     cover: '', logline: '', blurb: '', synopsisShort: '', synopsis: '', comps: '', keywords: '', bisac: '',
     publisher: '', isbnEbook: '', isbnPrint: '', pubDate: '', copyright: String(new Date().getFullYear()),
     dedication: '', acknowledgments: '', bio: '', extra: [],
-    folder: `Novels/${safeName(title || 'My Novel')}`, chaptersFolder: '', pwNovelId: '',
+    folder: `Novels/${safeName(title || 'My Novel')}`, chaptersFolder: '', pwNovelId: '', seriesId: '', pwSeriesLinks: [],
     readers: [], rounds: [], comments: [], checklists: makeChecklists(), checklistTab: 'draft',
     compile: clone(DEFAULT_COMPILE),
   };
@@ -135,7 +134,7 @@ const DEFAULT_DATA = {
   version: 1,
   modules: { world: true, plot: true },
   migration: { state: 'new' }, // new | postponed | done
-  manuscript: { projects: [], activeId: '', settings: DEFAULT_DS_SETTINGS, ui: { tab: 'manuscript', round: '' } },
+  manuscript: { projects: [], series: [], activeId: '', settings: DEFAULT_DS_SETTINGS, ui: { tab: 'manuscript', round: '' } },
   world: null, // Worldkeeper settings (its old data.json)
   plot: null, // Plot Weaver data (its old data.json)
 };

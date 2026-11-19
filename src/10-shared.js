@@ -54,19 +54,29 @@ function setProjectField(p, key, value) {
 /** Plot Weaver changed something: pick up a renamed novel and refresh Draftsmith. */
 function onPlotCommit() {
   let changed = false;
+  // Switched novel in Plot Weaver → switch book everywhere.
+  const act = HOST.plot && HOST.plot.data.activeNovelId;
+  if (act && act !== SG._pwActive) {
+    SG._pwActive = act; const p = DS().projects.find((x) => x.pwNovelId === act);
+    if (p && p.id !== DS().activeId) { DS().activeId = p.id; changed = true; syncRoundsToWorld(p); if (HOST.world) HOST.world.refreshSoon(100); }
+  }
   for (const p of DS().projects) { const n = linkedNovel(p); if (n && n.title && n.title !== p.title) { p.title = n.title; changed = true; } }
   if (changed) SG.saveSoon();
   SG.refreshDraftsmith();
 }
 
-/* ---------- Worldkeeper novel settings ⇄ project ---------- */
+/* ---------- Worldkeeper novel settings ⇄ current book ---------- */
 const WORLD_SHARED = {
-  title: ['title'], series: ['series'], audience: ['audience'], logline: ['logline'], synopsis: ['synopsisShort'],
+  title: ['title'], audience: ['audience'], logline: ['logline'], synopsis: ['synopsisShort'],
   goal: ['targetWords', (v) => Number(v) || 0], deadline: ['deadline'], stage: ['stage'],
   genre: ['genre', null, (v) => String(v || '').split(',').map((x) => x.trim()).filter(Boolean), (v) => (Array.isArray(v) ? v.join(', ') : String(v || ''))],
 };
+/** Worldkeeper Home values that belong to each book rather than to the world. */
+const WORLD_PER_BOOK = { milestones: [], banner: '', bannerPosition: 60, bannerStyle: 'clear', manualWords: 0, pov: '' };
 function bindWorldNovel(world) {
   const nv = world.settings && world.settings.novel; if (!nv) return;
+  const first = activeProject();
+  if (first && !first.wk) { first.wk = {}; for (const k of Object.keys(WORLD_PER_BOOK)) first.wk[k] = nv[k] !== undefined ? nv[k] : clone(WORLD_PER_BOOK[k]); }
   for (const [wkKey, [pKey, num, toWorld, fromWorld]] of Object.entries(WORLD_SHARED)) {
     Object.defineProperty(nv, wkKey, {
       enumerable: true, configurable: true,
@@ -74,7 +84,25 @@ function bindWorldNovel(world) {
       set: (v) => { const p = ensureProject(); let x = fromWorld ? fromWorld(v) : v; if (num) x = num(x); if (p[pKey] !== x) setProjectField(p, pKey, x); },
     });
   }
-  // Worldkeeper's Home tracks the Plot Weaver novel linked to the project.
+  // The series line: shown as "Series · Book N"; typing a series name in Worldkeeper puts the book in that series.
+  Object.defineProperty(nv, 'series', {
+    enumerable: true, configurable: true, get: () => seriesLine(activeProject()),
+    set: (v) => {
+      const p = ensureProject(); const name = String(v || '').replace(/[\s,·:–—-]*\bbook\s*\d+\s*$/i, '').trim();
+      if (!name) { if (seriesOf(p)) removeFromSeries(p); return; }
+      if (seriesOf(p) && seriesOf(p).name === name) return;
+      const s = allSeries().find((x) => x.name.toLowerCase() === name.toLowerCase()) || createSeries(name);
+      addToSeries(p, s.id);
+    },
+  });
+  for (const k of Object.keys(WORLD_PER_BOOK)) {
+    Object.defineProperty(nv, k, {
+      enumerable: true, configurable: true,
+      get: () => { const p = activeProject(); if (!p) return clone(WORLD_PER_BOOK[k]); p.wk = p.wk || {}; if (p.wk[k] === undefined) p.wk[k] = clone(WORLD_PER_BOOK[k]); return p.wk[k]; },
+      set: (v) => { const p = ensureProject(); p.wk = p.wk || {}; p.wk[k] = v; SG.saveSoon(); },
+    });
+  }
+  // Worldkeeper's Home tracks the Plot Weaver novel linked to the current book.
   const pwc = world.settings.plotweaver;
   if (pwc) Object.defineProperty(pwc, 'novel', { enumerable: true, configurable: true, get: () => { const n = linkedNovel(); return n ? n.title : ''; }, set: () => {} });
 }

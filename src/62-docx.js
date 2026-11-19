@@ -40,10 +40,7 @@ function buildDocx(book) {
     const q = book.questions; body.push(wp('Heading1', wrun(q.title)), q.intro ? wp('NoInd', wrun(q.intro, '<w:i/>')) : '');
     q.items.forEach((it, i) => {
       body.push(wp('Question', wrun(`${i + 1}. ${it.text}`)));
-      if (it.type === 'scale') body.push(wp('NoInd', wrun('☐ 1     ☐ 2     ☐ 3     ☐ 4     ☐ 5')));
-      else if (it.type === 'yesno') body.push(wp('NoInd', wrun('☐ Yes     ☐ No')));
-      else if (it.type === 'choice') body.push(wp('NoInd', wrun(fieldList(it.options).map((x) => '☐ ' + x).join('     '))));
-      else for (let k = 0; k < 3; k++) body.push(wp('AnswerLine', ''));
+      for (let k = 0; k < 4; k++) body.push(wp('AnswerLine', ''));
     });
   }
   if (msf) body.push(wp('Center', wrun('THE END'), '<w:spacing w:before="480"/>'));

@@ -132,11 +132,9 @@ function buildPdf(book) {
     const q = book.questions; chapterStart(q.title, 'back');
     if (q.intro) { para([{ text: q.intro, i: true }], true); y -= lead * 0.5; }
     q.items.forEach((it, i) => {
-      const lines = it.type === 'text' ? 4 : 1; ensure(lead * (2 + lines)); y -= lead * 0.4;
+      const lines = 4; ensure(lead * (2 + lines)); y -= lead * 0.4;
       para([{ text: `${i + 1}. ${it.text}`, b: true }], true, { noIndent: true });
-      const box = (x0, label) => { cur.ops.push(`0.5 w ${x0.toFixed(2)} ${(y - fs + 0.5).toFixed(2)} ${(fs * 0.75).toFixed(2)} ${(fs * 0.75).toFixed(2)} re S`); text(toWin(label), FAM[0], fs, x0 + fs * 1.1, y - fs); return x0 + fs * 1.1 + width(toWin(label), FAM[0], fs) + fs * 1.6; };
-      if (it.type === 'text') { for (let k = 0; k < lines; k++) { y -= lead; cur.ops.push(`0.4 w 0.6 G ${left} ${y.toFixed(2)} m ${right} ${y.toFixed(2)} l S 0 G`); } y -= lead * 0.3; }
-      else { const opts = it.type === 'scale' ? ['1', '2', '3', '4', '5'] : it.type === 'yesno' ? ['Yes', 'No'] : fieldList(it.options); let x0 = left; for (const op of opts) { if (x0 + width(toWin(op), FAM[0], fs) + fs * 2 > right) { y -= lead; x0 = left; } x0 = box(x0, op); } y -= lead; }
+      for (let k = 0; k < lines; k++) { y -= lead; cur.ops.push(`0.4 w 0.6 G ${left} ${y.toFixed(2)} m ${right} ${y.toFixed(2)} l S 0 G`); } y -= lead * 0.3;
     });
   }
 

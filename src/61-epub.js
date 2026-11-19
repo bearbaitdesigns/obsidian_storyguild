@@ -54,7 +54,7 @@ function buildEpub(book) {
   book.back.forEach((s, i) => add('back' + (i + 1), `back${i + 1}.xhtml`, 'application/xhtml+xml', xhtml(s.title, lang, `<h2>${xe(s.title)}</h2>\n${blocksHtml(s.blocks, book.opts.sceneBreak)}`), null, true, s.title));
   if (book.questions) {
     const q = book.questions;
-    const li = q.items.map((it) => `<li>${xe(it.text)}${it.type === 'scale' ? '<div class="opt">1 — 2 — 3 — 4 — 5</div>' : it.type === 'yesno' ? '<div class="opt">Yes / No</div>' : it.type === 'choice' && it.options ? `<div class="opt">${xe(fieldList(it.options).join(' / '))}</div>` : ''}</li>`).join('\n');
+    const li = q.items.map((it) => `<li>${xe(it.text)}</li>`).join('\n');
     add('questions', 'questions.xhtml', 'application/xhtml+xml', xhtml(q.title, lang, `<h2>${xe(q.title)}</h2>${q.intro ? `<p class="noind">${xe(q.intro)}</p>` : ''}<ol class="q">${li}</ol>`), null, true, q.title);
   }
   const navBody = `<nav epub:type="toc" id="toc"><h1>Contents</h1><ol>${toc.map((t) => `<li><a href="${t.href}">${xe(t.title)}</a></li>`).join('')}</ol></nav>

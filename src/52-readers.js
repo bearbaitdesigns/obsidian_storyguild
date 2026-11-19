@@ -69,20 +69,18 @@ function renderQuestions(view, p, rd, body) {
   const box = card(null, hint('Ask every reader in this round the same questions. Their answers appear below, side by side.'));
   qs.forEach((q, i) => {
     const t = el('input', { type: 'text', value: q.text, class: 'ds-grow', placeholder: 'Question…' }); t.addEventListener('change', () => { q.text = t.value; save(); });
-    const ty = el('select', { class: 'dropdown' }, Object.entries(Q_TYPES).map(([k, l]) => el('option', { value: k, selected: q.type === k }, l))); ty.addEventListener('change', () => { q.type = ty.value; save(); view.render(); });
-    const opts = q.type === 'choice' ? ((o) => { o.addEventListener('change', () => { q.options = o.value; save(); }); return o; })(el('input', { type: 'text', value: q.options || '', placeholder: 'Choices, comma-separated', class: 'ds-w200' })) : null;
     const mv = (d) => () => { const j = i + d; if (j < 0 || j >= qs.length) return; [qs[i], qs[j]] = [qs[j], qs[i]]; save(); view.render(); };
-    box.append(el('div', { class: 'ds-q' }, el('span', { class: 'ds-qn' }, `${i + 1}.`), t, ty, opts, btn('↑', mv(-1), 'clickable-icon ds-sm'), btn('↓', mv(1), 'clickable-icon ds-sm'), btn('✕', () => { qs.splice(i, 1); save(); view.render(); }, 'clickable-icon ds-sm')));
+    box.append(el('div', { class: 'ds-q' }, el('span', { class: 'ds-qn' }, `${i + 1}.`), t, btn('↑', mv(-1), 'clickable-icon ds-sm'), btn('↓', mv(1), 'clickable-icon ds-sm'), btn('✕', () => { qs.splice(i, 1); save(); view.render(); }, 'clickable-icon ds-sm')));
   });
   const add = (texts) => {
     const was = qs.length;
-    for (const t of texts) qs.push({ id: uid(), text: t.text ?? t, type: t.type || (/^rate\b/i.test(t) ? 'scale' : /^would you|^did the|^do you/i.test(t) ? 'yesno' : 'text'), options: t.options || '' });
+    for (const t of texts) qs.push({ id: uid(), text: typeof t === 'string' ? t : t.text });
     save(); view.render();
     if (!was && qs.length && rd.includeInCompile == null) askIncludeInPublish(view, rd);
   };
   const others = p.rounds.filter((r) => r !== rd && r.questions.length);
   box.append(el('div', { class: 'ds-row' }, btn('+ Add question', () => add([''])), qs.length ? null : btn(`Use suggested ${rd.type} questions`, () => add(DEFAULT_QUESTIONS[rd.type])),
-    others.length ? btn('Copy from another round…', () => new FormModal('Copy questions', [{ key: 'r', label: 'From round', type: 'select', options: others.map((r) => [r.id, `${r.name} (${r.questions.length})`]) }], 'Copy', (v) => add(roundOf(p, v.r).questions.map((q) => ({ text: q.text, type: q.type, options: q.options })))).open()) : null));
+    others.length ? btn('Copy from another round…', () => new FormModal('Copy questions', [{ key: 'r', label: 'From round', type: 'select', options: others.map((r) => [r.id, `${r.name} (${r.questions.length})`]) }], 'Copy', (v) => add(roundOf(p, v.r).questions.map((q) => q.text))).open()) : null));
   if (qs.length) box.append(hint(rd.includeInCompile ? 'These questions are added at the end of reader copies you make in Publish.' : 'Not included in Publish. Turn on “Include in Publish” to add them to reader copies.'));
   body.append(box);
 }
@@ -99,28 +97,18 @@ function renderAnswers(view, p, rd, body) {
   if (!people.length) { body.append(hint('Answers show here once readers are added to the round.')); return; }
   const box = el('div', { class: 'ds-answers' });
   rd.questions.forEach((q, i) => {
-    const vals = people.map((s) => ({ s, v: s.answers[q.id] })).filter((x) => x.v != null && x.v !== '');
-    let sum = '';
-    if (q.type === 'scale' && vals.length) sum = `average ${(vals.reduce((a, x) => a + Number(x.v), 0) / vals.length).toFixed(1)} / 5`;
-    if (q.type === 'yesno' && vals.length) sum = `${vals.filter((x) => x.v === 'Yes').length} yes · ${vals.filter((x) => x.v === 'No').length} no`;
-    if (q.type === 'choice' && vals.length) { const m = {}; vals.forEach((x) => { m[x.v] = (m[x.v] || 0) + 1; }); sum = Object.entries(m).map(([k, n]) => `${k}: ${n}`).join(' · '); }
-    box.append(el('div', { class: 'ds-ans' }, el('div', { class: 'ds-ans-q' }, el('b', {}, `${i + 1}. ${q.text || '(no text)'}`), el('span', { class: 'ds-hint' }, `${vals.length}/${people.length} answered${sum ? ' · ' + sum : ''}`)),
+    const vals = people.map((s) => s.answers[q.id]).filter((v) => v != null && v !== '');
+    box.append(el('div', { class: 'ds-ans' }, el('div', { class: 'ds-ans-q' }, el('b', {}, `${i + 1}. ${q.text || '(no text)'}`), el('span', { class: 'ds-hint' }, `${vals.length}/${people.length} answered`)),
       people.map((s) => { const r = readerOf(p, s.r); const v = s.answers[q.id];
         return el('div', { class: 'ds-ans-row' }, el('span', { class: 'ds-ans-who', style: { '--c': r.color } }, r.name),
-          v == null || v === '' ? el('span', { class: 'ds-hint ds-click', onclick: () => answersModal(view, p, rd, s) }, 'no answer yet') : q.type === 'scale' ? el('span', { class: 'ds-scale' }, '●'.repeat(Number(v)) + '○'.repeat(5 - Number(v)), ` ${v}/5`) : el('span', {}, String(v))); })));
+          v == null || v === '' ? el('span', { class: 'ds-hint ds-click', onclick: () => answersModal(view, p, rd, s) }, 'no answer yet') : el('span', { class: 'ds-ans-text' }, String(v))); })));
   });
   body.append(box);
 }
 function answersModal(view, p, rd, s) {
   if (!rd.questions.length) { notice('Add questions to this round first.'); return; }
   const r = readerOf(p, s.r);
-  new FormModal(`${r.name}’s answers — ${rd.name}`, rd.questions.map((q, i) => {
-    const label = `${i + 1}. ${q.text}`; const value = s.answers[q.id] ?? '';
-    if (q.type === 'scale') return { key: q.id, label, type: 'select', options: [['', '—'], '1', '2', '3', '4', '5'], value };
-    if (q.type === 'yesno') return { key: q.id, label, type: 'select', options: [['', '—'], 'Yes', 'No'], value };
-    if (q.type === 'choice') return { key: q.id, label, type: 'select', options: [['', '—'], ...fieldList(q.options)], value };
-    return { key: q.id, label, type: 'textarea', rows: 3, value };
-  }), 'Save answers', (v) => { for (const [k, x] of Object.entries(v)) { if (x === '' || x == null) delete s.answers[k]; else s.answers[k] = x; } save(); view.render(); }).open();
+  new FormModal(`${r.name}’s answers — ${rd.name}`, rd.questions.map((q, i) => ({ key: q.id, label: `${i + 1}. ${q.text}`, type: 'textarea', rows: 3, value: s.answers[q.id] ?? '' })), 'Save answers', (v) => { for (const [k, x] of Object.entries(v)) { if (x === '' || x == null) delete s.answers[k]; else s.answers[k] = x; } save(); view.render(); }).open();
 }
 
 /* ---------- attachments ---------- */

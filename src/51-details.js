@@ -2,14 +2,14 @@
    Book details tab — the shared metadata
    ===================================================================== */
 const META = [
-  ['Title & author', [['title', 'Title'], ['subtitle', 'Subtitle'], ['series', 'Series'], ['seriesNo', 'Book # in series'], ['author', 'Legal author name'], ['penName', 'Pen name (on the cover)']]],
+  ['Title & author', [['title', 'Title'], ['subtitle', 'Subtitle'], ['author', 'Legal author name'], ['penName', 'Pen name (on the cover)']]],
   ['Category', [['genre', 'Genre(s), comma-separated'], ['subgenre', 'Subgenre'], ['audience', 'Audience', ['', 'Adult', 'New Adult', 'Young Adult', 'Middle Grade', 'Children']], ['language', 'Language code (e.g. en, en-GB)'], ['targetWords', 'Target word count', 'number'], ['deadline', 'Draft deadline', 'date']]],
   ['Pitch & copy', [['logline', 'Logline / one-line pitch', 'ta2'], ['blurb', 'Back-cover blurb', 'ta6'], ['synopsisShort', 'Short summary (shown on Worldkeeper Home)', 'ta3'], ['synopsis', 'Full synopsis (1–2 pages, for queries)', 'ta8']]],
   ['Market', [['comps', 'Comparable titles'], ['keywords', 'Keywords (comma-separated)'], ['bisac', 'BISAC codes / categories']]],
   ['Publication', [['publisher', 'Publisher / imprint'], ['isbnEbook', 'ISBN — ebook'], ['isbnPrint', 'ISBN — print'], ['pubDate', 'Publication date', 'date'], ['copyright', 'Copyright year']]],
   ['Front & back matter', [['dedication', 'Dedication', 'ta2'], ['acknowledgments', 'Acknowledgments', 'ta4'], ['bio', 'About the author', 'ta4']]],
 ];
-const SHARED_HINT = { title: 'Worldkeeper · Plot Weaver', series: 'Worldkeeper', genre: 'Worldkeeper', audience: 'Worldkeeper', logline: 'Worldkeeper', synopsisShort: 'Worldkeeper', targetWords: 'Worldkeeper', deadline: 'Worldkeeper' };
+const SHARED_HINT = { title: 'Worldkeeper · Plot Weaver', genre: 'Worldkeeper', audience: 'Worldkeeper', logline: 'Worldkeeper', synopsisShort: 'Worldkeeper', targetWords: 'Worldkeeper', deadline: 'Worldkeeper' };
 
 function renderDetails(view, p, body) {
   const all = META.flatMap((s) => s[1]); const filled = all.filter(([k]) => String(p[k] ?? '').trim()).length + (p.cover ? 1 : 0);
@@ -61,11 +61,19 @@ function projectCard(view, p) {
   });
   const folder = el('input', { type: 'text', value: p.folder }); folder.addEventListener('change', () => { p.folder = normalizePath(folder.value.trim() || p.folder); SG.saveSoon(); view.render(); });
   const chf = el('input', { type: 'text', value: p.chaptersFolder, placeholder: `${p.folder}/Chapters` }); chf.addEventListener('change', () => { p.chaptersFolder = chf.value.trim() ? normalizePath(chf.value.trim()) : ''; SG.saveSoon(); view.render(); });
+  const s = seriesOf(p);
+  const sSel = el('select', { class: 'dropdown' }, seriesOptions().map(([v, l]) => el('option', { value: v, selected: v === (s ? s.id : '') }, l)));
+  sSel.addEventListener('change', () => { if (sSel.value === '__new') { sSel.value = s ? s.id : ''; new FormModal('New series', [{ key: 'name', label: 'Series name', required: true }], 'Create', (v) => addToSeries(p, createSeries(v.name).id)).open(); } else addToSeries(p, sSel.value); });
+  const no = s ? el('select', { class: 'dropdown' }, s.books.map((_, i) => el('option', { value: i, selected: i === s.books.indexOf(p.id) }, `Book ${i + 1}`))) : null;
+  if (no) no.addEventListener('change', () => addToSeries(p, s.id, Number(no.value)));
   return card('Project',
+    el('div', { class: 'ds-field' }, el('label', {}, 'Series ', el('span', { class: 'ds-shared', title: 'Shared with Worldkeeper and Plot Weaver' }, '⇄')), el('div', { class: 'ds-row ds-nowrap' }, sSel, no)),
+    el('div', { class: 'ds-row' }, btn('📚 Books & series', () => openLibrary(), 'ds-sm'), btn('+ New book', () => newBookModal(), 'ds-sm')),
+    hint('Books in a series share numbering everywhere; in Plot Weaver each book can draw on the books before it.'),
     el('div', { class: 'ds-field' }, el('label', {}, 'Plot Weaver novel'), pwSel), hint('Linked novels share the title, and Plot Weaver chapters can become chapter notes.'),
     el('div', { class: 'ds-field' }, el('label', {}, 'Project folder'), folder), hint('Drafts, readers’ files, assets and compiled books are kept here.'),
     el('div', { class: 'ds-field' }, el('label', {}, 'Chapters folder'), chf), hint('Every note in this folder is a chapter.'),
     el('div', { class: 'ds-row' }, btn('Delete project…', () => new ConfirmModal(`Delete “${p.title}”?`, 'Removes the project from Draftsmith (reader rounds, checklist, book details). Notes and files in the vault are not deleted.', 'Delete', () => {
-      DS().projects = DS().projects.filter((x) => x.id !== p.id); DS().activeId = ''; SG.saveSoon(); SG.refreshAll();
+      DS().projects = DS().projects.filter((x) => x.id !== p.id); DS().activeId = ''; syncSeries(); SG.saveSoon(); SG.refreshAll();
     }).open(), 'mod-warning')));
 }

@@ -56,9 +56,10 @@ function projectFromOld(worldData, plotData) {
     logline: nv.logline || '', synopsisShort: nv.synopsis || '', targetWords: Number(nv.goal) || 80000, deadline: nv.deadline || '', stage: nv.stage || 'First draft',
   });
   if (pwN) p.pwNovelId = pwN.id;
+  if (worldData) { p.wk = {}; for (const k of Object.keys(WORLD_PER_BOOK)) p.wk[k] = nv[k] !== undefined ? clone(nv[k]) : clone(WORLD_PER_BOOK[k]); }
   if (p.stage === 'Second draft') { p.draft = 2; p.draftHistory = [{ n: 1, date: '', words: null, note: 'First draft' }, { n: 2, date: today(), words: null, note: 'Second draft' }]; }
   // Worldkeeper reader milestones become Draftsmith reader rounds (and stay in sync from now on).
-  for (const m of (nv.milestones || [])) {
+  for (const m of ((p.wk && p.wk.milestones) || nv.milestones || [])) {
     if (!['Alpha readers', 'Beta readers'].includes(m.kind)) continue;
     const type = m.kind === 'Alpha readers' ? 'alpha' : 'beta';
     const r = { id: uid(), type, name: m.name || (type === 'alpha' ? 'Alpha round' : 'Beta round'), version: `Draft ${p.draft}`, due: m.due || '', focus: m.note || '', questions: [], includeInCompile: null, sends: [] };
@@ -79,7 +80,7 @@ async function runMigration(found, mode) {
     const pl = found.plot && found.plot.data ? clone(found.plot.data) : null;
     if (w) SG.data.world = w;
     if (pl) SG.data.plot = pl;
-    if (!DS().projects.length && (w || pl)) { const p = projectFromOld(w, pl); DS().projects.push(p); DS().activeId = p.id; }
+    if (!DS().projects.length && (w || pl)) { const p = projectFromOld(w, pl); DS().projects.push(p); DS().activeId = p.id; adoptLegacySeries(); syncSeries(); }
   }
   SG.data.migration = { state: 'done', at: new Date().toISOString(), mode, backup: dir, from: Object.values(found).filter(Boolean).map((x) => `${x.id}${x.version ? ' ' + x.version : ''}`) };
   await SG.saveNow();

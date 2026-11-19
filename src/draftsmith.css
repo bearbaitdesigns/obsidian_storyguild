@@ -19,8 +19,8 @@
 .ds-draftbox small { text-transform: uppercase; letter-spacing: .07em; font-size: 10px; color: var(--text-muted); }
 .ds-draftbox b { font-size: 2em; line-height: 1; color: var(--ds-acc); }
 .ds-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--background-modifier-border); margin: 14px 0 16px; overflow-x: auto; }
-.ds-tabs button { background: none; box-shadow: none; border-radius: 6px 6px 0 0; padding: 8px 14px; color: var(--text-muted); }
-.ds-tabs button.is-on { color: var(--text-normal); border-bottom: 2px solid var(--ds-acc); }
+.ds-tabs button { background: none; box-shadow: none; border-radius: 8px 8px 0 0; padding: 11px 20px; height: auto; font-size: 1.05em; font-weight: 500; color: var(--text-muted); }
+.ds-tabs button.is-on { color: var(--text-normal); border-bottom: 3px solid var(--ds-acc); background: var(--background-secondary); }
 .ds-card { border: 1px solid var(--background-modifier-border); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; background: var(--background-secondary); }
 .ds-card-h h3 { margin: 0 0 8px; font-size: var(--font-ui-smaller); text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
 .ds-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
@@ -143,3 +143,11 @@
   .ds-ck { grid-template-columns: 20px 1fr 110px 36px; } .ds-ck > button:last-child { display: none; }
   .ds-head { flex-wrap: wrap; }
 }
+.ds-ans-text { white-space: pre-wrap; }
+.ds-lib-modal { width: min(760px, 95vw); }
+.ds-lib-series { border: 1px solid var(--background-modifier-border); border-radius: 8px; padding: 10px 12px; margin: 10px 0; background: var(--background-secondary); }
+.ds-lib-sname { font-weight: 600; font-size: 1.05em; max-width: 280px; }
+.ds-lib-book { display: flex; gap: 8px; align-items: center; padding: 6px 4px; border-top: 1px dashed var(--background-modifier-border); flex-wrap: wrap; }
+.ds-lib-book.is-current { background: color-mix(in srgb, var(--interactive-accent) 10%, transparent); border-radius: 6px; }
+.ds-lib-no { width: 28px; color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.ds-lib .ds-lib-book select { width: auto !important; }

@@ -3,8 +3,10 @@
 Write, plan and build your novel in one Obsidian plugin. Storyguild has three sections:
 
 - **Draftsmith** — your manuscript: chapter notes, draft numbers, book details, alpha/beta reader rounds with questions and answers, publishing checklists, and publishing to PDF, Word, EPUB or Markdown.
-- **Worldkeeper** — worldbuilding sheets, dashboards, encyclopedia, Home, milestones and to-do list.
+- **Worldkeeper** — worldbuilding sheets, dashboards, encyclopedia, Home, milestones and to-do list. The Home banner has Plot Weaver and Draftsmith pills under the book's details, and Encyclopedia and World Atlas pills in its lower-left corner.
 - **Plot Weaver** — plotlines × chapters board, POVs, off-screen events, cause and effect.
+
+All three sections share **books and series**. The current book is the same everywhere. You can start a new book, create a series, or add an existing book to a series from **📚 Books & series**. It's on the ribbon, in the Draftsmith header, on the Worldkeeper Home banner and in the command palette (**New book…**, **New series…**, **Add a book to a series…**, **Switch book…**). A novel created in Plot Weaver becomes a book automatically, and switching novels in Plot Weaver switches the book everywhere.
 
 Worldkeeper and Plot Weaver work exactly as they did as separate plugins. Their views, code blocks (`worldkeeper`, `worldkeeper-home`, `worldkeeper-dashboard`, `worldkeeper-entry`, `plot-weaver`), commands and hotkeys keep the same names.
 
@@ -39,7 +41,9 @@ One set of book details serves all three sections:
 | Field | Draftsmith | Worldkeeper | Plot Weaver |
 |---|---|---|---|
 | Title | Book details | Home, novel settings | linked novel's name |
-| Series, genre, audience, logline, summary | Book details | Home, novel settings | — |
+| Series and book number | Books & series / Book details | Home banner (“Series · Book 2”) | each book draws on the earlier books (linked novels) |
+| Genre, audience, logline, summary | Book details | Home, novel settings | — |
+| Banner, milestones, manual word count | — | Home, one set per book | — |
 | Target word count, deadline, stage | Book details / header | Home goal ring, deadline, stage badge | — |
 | Cover | Book details | Home banner when no banner is set | — |
 | Word count | chapter notes | Home words and activity chart | stats strip |
@@ -59,7 +63,7 @@ Edit a shared field anywhere and it changes everywhere.
 - **Readers** — Run any number of alpha and beta rounds.
   - Each send records the date it was sent, the format, the manuscript version, the due date and its status.
   - Attach readers' files (PDF, Markdown, Word, text, images). Bullet points in a Markdown or text file can be imported as notes, and a line starting `Ch 5:` is linked to chapter 5.
-  - Each round has its own question set (written answer, 1–5 scale, yes/no or multiple choice). Readers' answers are shown side by side with a summary.
+  - Each round has its own set of questions. Readers' answers are shown side by side under each question.
   - When you add a round's first questions, Draftsmith asks whether to include them in Publish.
   - **Export round to note** writes the whole round to Markdown.
 - **Publishing checklist** — three tabs: **Drafting & Revision**, **Traditional** and **Self-publishing**. Steps marked ⚡ tick themselves from your data. You can add, remove or date any step, and send dated steps to the Worldkeeper to-do list.

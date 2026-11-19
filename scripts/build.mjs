@@ -49,6 +49,13 @@ wk = patch(wk, 'wk:ms-readers', `    if (MS_READERS.has(m.kind)) {
       readers = h('div', { class: 'ms-f' }, h('label', {}, 'Readers'), h('span', { class: 'cs-hint' }, \`Synced from Draftsmith → Readers (\${(m.readers || []).length} readers). Edit them there.\`));
     } else if (MS_READERS.has(m.kind)) {
       m.readers = m.readers || [];`);
+// Home banner: Plot Weaver and Draftsmith pills under the book info; Encyclopedia
+// and World Atlas pills move to the lower-left corner; a Books & series button.
+wk = patch(wk, 'wk:hero-sections', `daysLeft != null ? h('span', {}, \`\${daysLeft} days left\`) : null)),`,
+  `daysLeft != null ? h('span', {}, \`\${daysLeft} days left\`) : null), HOST.sectionPills()),`);
+wk = patch(wk, 'wk:hero-corner', `h('small', {}, 'of goal'))), h('div', { class: 'hd-pills' }, enc, atlas)));`,
+  `h('small', {}, 'of goal')))), h('div', { class: 'hd-corner' }, enc, atlas));`);
+wk = patch(wk, 'wk:hero-books', `pencilToggle(), changeBanner, renameTab);`, `pencilToggle(), changeBanner, renameTab, HOST.booksButton());`);
 // Expose a few helpers to the host.
 wk += `
 WorldkeeperPlugin.storyguild = { readTodos, writeTodos, pwLoad, mergeSettings, DEFAULT_SETTINGS, MS_STANDARD, S };
@@ -82,7 +89,7 @@ const header = `/*
 const HOST = {
   plugin: null, world: null, plot: null, plotVersion: '${JSON.parse(read('vendor', 'plot-weaver', 'manifest.json')).version}',
   worldVersion: '${JSON.parse(read('vendor', 'worldkeeper', 'manifest.json')).version}',
-  sharedWords: (w) => w, coverPath: () => '',
+  sharedWords: (w) => w, coverPath: () => '', sectionPills: () => null, booksButton: () => null,
 };
 `;
 const main = header + wrap('WorldkeeperModule', wk) + wrap('PlotWeaverModule', pw)
@@ -100,6 +107,7 @@ const css = [
   '/* ---- Draftsmith ---- */', read('src', 'draftsmith.css'),
   '/* ---- Worldkeeper ---- */', read('vendor', 'worldkeeper', 'styles.css'),
   '/* ---- Plot Weaver ---- */', read('vendor', 'plot-weaver', 'styles.css'),
+  '/* ---- Storyguild additions to Worldkeeper ---- */', read('src', 'worldkeeper-additions.css'),
 ].join('\n');
 writeFileSync(join(root, 'styles.css'), css);
 console.log(`main.js ${(main.length / 1024).toFixed(0)} KB · styles.css ${(css.length / 1024).toFixed(0)} KB`);

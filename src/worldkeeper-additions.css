@@ -1,0 +1,5 @@
+/* Worldkeeper Home banner (Storyguild) */
+.wk .hd-hero { padding-bottom: 64px; }
+.wk .hd-hero .hd-sections { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.wk .hd-hero .hd-sec { cursor: pointer; font: inherit; font-size: .88em; height: auto; box-shadow: none; }
+.wk .hd-hero .hd-corner { position: absolute; left: 16px; bottom: 14px; display: flex; gap: 8px; flex-wrap: wrap; z-index: 2; }

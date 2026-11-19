@@ -58,6 +58,10 @@ Edit a shared field anywhere and it changes everywhere.
 - **Manuscript** — Every note in the project's chapters folder is a chapter. Chapter order comes from a `chapter` property, or follows the Plot Weaver board. Each chapter has its own `draft` number, and the whole manuscript has one too.
   - **Start draft #N** saves a copy of every chapter to `Drafts/Draft N/` before the new draft begins.
   - Word counts are written to the `words` property as you type. You can turn this off.
+  - Each entry has a **type**: Chapter, Prologue, Interlude or Epilogue. Only chapters are numbered: a prologue shows as “Prologue” in the # column, and the first real chapter is Chapter 1.
+    - In Publish, headings follow the type, for example “Prologue: The Drowning” or “Chapter 1: Low Water”.
+    - For chapters linked to Plot Weaver, the type is shared with the board's section.
+  - **Reorder** by dragging rows or with ↑ ↓. When the book is linked to Plot Weaver, the board's chapters are reordered to match. Parts and Planning sections stay where they are.
   - **Chapters from Plot Weaver** creates a note for each chapter on the board.
   - **⇪ Import chapter notes** turns notes you already have into chapters.
     - Pick a folder (or single notes) and set the order. Then either move the notes into the book's chapters folder, where Obsidian keeps every link working, or keep them where they are and use that folder as the chapters folder.

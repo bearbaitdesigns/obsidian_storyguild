@@ -121,6 +121,21 @@ async def main():
         assert r['left'] == 0 and len(r['files']) == 6 and 'Prologue' in r['pwChapters']
         ball = [f for f in r['files'] if f[0] == '02 - Ballast'][0][1]
         assert ball['status'] == 'Revising' and ball['pov'] == 'Teodor' and ball['chapter'] == 5
+        # Chapter types + reorder by drag: Prologue moves to the top and isn't numbered
+        r = await ev("""async () => { const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view; v.render(); await new Promise(r => setTimeout(r, 150));
+          const rows = () => [...document.querySelectorAll('.ds-chtable tbody tr')].map(tr => tr.children[1].textContent.replace(/[↑↓]/g, '') + '|' + tr.children[2].textContent);
+          const before = rows(); const trs = [...document.querySelectorAll('.ds-chtable tbody tr')];
+          const src = trs.find(tr => tr.textContent.includes('01 - Prologue')); const dst = trs[0];
+          const dt = new DataTransfer(); src.dispatchEvent(new DragEvent('dragstart', { dataTransfer: dt })); dst.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, cancelable: true })); dst.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, cancelable: true }));
+          await new Promise(r => setTimeout(r, 800)); v.render(); await new Promise(r => setTimeout(r, 100));
+          // change "10 - Spring Tide" to an interlude via its type select
+          const tr2 = [...document.querySelectorAll('.ds-chtable tbody tr')].find(tr => tr.textContent.includes('10 - Spring Tide')); const ks = tr2.querySelector('.ds-kind'); ks.value = 'interlude'; ks.dispatchEvent(new Event('change'));
+          await new Promise(r => setTimeout(r, 600)); v.render(); await new Promise(r => setTimeout(r, 100));
+          const n = SGP.sections.plot.data.novels[0];
+          return { before, after: rows(), pw: n.chapters.map(c => c.title + ':' + c.kind) }; }""")
+        print('4c. types & order:', json.dumps(r, ensure_ascii=False))
+        assert r['after'][0].startswith('Prologue|01 - Prologue') and r['after'][1].startswith('1|Low Water')
+        assert r['pw'].index('Prologue:prologue') < r['pw'].index('Low Water:chapter') and 'Spring Tide:interlude' in r['pw']
         await page.wait_for_timeout(500)
         await page.screenshot(path=f'{OUT}/02-manuscript.png', full_page=True)
 

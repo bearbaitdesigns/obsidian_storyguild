@@ -9,11 +9,17 @@ const fmOf = (f) => (app().metadataCache.getFileCache(f) || {}).frontmatter || {
 const chaptersFolder = (p) => normalizePath(p.chaptersFolder || `${p.folder}/Chapters`);
 const projectSub = (p, key) => normalizePath(`${p.folder}/${DSS()[key]}`);
 const SCENE_KINDS = ['prologue', 'chapter', 'interlude', 'epilogue'];
+const KIND_LABEL = { chapter: 'Chapter', prologue: 'Prologue', interlude: 'Interlude', epilogue: 'Epilogue' };
+const normKind = (v) => { const k = String(v || '').trim().toLowerCase(); return SCENE_KINDS.includes(k) ? k : ''; };
+/** Guess a section type from a note name: "Prologue", "00 - Epilogue: After", "Interlude II"… */
+const guessKind = (name) => { const m = String(name || '').toLowerCase().match(/\b(prologue|epilogue|interlude)\b/); return m ? m[1] : 'chapter'; };
+/** The label in the # column and the number used in “Chapter {n}”: only true chapters are counted. */
+const chapterLabel = (c) => (c.kind === 'chapter' ? String(c.num) : KIND_LABEL[c.kind]);
 
 function listChapters(p) {
   if (!p) return [];
   const folder = chaptersFolder(p) + '/'; const K = DSS().keys; const sk = statusKey(); const wkKeys = fieldList(plotSettings().wordsField || 'words');
-  const novel = linkedNovel(p); const pwIndex = new Map(((novel && novel.chapters) || []).map((c, i) => [c.id, i]));
+  const novel = linkedNovel(p); const pwIndex = new Map(((novel && novel.chapters) || []).map((c, i) => [c.id, i])); const pwSec = new Map(((novel && novel.chapters) || []).map((c) => [c.id, c]));
   const out = app().vault.getMarkdownFiles().filter((f) => f.path.startsWith(folder)).map((f) => {
     const fm = fmOf(f);
     let w = null; for (const k of wkKeys) if (fm[k] != null && fm[k] !== '') { w = +String(fm[k]).replace(/[,\s_]/g, ''); break; }
@@ -23,6 +29,8 @@ function listChapters(p) {
       file: f, title: fm.title || f.basename, order: Number(fm[K.chapter]), draft: Number(fm[K.draft]) || 1,
       status: status == null ? '' : String(status), words: w, pov: fm[K.pov] == null ? '' : String(fm[K.pov]), pwChapter: fm[K.pwChapter] ? String(fm[K.pwChapter]) : '',
       pwIndex: fm[K.pwChapter] && pwIndex.has(String(fm[K.pwChapter])) ? pwIndex.get(String(fm[K.pwChapter])) : null,
+      // A Plot Weaver section's type wins (it is shared); otherwise the note's own property.
+      kind: normKind(fm[K.pwChapter] && pwSec.has(String(fm[K.pwChapter])) ? pwSec.get(String(fm[K.pwChapter])).kind || 'chapter' : fm[K.kind]) || 'chapter',
     };
   });
   const byPlot = DSS().followPlotOrder && novel;
@@ -32,7 +40,7 @@ function listChapters(p) {
     const ao = Number.isFinite(a.order) ? a.order : 1e9, bo = Number.isFinite(b.order) ? b.order : 1e9;
     return ao - bo || a.file.basename.localeCompare(b.file.basename, undefined, { numeric: true });
   });
-  out.forEach((c, i) => { c.n = i + 1; });
+  let num = 0; out.forEach((c, i) => { c.n = i + 1; c.num = c.kind === 'chapter' ? ++num : null; c.label = chapterLabel(c); });
   return out;
 }
 const totalWords = (p) => listChapters(p).reduce((a, c) => a + (c.words || 0), 0);
@@ -78,11 +86,13 @@ async function createChapter(p, title, extra = {}) {
   const tpl = DSS().chapterTemplate && app().vault.getAbstractFileByPath(normalizePath(DSS().chapterTemplate));
   if (tpl instanceof TFile) body = (await app().vault.read(tpl)).replace(/{{title}}/g, title).replace(/{{date}}/g, today()).replace(/{{novel}}/g, p.title);
   const f = await app().vault.create(path, body || '\n');
+  if (extra.at != null) { /* placed later by reorderChapters */ }
   const next = listChapters(p).filter((c) => c.file.path !== path).reduce((m, c) => Math.max(m, Number.isFinite(c.order) ? c.order : 0), 0) + 1;
   await setFm(f, (fm) => {
     const put = (k, v) => { if (k && (fm[k] === undefined || fm[k] === null || fm[k] === '')) fm[k] = v; };
     put(K.project, `[[${p.title}]]`); put(K.chapter, extra.order || next); put(K.draft, 1); put(statusKey(), statusDefs()[0].name); put(wordsKey(), 0);
     if (K.pov) put(K.pov, extra.pov || ''); if (extra.pwChapter) put(K.pwChapter, extra.pwChapter);
+    if (K.kind) put(K.kind, extra.kind || guessKind(title));
   });
   return f;
 }
@@ -91,10 +101,33 @@ async function chaptersFromPlot(p) {
   const n = linkedNovel(p); if (!n) { notice('Link this project to a Plot Weaver novel first (Book details).'); return 0; }
   const have = new Set(listChapters(p).map((c) => c.pwChapter).filter(Boolean)); let made = 0;
   const secs = (n.chapters || []).filter((c) => SCENE_KINDS.includes(c.kind || 'chapter'));
-  for (let i = 0; i < secs.length; i++) { const c = secs[i]; if (have.has(c.id)) continue; await createChapter(p, c.title || `Chapter ${i + 1}`, { pwChapter: c.id, order: i + 1 }); made++; }
+  for (let i = 0; i < secs.length; i++) { const c = secs[i]; if (have.has(c.id)) continue; await createChapter(p, c.title || `Chapter ${i + 1}`, { pwChapter: c.id, order: i + 1, kind: c.kind || 'chapter' }); made++; }
   return made;
 }
 async function renumberChapters(chs) { const K = DSS().keys; for (const c of chs) if (c.order !== c.n) await setFm(c.file, (fm) => { fm[K.chapter] = c.n; }); }
+/** Put chapters in a new order: writes the order property, and — for chapters linked to Plot Weaver —
+    reorders their sections on the board too, keeping Parts and Planning sections where they are. */
+async function reorderChapters(p, list) {
+  list.forEach((c, i) => { c.n = i + 1; });
+  const n = linkedNovel(p);
+  if (n) {
+    const linked = list.filter((c) => c.pwChapter && n.chapters.some((s) => s.id === c.pwChapter));
+    const slots = n.chapters.map((s, i) => (linked.some((c) => c.pwChapter === s.id) ? i : -1)).filter((i) => i >= 0);
+    const secs = linked.map((c) => n.chapters.find((s) => s.id === c.pwChapter));
+    const before = n.chapters.map((s) => s.id).join();
+    slots.forEach((slot, k) => { n.chapters[slot] = secs[k]; });
+    if (n.chapters.map((s) => s.id).join() !== before && HOST.plot) HOST.plot._sgCommit();
+  }
+  await renumberChapters(list);
+  SG.refreshDraftsmithSoon();
+}
+/** Change a chapter's type (chapter/prologue/interlude/epilogue); also on its Plot Weaver section. */
+async function setChapterKind(p, c, kind) {
+  const n = linkedNovel(p); const sec = n && c.pwChapter && n.chapters.find((s) => s.id === c.pwChapter);
+  if (sec && sec.kind !== kind) { sec.kind = kind; if (HOST.plot) HOST.plot._sgCommit(); }
+  await setFm(c.file, (fm) => { fm[DSS().keys.kind] = kind; });
+  SG.refreshDraftsmithSoon();
+}
 
 async function snapshotChapter(p, c) {
   const dir = `${projectSub(p, 'snapshotFolder')}/Chapters`; await ensureFolder(dir);
@@ -138,7 +171,8 @@ async function recount(f) {
    moves). Draftsmith only adds properties a note is missing, plus the chapter
    order you chose; your text and other properties are left alone. */
 const naturalSort = (a, b) => a.basename.localeCompare(b.basename, undefined, { numeric: true, sensitivity: 'base' });
-const titleFromName = (name) => name.replace(/^\s*(?:ch(?:apter)?\.?\s*)?\d+[\s.)_:–—-]*/i, '').trim() || name;
+/** “02 - Ballast” → “Ballast”, “Chapter 3: Saltglass” → “Saltglass”; “1984” and “7 Days” stay as they are. */
+const titleFromName = (name) => name.replace(/^\s*(?:ch(?:apter)?\.?\s*\d+[\s.)_:–—-]*|\d+\s*[.)_:–—-]+\s*)/i, '').trim() || name;
 async function importChapters(p, files, opts = {}) {
   const K = DSS().keys; const novel = linkedNovel(p); let moved = 0, linked = 0, made = 0;
   if (opts.mode === 'folder' && opts.folder) p.chaptersFolder = normalizePath(opts.folder);
@@ -155,12 +189,12 @@ async function importChapters(p, files, opts = {}) {
       const want = [f.basename, titleFromName(f.basename), fm0.title].filter(Boolean).map((x) => String(x).toLowerCase());
       const hit = secs.find((c) => !taken.has(c.id) && want.includes(String(c.title || '').toLowerCase()));
       if (hit) { pwId = hit.id; linked++; }
-      else if (opts.createPlot) { const sec = { id: Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4), title: titleFromName(f.basename), kind: 'chapter' }; novel.chapters.push(sec); pwId = sec.id; made++; }
+      else if (opts.createPlot) { const sec = { id: Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4), title: titleFromName(f.basename), kind: normKind(fm0[K.kind]) || guessKind(f.basename) }; novel.chapters.push(sec); pwId = sec.id; made++; }
       if (pwId) taken.add(pwId);
     }
     await setFm(f, (fm) => {
       const put = (k, v) => { if (k && (fm[k] === undefined || fm[k] === null || fm[k] === '')) fm[k] = v; };
-      put(K.project, `[[${p.title}]]`); fm[K.chapter] = start + i + 1; put(K.draft, 1); put(statusKey(), statusDefs()[0].name); fm[wordsKey()] = words;
+      put(K.project, `[[${p.title}]]`); fm[K.chapter] = start + i + 1; put(K.draft, 1); if (K.kind && !pwId) put(K.kind, guessKind(f.basename)); put(statusKey(), statusDefs()[0].name); fm[wordsKey()] = words;
       if (pwId) fm[K.pwChapter] = pwId;
     });
   }

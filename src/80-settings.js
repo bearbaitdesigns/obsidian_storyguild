@@ -22,6 +22,7 @@ class StoryguildSettingTab extends PluginSettingTab {
     c.createEl('p', { cls: 'setting-item-description', text: `All three sections read the same status and word-count properties. They come from Plot Weaver’s settings (now: status “${statusKey()}”, words “${wordsKey()}”) and its status list (${statusDefs().map((x) => x.name).join(', ')}).` });
     const key = (k, name, desc) => new Setting(c).setName(name).setDesc(desc).addText((t) => t.setValue(s.keys[k] || '').onChange((v) => { s.keys[k] = v.trim(); save(); }));
     key('chapter', 'Chapter order property', 'A number that sets the order of chapters (when not following Plot Weaver).');
+    key('kind', 'Chapter type property', 'chapter, prologue, interlude or epilogue. For chapters linked to Plot Weaver, the board’s section type is used.');
     key('draft', 'Chapter draft property', 'The draft number of each chapter.');
     key('pov', 'POV property', 'Optional. Shown on the Manuscript tab.');
     key('pwChapter', 'Plot Weaver chapter property', 'Links a chapter note to a chapter on the Plot Weaver board.');

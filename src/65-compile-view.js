@@ -14,7 +14,7 @@ function renderCompile(view, p, body) {
   const left = el('div', {});
   left.append(card('Format', el('div', { class: 'ds-fmt' }, [['pdf', 'PDF', 'print & share'], ['docx', 'Word', '.docx'], ['epub', 'EPUB', 'e-readers'], ['md', 'Markdown', 'one note']].map(([k, l, s]) =>
     el('button', { class: o.format === k ? 'is-on' : '', onclick: () => set('format', k) }, el('b', {}, l), el('small', {}, s))))));
-  const pick = o.chapters === 'pick' ? el('div', { class: 'ds-pick' }, chs.map((c) => el('label', {}, ((cb) => { cb.addEventListener('change', () => { const s2 = new Set(o.picked || []); cb.checked ? s2.add(c.file.path) : s2.delete(c.file.path); o.picked = [...s2]; SG.saveSoon(); view.render(); }); return cb; })(el('input', { type: 'checkbox', checked: (o.picked || []).includes(c.file.path) })), ` ${c.n}. ${c.title}`))) : null;
+  const pick = o.chapters === 'pick' ? el('div', { class: 'ds-pick' }, chs.map((c) => el('label', {}, ((cb) => { cb.addEventListener('change', () => { const s2 = new Set(o.picked || []); cb.checked ? s2.add(c.file.path) : s2.delete(c.file.path); o.picked = [...s2]; SG.saveSoon(); view.render(); }); return cb; })(el('input', { type: 'checkbox', checked: (o.picked || []).includes(c.file.path) })), ` ${c.label}. ${c.title}`))) : null;
   left.append(card(`Chapters · ${sel.length} of ${chs.length}`,
     select('chapters', 'Include', [['all', 'All chapters'], ['status', 'Chapters with a status…'], ['pick', 'Let me pick']]),
     o.chapters === 'status' ? select('statusFilter', 'Status', [['', '—'], ...statusDefs().map((d) => d.name)]) : null, pick,
@@ -53,7 +53,7 @@ function previewPage(p, sel) {
   if (o.format === 'epub' && p.cover && resourceUrl(p.cover)) page.append(el('img', { class: 'ds-page-cover', src: resourceUrl(p.cover) }));
   if (o.titlePage || msf) page.append(el('div', { class: 'ds-page-title' }, el('b', {}, msf ? p.title.toUpperCase() : p.title), p.subtitle ? el('i', {}, p.subtitle) : null, el('span', {}, (msf ? 'by ' : '') + (p.penName || p.author || 'Author'))));
   if (first) {
-    page.append(el('h4', {}, chapterHeading(o.heading, 1, first.title)));
+    page.append(el('h4', {}, first.kind === 'chapter' ? chapterHeading(o.heading, 1, first.title) : sectionHeading(first)));
     const holder = el('div', { class: 'ds-page-text' }); page.append(holder);
     app().vault.cachedRead(first.file).then((md) => { const bl = mdToBlocks(md, first.title, { smart: o.smartQuotes !== false }).slice(0, 6);
       for (const b of bl) holder.append(b.t === 'break' ? el('div', { class: 'ds-page-brk' }, o.sceneBreak) : b.t === 'h' ? el('b', {}, b.text) : el('p', { class: b.first ? 'is-first' : '' }, b.runs.map((r) => (r.i ? el('em', {}, r.text) : r.b ? el('b', {}, r.text) : r.text)))); });

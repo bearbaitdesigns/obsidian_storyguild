@@ -141,7 +141,7 @@ async function importBullets(view, p, rd, s, f) {
     const m = line.match(/^\s*[-*+]\s+(?:\[.\]\s+)?(.+)$/); if (!m) continue;
     let text = m[1].trim(); let ch = null;
     const c = text.match(/^(?:ch(?:apter)?\.?\s*)(\d+)\s*[:.\-–—]\s*(.*)$/i);
-    if (c) { const hit = chs.find((x) => x.n === Number(c[1])); if (hit) { ch = hit.file.path; text = c[2]; } }
+    if (c) { const hit = chs.find((x) => x.num === Number(c[1])); if (hit) { ch = hit.file.path; text = c[2]; } }
     p.comments.push({ id: uid(), round: rd.id, r: s.r, ch, type: 'Other', text, quote: '', date: today(), resolved: false, src: f.path }); n++;
   }
   save(); view.render(); notice(n ? `Imported ${n} notes from ${f.name}. Lines starting “Ch 5:” were linked to that chapter.` : 'No bullet points found in that file.');
@@ -160,7 +160,7 @@ function noteModal(view, p, rd, readerId) {
   const people = rd.sends.map((s) => [s.r, readerOf(p, s.r).name]); if (!people.length) { notice('Add a reader to this round first.'); return; }
   new FormModal('Add reader note', [
     { key: 'r', label: 'Reader', type: 'select', options: people, value: readerId ?? people[0][0] },
-    { key: 'ch', label: 'Chapter', type: 'select', options: [['', '— Whole manuscript —'], ...listChapters(p).map((c) => [c.file.path, `${c.n}. ${c.title}`])] },
+    { key: 'ch', label: 'Chapter', type: 'select', options: [['', '— Whole manuscript —'], ...listChapters(p).map((c) => [c.file.path, `${c.label}. ${c.title}`])] },
     { key: 'type', label: 'Kind of note', type: 'select', options: NOTE_TYPES },
     { key: 'quote', label: 'Quoted passage (optional)' }, { key: 'text', label: 'Note', type: 'textarea', required: true },
   ], 'Save', (v) => { p.comments.push({ id: uid(), round: rd.id, r: v.r, ch: v.ch || null, type: v.type, text: v.text.trim(), quote: v.quote.trim(), date: today(), resolved: false }); save(); view.render(); }).open();

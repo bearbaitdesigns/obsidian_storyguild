@@ -1,6 +1,11 @@
 /* =====================================================================
    Publish: gather the book and write the file
    ===================================================================== */
+/** “Prologue”, or “Prologue: The Drowning” when the note has its own title. */
+function sectionHeading(c) {
+  const label = KIND_LABEL[c.kind]; const t = titleFromName(String(c.title || '')).replace(new RegExp(`^\\s*${label}\\s*[:.\\-–—]?\\s*`, 'i'), '').trim();
+  return t ? `${label}: ${t}` : label;
+}
 function compileChapters(p) {
   const o = p.compile; const all = listChapters(p);
   if (o.chapters === 'status' && o.statusFilter) return all.filter((c) => statusDef(c.status)?.name === o.statusFilter);
@@ -13,9 +18,11 @@ async function gatherBook(p) {
   const o = p.compile; const chs = compileChapters(p); const smart = o.smartQuotes !== false;
   const chapters = [];
   let words = 0;
+  let num = 0;
   for (let i = 0; i < chs.length; i++) {
     const c = chs[i]; const md = await app().vault.cachedRead(c.file); words += countWords(md);
-    chapters.push({ title: c.title, heading: chapterHeading(o.heading, i + 1, c.title), blocks: mdToBlocks(md, c.title, { smart }) });
+    const heading = c.kind === 'chapter' ? chapterHeading(o.heading, ++num, titleFromName(c.title)) : sectionHeading(c);
+    chapters.push({ title: c.title, kind: c.kind, heading, blocks: mdToBlocks(md, c.title, { smart }) });
   }
   let cover = null;
   if (p.cover && o.format !== 'docx') {

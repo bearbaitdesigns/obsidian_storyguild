@@ -21,7 +21,7 @@ class StoryguildPlugin extends Plugin {
     this.addRibbonIcon('feather', 'Open Draftsmith', () => this.openDraftsmith());
     const cmd = (id, name, fn) => this.addCommand({ id, name, callback: fn });
     cmd('open-draftsmith', 'Open Draftsmith', () => this.openDraftsmith());
-    cmd('new-chapter', 'Draftsmith: new chapter', () => new FormModal('New chapter', [{ key: 'title', label: 'Title', required: true }], 'Create', async (v) => openFile(await createChapter(ensureProject(), v.title.trim()))).open());
+    cmd('new-chapter', 'Draftsmith: new chapter', () => newChapterModal(ensureProject()));
     cmd('start-draft', 'Draftsmith: start a new manuscript draft', () => { const p = ensureProject(); new ConfirmModal(`Start draft #${p.draft + 1}?`, 'A copy of every chapter note is saved as a snapshot first.', 'Start draft', () => startManuscriptDraft(p, '', false)).open(); });
     cmd('publish', 'Draftsmith: publish with the current settings', () => compileProject(ensureProject()));
     cmd('import-chapters', 'Draftsmith: import existing chapter notes…', () => new ImportChaptersModal(ensureProject()).open());

@@ -58,6 +58,8 @@ Edit a shared field anywhere and it changes everywhere.
 - **Manuscript** — Every note in the project's chapters folder is a chapter. Chapter order comes from a `chapter` property, or follows the Plot Weaver board. Each chapter has its own `draft` number, and the whole manuscript has one too.
   - **Start draft #N** saves a copy of every chapter to `Drafts/Draft N/` before the new draft begins.
   - Word counts are written to the `words` property as you type. You can turn this off.
+    - Only prose is counted. Left out: frontmatter properties, fenced blocks (```, ''' or ~~~), inline code, [[wiki links]] and ![[embeds]], comments (%% %% and <!-- -->), callout titles, #tags and URLs.
+    - Counts are refreshed for every chapter after an update. The command **Recount words in all chapters** does it any time.
   - Each entry has a **type**: Chapter, Prologue, Interlude or Epilogue. Only chapters are numbered: a prologue shows as “Prologue” in the # column, and the first real chapter is Chapter 1.
     - In Publish, headings follow the type, for example “Prologue: The Drowning” or “Chapter 1: Low Water”.
     - For chapters linked to Plot Weaver, the type is shared with the board's section.

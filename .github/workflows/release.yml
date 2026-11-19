@@ -51,6 +51,7 @@ jobs:
       - name: Validate plugin files
         run: |
           node --check main.js
+          node test/wordcount.js
           node -e "
             const m = require('./manifest.json'), v = require('./versions.json');
             for (const k of ['id','name','version','minAppVersion','description','author']) if (!m[k]) { console.error('manifest.json is missing ' + k); process.exit(1); }

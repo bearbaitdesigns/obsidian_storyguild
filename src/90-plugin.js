@@ -24,6 +24,7 @@ class StoryguildPlugin extends Plugin {
     cmd('new-chapter', 'Draftsmith: new chapter', () => newChapterModal(ensureProject()));
     cmd('start-draft', 'Draftsmith: start a new manuscript draft', () => { const p = ensureProject(); new ConfirmModal(`Start draft #${p.draft + 1}?`, 'A copy of every chapter note is saved as a snapshot first.', 'Start draft', () => startManuscriptDraft(p, '', false)).open(); });
     cmd('publish', 'Draftsmith: publish with the current settings', () => compileProject(ensureProject()));
+    cmd('recount-words', 'Draftsmith: recount words in all chapters', async () => notice(`Recounted ${await recountAll()} chapter notes.`));
     cmd('import-chapters', 'Draftsmith: import existing chapter notes…', () => new ImportChaptersModal(ensureProject()).open());
     this.addCommand({ id: 'add-note-as-chapter', name: 'Draftsmith: add this note as a chapter', checkCallback: (check) => { const f = this.app.workspace.getActiveFile(); if (!f || f.extension !== 'md' || isChapterFile(f)) return false; if (!check) new ConfirmModal(`Add “${f.basename}” as a chapter?`, `It moves into ${chaptersFolder(ensureProject())} of “${ensureProject().title}” (links stay intact) and becomes the last chapter.`, 'Add chapter', async () => { await importChapters(ensureProject(), [f], { mode: 'move', matchPlot: true, append: true }); notice(`“${f.basename}” is now a chapter.`); }).open(); return true; } });
     cmd('chapters-from-plot', 'Draftsmith: create chapter notes from Plot Weaver', async () => { const n = await chaptersFromPlot(ensureProject()); notice(`Created ${n} chapter notes.`); });
@@ -80,6 +81,8 @@ class StoryguildPlugin extends Plugin {
       if (sub) { HOST.world = sub; bindWorldNovel(sub); syncRoundsToWorld(); }
     }
     syncSeries();
+    // Counting rules can change between versions: bring every chapter's words property up to date once per version.
+    if (this.data.countedWith !== this.manifest.version) { this.data.countedWith = this.manifest.version; this.saveSoon(); setTimeout(() => recountAll().catch((e) => console.error('Storyguild recount', e)), 3000); }
     const cur = activeProject(); const n = cur && linkedNovel(cur);
     if (n && HOST.plot && HOST.plot.data.activeNovelId !== n.id) { HOST.plot.data.activeNovelId = n.id; this._pwActive = n.id; HOST.plot._sgCommit(); }
     this.refreshAll();

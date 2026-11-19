@@ -180,6 +180,8 @@ async function startManuscriptDraft(p, note, bumpAll) {
 
 /* ---------- live word counts ---------- */
 function isChapterFile(f) { return f instanceof TFile && f.extension === 'md' && DS().projects.some((p) => f.path.startsWith(chaptersFolder(p) + '/')); }
+/** Recount every chapter note (e.g. after the counting rules change). Writes only counts that differ. */
+async function recountAll() { let n = 0; for (const f of app().vault.getMarkdownFiles()) if (isChapterFile(f)) { await recount(f); n++; } return n; }
 async function recount(f) {
   if (!isChapterFile(f)) return;
   const n = countWords(await app().vault.cachedRead(f)); SG.wordCache.set(f.path, n);

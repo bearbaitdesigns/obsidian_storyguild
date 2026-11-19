@@ -33,16 +33,27 @@ const notice = (m, t) => new Notice(m, t);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /* ---------- Markdown helpers ---------- */
+/** Split a note into frontmatter and body. Handles an empty block (---/---), Windows line
+    endings, a byte-order mark and spaces after the fences. */
 function splitFrontmatter(text) {
-  const m = String(text).match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
-  return m ? { fm: m[1], body: text.slice(m[0].length) } : { fm: '', body: String(text) };
+  const t = String(text ?? '');
+  const m = t.match(/^﻿?---[ \t]*\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/);
+  return m ? { fm: m[1] || '', body: t.slice(m[0].length) } : { fm: '', body: t };
 }
-/** Prose words in a note body: ignores frontmatter, comments, code, link targets and markup. */
+/** Words of prose only. Not counted: frontmatter properties; fenced blocks (```, ''' or ~~~)
+    and inline code; [[wiki links]] and ![[embeds]], including their text; comments (%% %%,
+    <!-- -->); callout titles; #tags; URLs; Markdown and HTML markup. */
 function countWords(text) {
-  let b = splitFrontmatter(text).body;
-  b = b.replace(/%%[\s\S]*?%%/g, ' ').replace(/<!--[\s\S]*?-->/g, ' ').replace(/```[\s\S]*?```/g, ' ')
-    .replace(/!\[\[[^\]]*\]\]/g, ' ').replace(/\[\[([^\]|]*\|)?([^\]]*)\]\]/g, '$2').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/^\s*>\s*\[![^\]]*\][+-]?/gm, ' ').replace(/[#*_>`~=|-]+/g, ' ');
+  let b = splitFrontmatter(text).body.replace(/\r\n?/g, '\n');
+  b = b.replace(/%%[\s\S]*?(?:%%|$)/g, ' ').replace(/<!--[\s\S]*?(?:-->|$)/g, ' ')
+    .replace(/^[ \t]*(`{3,}|~{3,}|'{3,})[^\n]*\n[\s\S]*?(?:^[ \t]*\1[ \t]*$|(?![\s\S]))/gm, ' ')
+    .replace(/`[^`\n]*`/g, ' ')
+    .replace(/!?\[\[[^\]]*\]\]/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/https?:\/\/\S+/g, ' ').replace(/<[^>\n]+>/g, ' ')
+    .replace(/^[ \t]*>[ \t]*\[![^\]]*\][+-]?.*$/gm, ' ')
+    .replace(/(^|\s)#[\p{L}\p{N}_/-]+/gu, '$1')
+    .replace(/[#*_>`~=|]+/g, ' ');
   const m = b.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu);
   return m ? m.length : 0;
 }

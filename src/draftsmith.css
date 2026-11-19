@@ -162,7 +162,11 @@
 .ds-kindlabel { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-accent); }
 .ds-drag-row:not(.is-chapter) .ds-link { font-style: italic; }
 .ds-kind { font-size: 12px; }
-.ds-move a { visibility: hidden; } .ds-drag-row:hover .ds-move a { visibility: visible; }
 .ds-drag-row.is-idea td { background: color-mix(in srgb, #e0b04f 6%, transparent); }
 .ds-drag-row.is-idea .ds-kindlabel { color: #e0b04f; }
 .ds-drag-row.is-idea .ds-link { color: var(--text-muted); }
+.ds-chtable td, .ds-chtable th { white-space: nowrap; }
+.ds-chtable td:nth-child(3) { white-space: normal; min-width: 140px; }
+.ds-chtable .ds-num { width: 28px; text-align: center; }
+.ds-chtable .ds-kindlabel { font-weight: 700; font-size: 12px; letter-spacing: 0; cursor: help; }
+.ds-chtable td:nth-child(9) { white-space: normal; }

@@ -13,6 +13,8 @@ const SCENE_KINDS = ['prologue', 'chapter', 'interlude', 'epilogue'];
     manuscript that isn't numbered, isn't linked to Plot Weaver and doesn't count toward words. */
 const DS_KINDS = [...SCENE_KINDS, 'idea'];
 const KIND_LABEL = { chapter: 'Chapter', prologue: 'Prologue', interlude: 'Interlude', epilogue: 'Epilogue', idea: 'Idea' };
+/** Short labels for the # column. */
+const KIND_SHORT = { prologue: 'P', interlude: 'I', epilogue: 'E', idea: '💡' };
 const normKind = (v) => { const k = String(v || '').trim().toLowerCase(); return DS_KINDS.includes(k) ? k : ''; };
 const isIdea = (c) => c.kind === 'idea';
 /** Guess a section type from a note name: "Prologue", "00 - Epilogue: After", "Interlude II"… */

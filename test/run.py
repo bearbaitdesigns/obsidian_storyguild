@@ -134,7 +134,7 @@ async def main():
           const n = SGP.sections.plot.data.novels[0];
           return { before, after: rows(), pw: n.chapters.map(c => c.title + ':' + c.kind) }; }""")
         print('4c. types & order:', json.dumps(r, ensure_ascii=False))
-        assert r['after'][0].startswith('Prologue|01 - Prologue') and r['after'][1].startswith('1|Low Water')
+        assert r['after'][0].startswith('P|01 - Prologue') and r['after'][1].startswith('1|Low Water')
         assert r['pw'].index('Prologue:prologue') < r['pw'].index('Low Water:chapter') and 'Spring Tide:interlude' in r['pw']
         # Idea: unlinked, unnumbered, placeable anywhere, convertible back and linkable
         r = await ev("""async () => { const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view; const wait = (ms) => new Promise(r => setTimeout(r, ms));
@@ -153,8 +153,8 @@ async def main():
           const m = __modals[__modals.length - 1]; [...m.contentEl.querySelectorAll('button')].find(b => b.textContent === 'Link').click(); await wait(600); v.render(); await wait(100);
           return { asIdea, moved, final: rows(), fm: fm(), pw: SGP.sections.plot.data.novels[0].chapters.map(c => c.title + ':' + c.kind) }; }""")
         print('4d. idea:', json.dumps(r, ensure_ascii=False))
-        assert 'plotweaver-chapter' not in r['asIdea']['fm'] and any(x.startswith('Idea|02 - Ballast') for x in r['asIdea']['rows'])
-        assert r['moved'][1].startswith('Idea|02 - Ballast') and r['moved'][2].startswith('1|Low Water')
+        assert 'plotweaver-chapter' not in r['asIdea']['fm'] and any(x.startswith('💡|02 - Ballast') for x in r['asIdea']['rows'])
+        assert r['moved'][1].startswith('💡|02 - Ballast') and r['moved'][2].startswith('1|Low Water')
         assert r['final'][1].startswith('1|02 - Ballast') and r['fm'].get('plotweaver-chapter') and r['pw'].index('Ballast:chapter') < r['pw'].index('Low Water:chapter')
         await page.wait_for_timeout(500)
         await page.screenshot(path=f'{OUT}/02-manuscript.png', full_page=True)

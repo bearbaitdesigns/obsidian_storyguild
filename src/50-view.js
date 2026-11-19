@@ -75,27 +75,24 @@ function renderManuscript(view, p, body) {
     return;
   }
   const K = DSS().keys; const sk = statusKey();
-  const tbl = el('table', { class: 'ds-table ds-chtable' }, el('thead', {}, el('tr', {}, ['', '#', 'Chapter', 'Type', 'Draft', 'Status', 'Words', 'POV', 'Plot Weaver', 'Notes', ''].map((x) => el('th', {}, x)))));
+  const tbl = el('table', { class: 'ds-table ds-chtable' }, el('thead', {}, el('tr', {}, ['', '#', 'Chapter', 'Type', 'Draft', 'Status', 'Words', 'POV', 'Plot Weaver', ''].map((x) => el('th', {}, x)))));
   let dragFrom = null;
   const tb = el('tbody'); tbl.append(tb);
   chs.forEach((c, i) => {
     const st = el('select', { class: 'dropdown ds-st' }, el('option', { value: '' }, '—'), statusDefs().map((d) => el('option', { selected: statusDef(c.status)?.name === d.name }, d.name)), c.status && !statusDef(c.status) ? el('option', { selected: true }, c.status) : null);
     const def = statusDef(c.status); if (def) st.style.setProperty('--c', def.color || '#888');
     st.addEventListener('change', () => setFm(c.file, (fm) => { fm[sk] = st.value; }));
-    const cards = cardsForChapter(p, c); const open = p.comments.filter((x) => x.ch === c.file.path && !x.resolved).length;
-    const moveTo = async (j) => { if (j < 0 || j >= chs.length || j === i) return; const a = chs.slice(); const [x] = a.splice(i, 1); a.splice(j, 0, x); await reorderChapters(p, a); };
+    const cards = cardsForChapter(p, c);
     const kind = el('select', { class: 'dropdown ds-kind' }, DS_KINDS.map((k) => el('option', { value: k, selected: c.kind === k }, (k === 'idea' ? '💡 ' : '') + KIND_LABEL[k])));
     kind.addEventListener('change', () => setChapterKind(p, c, kind.value));
     const tr = el('tr', { class: 'ds-drag-row is-' + c.kind, draggable: 'true' },
       el('td', { class: 'ds-grip', title: 'Drag to reorder' }, '⋮⋮'),
-      el('td', { class: 'ds-num' }, c.kind === 'chapter' ? String(c.num) : el('span', { class: 'ds-kindlabel' }, c.label),
-        el('span', { class: 'ds-move' }, el('a', { onclick: () => moveTo(i - 1), title: 'Move up' }, '↑'), el('a', { onclick: () => moveTo(i + 1), title: 'Move down' }, '↓'))),
+      el('td', { class: 'ds-num' }, c.kind === 'chapter' ? String(c.num) : el('span', { class: 'ds-kindlabel', title: c.label }, KIND_SHORT[c.kind])),
       el('td', {}, el('a', { class: 'ds-link', onclick: () => openFile(c.file) }, c.title)),
       el('td', {}, kind),
       el('td', {}, pill('D' + c.draft, 'is-draft'), el('a', { class: 'ds-mini', title: 'Save this version and start the next chapter draft', onclick: async () => { await bumpChapterDraft(p, c); } }, '+')),
       el('td', {}, st), el('td', { class: 'ds-r', title: isIdea(c) ? 'Ideas don’t count toward the manuscript’s words' : null }, c.words == null ? '—' : isIdea(c) ? `(${fmtN(c.words)})` : fmtN(c.words)), el('td', {}, c.pov || '—'),
       el('td', {}, isIdea(c) ? hint('idea · not linked') : cards.length ? cards.slice(0, 4).map((x) => el('span', { class: 'ds-pw', title: `${x.plotline ? x.plotline.name + ': ' : ''}${x.b.title}${x.pov ? ' · POV ' + x.pov.name : ''} — open on the board`, onclick: () => HOST.plot.openBoard(novel.id, x.b.id) }, el('i', { style: { background: (x.plotline && x.plotline.color) || '#888' } }), x.b.title.length > 28 ? x.b.title.slice(0, 27) + '…' : x.b.title)) : c.pwChapter ? hint('no cards') : el('a', { class: 'ds-mini', onclick: () => linkChapterToPlot(p, c) }, novel ? 'link…' : '—')),
-      el('td', {}, open ? pill(`${open} open`, 'is-warn') : '—'),
       el('td', {}, el('a', { class: 'ds-mini', title: 'Open', onclick: () => openFile(c.file) }, '↗')));
     tr.addEventListener('dragstart', (e) => { dragFrom = i; tr.addClass('is-dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(i)); } catch (x) { /* */ } });
     tr.addEventListener('dragend', () => tr.removeClass('is-dragging'));
@@ -105,7 +102,7 @@ function renderManuscript(view, p, body) {
     tb.append(tr);
   });
   body.append(el('div', { class: 'ds-tablewrap' }, tbl));
-  body.append(hint(`Drag rows (or use ↑ ↓) to reorder. Only chapters are numbered — a prologue, interlude or epilogue keeps its own name. Status and words use Plot Weaver’s fields (“${sk}”, “${wordsKey()}”), so all three sections read the same properties.${plotOrder ? ' Reordering here also reorders the Plot Weaver board, and type changes are shared with it.' : ''}`));
+  body.append(hint(`Drag rows by ⋮⋮ to reorder. Only chapters are numbered: P = prologue, I = interlude, E = epilogue, 💡 = idea. Status and words use Plot Weaver’s fields (“${sk}”, “${wordsKey()}”), so all three sections read the same properties.${plotOrder ? ' Reordering here also reorders the Plot Weaver board, and type changes are shared with it.' : ''}`));
 }
 function daysText(iso) { const d = daysUntil(iso); return d == null ? '' : d < 0 ? `${-d} days overdue` : d === 0 ? 'today' : `in ${d} days`; }
 function nextDatedStep(p) {

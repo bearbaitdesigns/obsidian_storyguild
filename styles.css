@@ -41,7 +41,11 @@
 .ds-table { width: 100%; border-collapse: collapse; font-size: var(--font-ui-small); }
 .ds-table th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); padding: 8px 10px; border-bottom: 1px solid var(--background-modifier-border); font-weight: 600; }
 .ds-table td { padding: 7px 10px; border-bottom: 1px solid var(--background-modifier-border-hover); vertical-align: middle; }
-.ds-table input[type=date], .ds-table select, .ds-table input[type=text] { font-size: 12px; padding: 2px 5px; height: auto; }
+.ds-table input[type=date], .ds-table input[type=text] { font-size: 12px; padding: 2px 5px; height: auto; }
+/* Selects in tables keep room for Obsidian's dropdown arrow so the text never runs under it. */
+.ds-table select.dropdown { font-size: 12px; height: auto; line-height: 1.4; padding: 4px 28px 4px 8px !important; background-position: right 8px center; min-width: 0; width: auto; }
+.ds-chtable select.ds-kind { min-width: 112px; }
+.ds-chtable select.ds-st { min-width: 128px; }
 .ds-r { text-align: right; font-variant-numeric: tabular-nums; }
 .ds-num { color: var(--text-muted); white-space: nowrap; }
 .ds-move a { margin-left: 4px; cursor: pointer; opacity: .5; } .ds-move a:hover { opacity: 1; }
@@ -163,7 +167,7 @@
 .ds-drag-row.is-over td { box-shadow: inset 0 2px 0 var(--interactive-accent); }
 .ds-kindlabel { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-accent); }
 .ds-drag-row:not(.is-chapter) .ds-link { font-style: italic; }
-.ds-kind { font-size: 12px; }
+
 .ds-drag-row.is-idea td { background: color-mix(in srgb, #e0b04f 6%, transparent); }
 .ds-drag-row.is-idea .ds-kindlabel { color: #e0b04f; }
 .ds-drag-row.is-idea .ds-link { color: var(--text-muted); }

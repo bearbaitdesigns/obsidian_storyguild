@@ -1,0 +1,10 @@
+{
+  "id": "plot-weaver",
+  "name": "Plot Weaver",
+  "version": "1.8.0",
+  "minAppVersion": "1.4.0",
+  "description": "Outline a novel across multiple simultaneous plotlines and POVs. Plan in story time, assign scenes to chapters when ready, track off-screen events and cause-and-effect between threads, and shelve, park, archive or rearrange ideas by drag and drop.",
+  "author": "bearbaitdesigns",
+  "authorUrl": "https://github.com/bearbaitdesigns",
+  "isDesktopOnly": false
+}

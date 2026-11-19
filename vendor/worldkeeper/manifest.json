@@ -1,0 +1,10 @@
+{
+  "id": "worldkeeper",
+  "name": "Worldkeeper",
+  "version": "1.0.6",
+  "minAppVersion": "1.4.0",
+  "description": "Worldbuilding sheets, dashboards, an encyclopedia and novel progress tracking: characters, places, cultures, conlangs, magic systems, pantheons and more.",
+  "author": "bearbaitdesigns",
+  "authorUrl": "https://github.com/bearbaitdesigns",
+  "isDesktopOnly": false
+}

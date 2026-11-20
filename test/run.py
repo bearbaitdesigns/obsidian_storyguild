@@ -187,12 +187,18 @@ async def main():
           const out = { pwTitle: SGP.sections.plot.data.novels[0].title, wkTitle: SGP.sections.world.settings.novel.title };
           v.setTab('checklist'); await new Promise(r => setTimeout(r, 200));
           const it = p.checklists.draft[1].items[1]; it.due = '2026-12-31'; v.render(); await new Promise(r => setTimeout(r, 100));
-          const wkb = document.querySelectorAll('.ds-wk')[4]; wkb.click(); await new Promise(r => setTimeout(r, 400));
+          const row = [...document.querySelectorAll('.ds-ck')].find(r => r.querySelector('.ds-ghost').value === it.t); row.querySelector('.ds-wk').click(); await new Promise(r => setTimeout(r, 300));
           out.todo = await app.vault.read(app.vault.getAbstractFileByPath('Worldkeeper/To-do.md'));
+          const ms = SGP.sections.world.settings.novel.milestones; const m = ms.find(x => x.checklistId === it.id);
+          out.milestone = m ? [m.name, m.kind, m.due, m.status] : null;
+          // tick it on Worldkeeper Home's side → the checklist step is ticked
+          m.status = 'done'; await SGP.sections.world.saveSettings(); await new Promise(r => setTimeout(r, 200)); v.render(); await new Promise(r => setTimeout(r, 100));
+          out.tickedBack = it.done;
           out.auto = p.checklists.trad[1].items.map(i => [i.t, itemDoneTest(p, i)]);
           return out; }""".replace('setProjectFieldTest = null;', '').replace('itemDoneTest(p, i)', 'null'))
         print('6. shared title + todo:', json.dumps(r, ensure_ascii=False))
-        assert r['pwTitle'] == 'The Salt Lantern (rev)' and r['wkTitle'] == 'The Salt Lantern (rev)' and 'Draftsmith' not in r['todo'] or '#draftsmith' in r['todo']
+        assert r['pwTitle'] == 'The Salt Lantern (rev)' and r['wkTitle'] == 'The Salt Lantern (rev)'
+        assert '#draftsmith' not in r['todo'] and r['milestone'] == ['Draft 1 complete', 'Drafting', '2026-12-31', 'planned'] and r['tickedBack'] is True
         await page.screenshot(path=f'{OUT}/04-checklist.png', full_page=True)
         await ev("""async () => { app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view.setTab('details'); await new Promise(r => setTimeout(r, 200)); }""")
         await page.screenshot(path=f'{OUT}/05-details.png', full_page=True)

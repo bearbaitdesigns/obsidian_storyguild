@@ -136,14 +136,54 @@ function syncRoundsToWorld(p) {
 }
 const readerName = (p, id) => (p.readers.find((r) => r.id === id) || {}).name || 'Reader';
 
-/* ---------- checklist steps ⇄ Worldkeeper to-do list ---------- */
-const todoText = (p, it) => `${it.t} — ${p.title}`;
-async function worldTodos() { const api = WorldkeeperModule.storyguild; if (!HOST.world) return null; try { return await api.readTodos(); } catch (e) { return null; } }
-async function pushTodo(p, it, on) {
-  const api = WorldkeeperModule.storyguild; if (!HOST.world) { notice('Turn on the Worldkeeper section to send steps to its to-do list.'); return false; }
-  const list = (await api.readTodos()) || []; const text = todoText(p, it);
-  const i = list.findIndex((t) => t.text.trim() === text || (it.wkText && t.text.trim() === it.wkText));
-  if (on) { const row = { done: !!it.done, text, due: it.due || '', tag: 'Draftsmith' }; if (i >= 0) list[i] = Object.assign(list[i], row); else list.push(row); it.wkText = text; }
-  else if (i >= 0) list.splice(i, 1);
-  await api.writeTodos(list); HOST.world.refreshSoon(100); return true;
+/* ---------- checklist steps ⇄ Worldkeeper "Milestones & deadlines" ----------
+   A checklist step marked 🎯 becomes a milestone of the same book on Worldkeeper Home,
+   with its target date as the deadline. Ticking either side ticks the other.
+   (Worldkeeper's to-do list keeps only to-dos from your notes and the to-do file.) */
+function milestoneKind(tab, group) {
+  const g = String(group || '').toLowerCase();
+  if (tab === 'draft') { if (/^draft 1\b/.test(g)) return 'Drafting'; if (/^draft \d/.test(g)) return 'Revision'; if (/reader/.test(g)) return 'Other'; if (/polish/.test(g)) return 'Proofreading'; return 'Other'; }
+  if (/submission package|agent|query/.test(g)) return 'Querying';
+  if (/on submission/.test(g)) return 'Submission';
+  if (/manuscript ready|edit/.test(g)) return 'Editing';
+  return 'Publishing';
+}
+const bookMilestones = (p) => { p.wk = p.wk || {}; if (!Array.isArray(p.wk.milestones)) p.wk.milestones = []; return p.wk.milestones; };
+function setChecklistMilestone(p, it, tab, group, on) {
+  const ms = bookMilestones(p); const i = ms.findIndex((m) => m.checklistId === it.id);
+  if (!on) { if (i >= 0) ms.splice(i, 1); }
+  else {
+    const old = i >= 0 ? ms[i] : null; const done = itemDone(p, it);
+    const m = Object.assign(old || { id: 'ck' + it.id, checklistId: it.id, projectId: p.id, progress: 0, readers: [] }, {
+      name: it.t, kind: old && old.kind ? old.kind : milestoneKind(tab, group), due: it.due || '', status: done ? 'done' : old && old.status === 'active' ? 'active' : 'planned',
+    });
+    if (!old) ms.push(m);
+  }
+  SG.saveSoon(); if (HOST.world && activeProject() === p) HOST.world.refreshSoon(100);
+}
+/** Pick up changes made on Worldkeeper Home: ticked as done, new deadline, or milestone deleted. */
+function reflectChecklistMilestones(p) {
+  const ms = bookMilestones(p); let changed = false;
+  for (const [, gs] of Object.entries(p.checklists)) for (const g of gs) for (const it of g.items) {
+    if (!it.wk) continue; const m = ms.find((x) => x.checklistId === it.id);
+    if (!m) { it.wk = false; changed = true; continue; }
+    if (!it.auto && (m.status === 'done') !== !!it.done) { it.done = m.status === 'done'; changed = true; }
+    if ((m.due || '') !== (it.due || '')) { it.due = m.due || ''; changed = true; }
+    if (it.auto) { const st = itemDone(p, it) ? 'done' : m.status === 'done' ? 'planned' : m.status; if (st !== m.status) { m.status = st; changed = true; } }
+  }
+  if (changed) SG.saveSoon();
+  return changed;
+}
+/** One-time move: steps that 1.x sent to the Worldkeeper to-do file become milestones instead. */
+async function moveChecklistTodosToMilestones() {
+  const api = WorldkeeperModule.storyguild; let list = null; try { list = HOST.world ? await api.readTodos() : null; } catch (e) { list = null; }
+  let removed = 0;
+  for (const p of DS().projects) for (const [tab, gs] of Object.entries(p.checklists)) for (const g of gs) for (const it of g.items) {
+    if (!it.wk) continue;
+    setChecklistMilestone(p, it, tab, g.g, true);
+    if (list) { const text = `${it.t} — ${p.title}`; const before = list.length; list = list.filter((t) => !(t.text.trim() === text || (it.wkText && t.text.trim() === it.wkText))); removed += before - list.length; }
+    delete it.wkText;
+  }
+  if (list && removed) { await api.writeTodos(list); HOST.world.refreshSoon(100); }
+  return removed;
 }

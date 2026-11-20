@@ -81,6 +81,7 @@ class StoryguildPlugin extends Plugin {
       if (sub) { HOST.world = sub; bindWorldNovel(sub); syncRoundsToWorld(); }
     }
     syncSeries();
+    if (HOST.world && !this.data.checklistMilestones) { this.data.checklistMilestones = 1; this.saveSoon(); moveChecklistTodosToMilestones().then((n) => { if (n) notice(`Storyguild: ${n} checklist step${n === 1 ? '' : 's'} moved from the Worldkeeper to-do list to Milestones & deadlines.`, 8000); }).catch((e) => console.error(e)); }
     // Counting rules can change between versions: bring every chapter's words property up to date once per version.
     if (this.data.countedWith !== this.manifest.version) { this.data.countedWith = this.manifest.version; this.saveSoon(); setTimeout(() => recountAll().catch((e) => console.error('Storyguild recount', e)), 3000); }
     const cur = activeProject(); const n = cur && linkedNovel(cur);
@@ -91,7 +92,7 @@ class StoryguildPlugin extends Plugin {
     const manifest = Object.assign({}, this.manifest, { id: OLD_IDS[key], name, version: key === 'plot' ? HOST.plotVersion : HOST.worldVersion });
     const sub = new Cls(this.app, manifest);
     sub.loadData = async () => this.data[key];
-    sub.saveData = async (d) => { this.data[key] = d; await this.saveNow(); };
+    sub.saveData = async (d) => { this.data[key] = d; if (key === 'world') { const p = activeProject(); if (p && reflectChecklistMilestones(p)) this.refreshDraftsmithSoon(); } await this.saveNow(); };
     let ready = Promise.resolve();
     const orig = sub.onload;
     sub.onload = function () { ready = Promise.resolve().then(() => orig.call(sub)); return ready; };

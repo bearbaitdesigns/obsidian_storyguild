@@ -25,10 +25,11 @@ function autoChecks(p) {
 function itemDone(p, it) { if (!it.auto) return !!it.done; const a = autoChecks(p)[it.auto]; try { return a ? !!a[1]() : !!it.done; } catch (e) { return false; } }
 
 function renderChecklist(view, p, body) {
+  reflectChecklistMilestones(p);
   const tab = CHECKLIST_NAMES[p.checklistTab] ? p.checklistTab : 'draft'; const L = p.checklists[tab]; const autos = autoChecks(p);
   const all = L.flatMap((g) => g.items); const done = all.filter((it) => itemDone(p, it)).length;
   body.append(el('div', { class: 'ds-row' }, el('p', { class: 'ds-hint ds-grow' }, tab === 'draft' ? 'Prep, drafts, revisions and reader rounds — everything up to a finished manuscript.' : 'The usual steps from finished manuscript to launch.',
-    ' Steps marked ⚡ tick themselves from your data. Add, remove or date any step; dated steps can go to the Worldkeeper to-do list.'),
+    ' Steps marked ⚡ tick themselves from your data. Add, remove or date any step; 🎯 makes a dated step a milestone on Worldkeeper Home.'),
     el('div', { class: 'ds-seg' }, Object.entries(CHECKLIST_NAMES).map(([k, l]) => el('button', { class: k === tab ? 'is-on' : '', onclick: () => { p.checklistTab = k; SG.saveSoon(); view.render(); } }, l)))));
   body.append(card(null, el('div', { class: 'ds-row' }, el('b', { class: 'ds-grow' }, `${CHECKLIST_NAMES[tab]} · ${done} of ${all.length} done`), el('span', { class: 'ds-hint' }, all.length ? Math.round((done / all.length) * 100) + '%' : '')),
     el('div', { class: 'ds-bar' }, el('i', { style: { width: (all.length ? (done / all.length) * 100 : 0) + '%' } }))));
@@ -40,14 +41,19 @@ function renderChecklist(view, p, body) {
     g.items.forEach((it, ii) => {
       const isDone = itemDone(p, it);
       const cb = el('input', { type: 'checkbox', checked: isDone, disabled: !!it.auto, title: it.auto ? 'Ticks itself' : '' });
-      cb.addEventListener('change', async () => { it.done = cb.checked; SG.saveSoon(); if (it.wk) await pushTodo(p, it, true); view.render(); });
-      const text = el('input', { type: 'text', value: it.t, class: 'ds-ghost' }); text.addEventListener('change', async () => { if (it.wk) await pushTodo(p, it, false); it.t = text.value; if (it.wk) await pushTodo(p, it, true); SG.saveSoon(); });
-      const due = el('input', { type: 'date', value: it.due || '', title: 'Target date' }); due.addEventListener('change', async () => { it.due = due.value; SG.saveSoon(); if (it.wk) await pushTodo(p, it, true); view.render(); });
-      const wk = el('button', { class: 'ds-wk' + (it.wk ? ' is-on' : ''), title: it.wk ? 'On the Worldkeeper to-do list — click to remove' : 'Add to the Worldkeeper to-do list' }, 'WK');
-      wk.addEventListener('click', async () => { const on = !it.wk; if (await pushTodo(p, it, on)) { it.wk = on; SG.saveSoon(); notice(on ? 'Added to the Worldkeeper to-do list.' : 'Removed from the Worldkeeper to-do list.'); view.render(); } });
+      const sync = () => { if (it.wk) setChecklistMilestone(p, it, tab, g.g, true); };
+      cb.addEventListener('change', () => { it.done = cb.checked; SG.saveSoon(); sync(); view.render(); });
+      const text = el('input', { type: 'text', value: it.t, class: 'ds-ghost' }); text.addEventListener('change', () => { it.t = text.value; SG.saveSoon(); sync(); });
+      const due = el('input', { type: 'date', value: it.due || '', title: 'Target date' }); due.addEventListener('change', () => { it.due = due.value; SG.saveSoon(); sync(); view.render(); });
+      const wk = el('button', { class: 'ds-wk' + (it.wk ? ' is-on' : ''), title: it.wk ? 'A milestone on Worldkeeper Home (Milestones & deadlines) — click to remove' : 'Make this a milestone on Worldkeeper Home (Milestones & deadlines)' }, '🎯');
+      wk.addEventListener('click', () => {
+        const on = !it.wk; if (on && !it.due) { notice('Give the step a target date first — it becomes the milestone’s deadline.'); due.focus(); return; }
+        it.wk = on; setChecklistMilestone(p, it, tab, g.g, on);
+        notice(on ? `“${it.t}” is now a milestone on Worldkeeper Home.` : `“${it.t}” was removed from Worldkeeper’s milestones.`); view.render();
+      });
       const a = it.auto && autos[it.auto];
       box.append(el('div', { class: 'ds-ck' + (isDone ? ' is-done' : '') }, cb, el('div', { class: 'ds-ck-t' }, text, a ? el('small', { class: 'ds-auto' }, '⚡ ' + a[0]) : null), due, wk,
-        btn('✕', async () => { if (it.wk) await pushTodo(p, it, false); g.items.splice(ii, 1); SG.saveSoon(); view.render(); }, 'clickable-icon ds-sm', 'Remove step')));
+        btn('✕', () => { if (it.wk) setChecklistMilestone(p, it, tab, g.g, false); g.items.splice(ii, 1); SG.saveSoon(); view.render(); }, 'clickable-icon ds-sm', 'Remove step')));
     });
     const add = el('input', { type: 'text', placeholder: 'Add a step…', class: 'ds-grow' });
     const doAdd = () => { const t = add.value.trim(); if (!t) return; g.items.push({ id: uid(), t, auto: null, done: false, due: '', wk: false }); SG.saveSoon(); view.render(); };
@@ -58,10 +64,5 @@ function renderChecklist(view, p, body) {
   body.append(el('div', { class: 'ds-row' }, btn('+ Add section', () => new FormModal('New section', [{ key: 'g', label: 'Section name', required: true }], 'Add', (v) => { L.push({ id: uid(), g: v.g.trim(), items: [] }); SG.saveSoon(); view.render(); }).open()),
     btn('Reset this tab to the standard steps…', () => new ConfirmModal(`Reset ${CHECKLIST_NAMES[tab]}?`, 'Your own steps, ticks and dates on this tab are replaced with the standard list.', 'Reset', () => { p.checklists[tab] = makeChecklists()[tab]; SG.saveSoon(); view.render(); }).open())));
 
-  // Ticked in Worldkeeper? Reflect it here.
-  if (all.some((it) => it.wk && !it.auto)) worldTodos().then((list) => {
-    if (!list) return; let changed = false;
-    for (const it of all) if (it.wk && !it.auto) { const t = list.find((x) => x.text.trim() === todoText(p, it)); if (t && t.done !== !!it.done) { it.done = t.done; changed = true; } }
-    if (changed) { SG.saveSoon(); view.render(); }
-  });
+
 }

@@ -49,7 +49,7 @@ One set of book details serves all three sections:
 | Word count | chapter notes | Home words and activity chart | stats strip |
 | Status and words properties on notes | same fields | same fields | Plot Weaver's own field settings |
 | Reader rounds | Readers tab | Milestones card (read-only there) | — |
-| Checklist steps marked WK | Publishing checklist | To-do list (with 📅 due date) | — |
+| Checklist steps marked 🎯 | Publishing checklist | Milestones & deadlines card (the step's date is the deadline; ticking either side ticks both) | — |
 
 Edit a shared field anywhere and it changes everywhere.
 
@@ -82,7 +82,7 @@ Edit a shared field anywhere and it changes everywhere.
   - Each round has its own set of questions. Readers' answers are shown side by side under each question.
   - When you add a round's first questions, Draftsmith asks whether to include them in Publish.
   - **Export round to note** writes the whole round to Markdown.
-- **Publishing checklist** — three tabs: **Drafting & Revision**, **Traditional** and **Self-publishing**. Steps marked ⚡ tick themselves from your data. You can add, remove or date any step, and send dated steps to the Worldkeeper to-do list.
+- **Publishing checklist** — three tabs: **Drafting & Revision**, **Traditional** and **Self-publishing**. Steps marked ⚡ tick themselves from your data. You can add, remove or date any step. 🎯 turns a dated step into a milestone on the Worldkeeper Home Milestones & deadlines card. The to-do list keeps only to-dos from your notes and the to-do file.
 - **Publish** — PDF (book layout or standard manuscript format), Word (.docx), EPUB 3 or one Markdown note.
   - Options: title page, contents, front and back matter, chapter heading template (`{n}`, `{N}`, `{title}`), scene-break mark, page size and curly quotes.
   - A round's questions can be added at the end of a reader copy as a plain list, with no space for answers (readers answer separately).

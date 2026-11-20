@@ -102,7 +102,8 @@
 .ds-ghost:hover, .ds-ghost:focus { border-color: var(--background-modifier-border) !important; }
 .ds-auto { font-size: 11px; color: #3fb6b2; padding-left: 4px; }
 .ds-wk { font-size: 10px !important; padding: 2px 0 !important; height: auto !important; box-shadow: none !important; background: none !important; border: 1px solid var(--background-modifier-border) !important; color: var(--text-faint); }
-.ds-wk.is-on { color: #d7924a; border-color: #d7924a !important; }
+.ds-wk.is-on { color: #d7924a; border-color: #d7924a !important; background: color-mix(in srgb, #d7924a 14%, transparent) !important; }
+.ds-wk:not(.is-on) { filter: grayscale(1); opacity: .6; }
 .ds-meta { display: grid; grid-template-columns: 260px 1fr; gap: 16px; align-items: start; }
 .ds-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
 .ds-shared { color: #3fb6b2; cursor: help; }

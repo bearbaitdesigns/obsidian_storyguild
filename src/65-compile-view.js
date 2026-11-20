@@ -7,7 +7,9 @@ function renderCompile(view, p, body) {
   const toggle = (k, label, desc) => el('div', { class: 'ds-opt' }, el('div', {}, el('div', {}, label), desc ? el('small', { class: 'ds-hint' }, desc) : null),
     ((c) => { c.addEventListener('change', () => set(k, c.checked)); return c; })(el('input', { type: 'checkbox', checked: !!o[k] })));
   const select = (k, label, options) => el('div', { class: 'ds-opt' }, el('div', {}, label), ((s) => { s.addEventListener('change', () => set(k, s.value)); return s; })(el('select', { class: 'dropdown' }, options.map((x) => { const [v, l] = Array.isArray(x) ? x : [x, x]; return el('option', { value: v, selected: String(o[k]) === String(v) }, l); }))));
-  const textOpt = (k, label, ph) => el('div', { class: 'ds-opt' }, el('div', {}, label), ((i) => { i.addEventListener('change', () => set(k, i.value, false)); return i; })(el('input', { type: 'text', value: o[k] || '', placeholder: ph || '' })));
+  const textOpt = (k, label, ph, redraw = true) => el('div', { class: 'ds-opt' }, el('div', {}, label), ((i) => { i.addEventListener('change', () => set(k, i.value, redraw)); return i; })(el('input', { type: 'text', value: o[k] || '', placeholder: ph || '' })));
+  const toggleVal = (k, label, desc, value) => el('div', { class: 'ds-opt' }, el('div', {}, el('div', {}, label), desc ? el('small', { class: 'ds-hint' }, desc) : null),
+    ((c) => { c.addEventListener('change', () => set(k, c.checked)); return c; })(el('input', { type: 'checkbox', checked: !!value })));
 
   body.append(el('p', { class: 'ds-hint' }, 'Stitch your chapter notes into one book. Properties, comments, callouts and Obsidian links are left out; *italics* and **bold** are kept, and scene breaks (***, ---, #) become your scene-break mark.'));
   const grid = el('div', { class: 'ds-pubgrid' }); body.append(grid);
@@ -27,13 +29,18 @@ function renderCompile(view, p, body) {
     !(msfAllowed && o.manuscriptFormat) ? [toggle('titlePage', 'Title page'), toggle('toc', 'Table of contents'), toggle('frontMatter', 'Copyright, dedication, acknowledgments & author bio', 'Taken from Book details')] : null,
     msfAllowed && !o.manuscriptFormat ? [select('pageSize', 'Page size', [['6x9', '6 × 9 in (trade)'], ['5.5x8.5', '5.5 × 8.5 in'], ['5x8', '5 × 8 in'], ['letter', 'US Letter'], ['a4', 'A4']]), select('fontSize', 'Font size', ['10', '10.5', '11', '11.5', '12'].map((x) => [x, x + ' pt']))] : null,
     o.format === 'docx' && !o.manuscriptFormat ? select('font', 'Font', ['Times', 'Garamond', 'Georgia']) : null,
-    toggle('draftStamp', 'Stamp the draft number', `Adds “Draft ${p.draft}” to the copyright page and file name`),
+    toggle('draftStamp', 'Stamp the draft number and word count', `Adds “Draft ${p.draft} · ${fmtN(totalWords(p))} words” to the copyright page, and the draft to the file name`),
     toggle('smartQuotes', 'Curly quotes and dashes', 'Turns "straight" quotes into “curly” ones and -- into —'),
-    textOpt('folder', 'Save to folder', projectSub(p, 'compiledFolder'))));
+    textOpt('folder', 'Save to folder', projectSub(p, 'compiledFolder'), false)));
+  left.append(card('Copyright & notices',
+    toggleVal('draftNotice', 'Draft copyright notice', `Uses your draft notice from Book details on the copyright page${o.draftNotice == null ? ` (on automatically while the stage isn’t Published)` : ''}`, draftNoticeOn(p)),
+    toggle('footerCopyright', 'Short copyright on every page', fillTokens(p.shortCopyright || DEFAULT_LEGAL.shortCopyright, p)),
+    toggle('footerAi', 'AI notice on every page', fillTokens(p.aiNotice || DEFAULT_LEGAL.aiNotice, p)),
+    hint(o.format === 'epub' ? 'E-books have no fixed pages, so these notices end every chapter instead.' : 'Wording is set in Book details → Copyright & notices.')));
   // reader questions
   const qRounds = roundsForPublish(p);
   left.append(card('Reader questions',
-    qRounds.length ? [toggle('includeQuestions', 'Add reader questions at the end', 'For alpha and beta reader copies'),
+    qRounds.length ? [toggle('includeQuestions', 'Add reader questions', 'For alpha, beta and ARC reader copies. They’re printed before the table of contents.'),
       o.includeQuestions ? select('questionsRound', 'Questions from', qRounds.map((r) => [r.id, `${r.name} (${r.questions.length})`]).reverse()) : null]
       : hint(p.rounds.some((r) => r.questions.length) ? 'Your rounds have questions, but none are set to “Include in Publish”. Turn that on in Readers.' : 'Add questions to a reader round (Readers tab) to offer them here.')));
   left.append(el('div', { class: 'ds-row' }, btn(`Publish ${({ pdf: 'PDF', docx: 'Word', epub: 'EPUB', md: 'Markdown' })[o.format]}`, async (e) => { e.target.disabled = true; try { await compileProject(p); } catch (err) { console.error(err); notice('Publishing failed: ' + err.message); } view.render(); }, 'mod-cta ds-big')));
@@ -46,18 +53,79 @@ function renderCompile(view, p, body) {
   grid.append(left, right);
 }
 
-/** A rough look at the first page, so the options feel concrete. */
+/* ---------- Preview ----------
+   Miniature pages that follow every choice: format, page size, font and size, manuscript
+   format, title page, copyright notices, reader questions, contents with (estimated) page
+   numbers, chapter heading, scene break, curly quotes, and the notices at the foot of each page. */
+const PREVIEW_W = 250;
+const PAGE_PT = { '6x9': [432, 648], '5.5x8.5': [396, 612], '5x8': [360, 576], letter: [612, 792], a4: [595, 842] };
+const WORDS_PER_PAGE = { '6x9': 300, '5.5x8.5': 270, '5x8': 235, letter: 520, a4: 540 };
 function previewPage(p, sel) {
-  const o = p.compile; const msf = o.manuscriptFormat && (o.format === 'pdf' || o.format === 'docx');
-  const page = el('div', { class: 'ds-page' + (msf ? ' is-msf' : '') + (o.format === 'epub' ? ' is-epub' : '') });
+  const o = p.compile; const fmt = o.format; const msf = !!o.manuscriptFormat && (fmt === 'pdf' || fmt === 'docx'); const epub = fmt === 'epub';
+  const wrap = el('div', { class: 'ds-preview' }, el('div', { class: 'ds-row' }, el('b', { class: 'ds-grow' }, 'Preview'), el('small', { class: 'ds-hint' }, epub ? 'e-reader screens' : fmt === 'md' ? 'one note' : `${msf ? 'US Letter, manuscript format' : (o.pageSize || '6x9').replace('x', ' × ') + (/\d/.test(o.pageSize || '6') ? ' in' : '')} · page numbers estimated`)));
+  if (!sel.length) { wrap.append(hint('No chapters selected.')); return wrap; }
+  const author = p.penName || p.author || 'Author';
+  const fs = msf ? 12 : Number(o.fontSize) || 11;
+  const [pw, ph] = epub ? [360, 600] : msf ? PAGE_PT.letter : PAGE_PT[o.pageSize] || PAGE_PT['6x9'];
+  const k = PREVIEW_W / pw; const px = (pt) => `${(pt * k).toFixed(2)}px`;
+  const family = msf ? '"Courier New", Courier, monospace' : epub ? 'Georgia, serif' : fmt === 'docx' && o.font === 'Garamond' ? 'Garamond, "EB Garamond", serif' : fmt === 'docx' && o.font === 'Georgia' ? 'Georgia, serif' : '"Times New Roman", Times, serif';
+  const smart = o.smartQuotes !== false; const sq = (t) => (smart ? smartQuotes(t) : t);
+  const footer = [o.footerCopyright !== false ? fillTokens(p.shortCopyright || DEFAULT_LEGAL.shortCopyright, p) : '', o.footerAi !== false ? fillTokens(p.aiNotice || DEFAULT_LEGAL.aiNotice, p) : ''].filter(Boolean);
+  const qRound = o.includeQuestions ? roundsForPublish(p).find((r) => r.id === o.questionsRound) || roundsForPublish(p).slice(-1)[0] : null;
+  if (fmt === 'md') {
+    const note = el('div', { class: 'ds-pp is-note', style: { 'font-size': '12px' } }, el('b', {}, `# ${p.title}`), el('div', {}, `by ${author}`), ...footer.map((l) => el('div', { class: 'ds-hint' }, `> ${l}`)),
+      qRound ? el('div', {}, el('b', {}, '## Questions for Readers'), ...qRound.questions.slice(0, 3).map((q, i) => el('div', {}, `${i + 1}. ${q.text}`))) : null,
+      el('b', {}, `## ${headingFor(sel[0], 1, o)}`), el('div', { class: 'ds-hint' }, '…'));
+    wrap.append(note); return wrap;
+  }
+  // Page plan, mirroring the PDF writer.
+  const pages = []; const add = (kind, build) => pages.push({ kind, build });
+  const hasCover = !msf && p.cover && resourceUrl(p.cover) && (epub || /\.jpe?g$/i.test(p.cover));
+  if (hasCover) add('cover', (b) => b.append(el('img', { class: 'ds-pp-cover', src: resourceUrl(p.cover) })));
+  if (o.titlePage || msf) add('title', (b) => {
+    if (msf) { b.append(el('div', { class: 'ds-pp-msfhead' }, el('div', {}, p.author || author, o.contact ? el('div', {}, o.contact) : null), el('div', {}, `About ${aboutWords(totalWords(p))} words`)), el('div', { class: 'ds-pp-center', style: { 'margin-top': '38%' } }, el('div', {}, p.title.toUpperCase()), p.subtitle ? el('div', {}, p.subtitle) : null, el('div', {}, `by ${author}`))); return; }
+    b.append(el('div', { class: 'ds-pp-center', style: { 'margin-top': '22%' } }, el('div', { style: { 'font-size': px(fs * 2.4), 'line-height': 1.15 } }, p.title), p.subtitle ? el('i', { style: { 'font-size': px(fs * 1.3) } }, p.subtitle) : null, p.series ? el('i', {}, seriesLine(p)) : null),
+      el('div', { class: 'ds-pp-center', style: { position: 'absolute', left: 0, right: 0, bottom: '24%', 'font-size': px(fs * 1.4) } }, author));
+  });
+  if (o.frontMatter && !msf) {
+    const copy = [...(draftNoticeOn(p) ? fillTokens(p.draftCopyright || DEFAULT_LEGAL.draftCopyright, p).split(/\n+/) : [`Copyright © ${p.copyright || new Date().getFullYear()} ${author}`, 'All rights reserved.']), p.isbnPrint || p.isbnEbook ? `ISBN ${epub ? p.isbnEbook || p.isbnPrint : p.isbnPrint || p.isbnEbook}` : '', p.publisher ? `Published by ${p.publisher}` : '', o.draftStamp ? `Draft ${p.draft} · ${fmtN(totalWords(p))} words · ${today()}` : ''].filter(Boolean);
+    add('front', (b) => b.append(el('div', { class: 'ds-pp-center', style: { position: 'absolute', left: 0, right: 0, bottom: '6%', 'font-size': px(fs * 0.85) } }, copy.map((l) => el('p', {}, l)), epub ? footer.map((l) => el('p', { class: 'ds-pp-legal-in' }, l)) : null)));
+    if (String(p.dedication || '').trim()) add('front', (b) => b.append(el('div', { class: 'ds-pp-center', style: { 'margin-top': '30%', 'font-style': 'italic' } }, p.dedication)));
+  }
+  if (qRound) add('questions', (b) => { b.append(el('div', { class: 'ds-pp-h' }, o.questionsTitle || 'Questions for Readers'), el('p', { class: 'ds-pp-intro' }, qRound.focus ? `Thank you for reading! ${qRound.focus}` : 'Thank you for reading! Please keep these questions in mind as you read.'), ...qRound.questions.filter((q) => q.text.trim()).map((q, i) => el('p', { class: 'ds-pp-q' }, `${i + 1}. ${q.text}`))); if (epub) b.append(...footer.map((l) => el('p', { class: 'ds-pp-legal-in' }, l))); });
+  const tocAt = pages.length; const showToc = o.toc && !msf;
+  // estimate where each chapter starts
+  const wpp = msf ? 250 : Math.round((WORDS_PER_PAGE[o.pageSize] || 300) * (11 / fs) ** 2);
+  const tocPages = showToc && !epub ? Math.max(1, Math.ceil(sel.length / 18)) : showToc ? 1 : 0;
+  let pageNo = pages.length + tocPages - (hasCover ? 1 : 0); const starts = [];
+  for (const c of sel) { starts.push(pageNo + 1); pageNo += Math.max(1, Math.ceil(((c.words || 0) + wpp * 0.3) / wpp)); }
+  let n = 0; const headings = sel.map((c) => headingFor(c, c.kind === 'chapter' ? ++n : 0, o));
+  const back = o.frontMatter && !msf ? [String(p.acknowledgments || '').trim() ? 'Acknowledgments' : '', String(p.bio || '').trim() ? 'About the Author' : ''].filter(Boolean) : [];
+  back.forEach(() => { starts.push(pageNo + 1); pageNo += 1; });
+  const entries = [...headings, ...back];
+  if (showToc) add('toc', (b) => { b.append(el('div', { class: 'ds-pp-h', style: { 'margin-top': '8%' } }, 'Contents'), ...entries.slice(0, 16).map((h, i) => el('div', { class: 'ds-pp-toc' }, el('span', {}, h), epub ? null : el('i'), epub ? null : el('span', {}, String(starts[i])))), ...(entries.length > 16 ? [el('div', { class: 'ds-pp-center' }, '…')] : [])); });
   const first = sel[0];
-  if (o.format === 'epub' && p.cover && resourceUrl(p.cover)) page.append(el('img', { class: 'ds-page-cover', src: resourceUrl(p.cover) }));
-  if (o.titlePage || msf) page.append(el('div', { class: 'ds-page-title' }, el('b', {}, msf ? p.title.toUpperCase() : p.title), p.subtitle ? el('i', {}, p.subtitle) : null, el('span', {}, (msf ? 'by ' : '') + (p.penName || p.author || 'Author'))));
-  if (first) {
-    page.append(el('h4', {}, first.kind === 'chapter' ? chapterHeading(o.heading, 1, titleFromName(first.title)) : isIdea(first) ? titleFromName(first.title) : sectionHeading(first)));
-    const holder = el('div', { class: 'ds-page-text' }); page.append(holder);
-    app().vault.cachedRead(first.file).then((md) => { const bl = mdToBlocks(md, first.title, { smart: o.smartQuotes !== false }).slice(0, 6);
-      for (const b of bl) holder.append(b.t === 'break' ? el('div', { class: 'ds-page-brk' }, o.sceneBreak) : b.t === 'h' ? el('b', {}, b.text) : el('p', { class: b.first ? 'is-first' : '' }, b.runs.map((r) => (r.i ? el('em', {}, r.text) : r.b ? el('b', {}, r.text) : r.text)))); });
-  } else page.append(el('p', { class: 'ds-hint' }, 'No chapters selected.'));
-  return el('div', {}, el('div', { class: 'ds-hint ds-center' }, 'Preview'), page);
+  add('chapter', (b) => {
+    b.append(el('div', { class: 'ds-pp-h', style: { 'margin-top': msf ? '28%' : '16%' } }, headings[0]));
+    const holder = el('div', { class: 'ds-pp-text' }); b.append(holder);
+    app().vault.cachedRead(first.file).then((md) => {
+      for (const bl of mdToBlocks(md, first.title, { smart }).slice(0, 14)) holder.append(bl.t === 'break' ? el('div', { class: 'ds-pp-brk' }, o.sceneBreak || '* * *') : bl.t === 'h' ? el('b', {}, bl.text) : el('p', { class: bl.first ? 'is-first' : '' }, bl.runs.map((r) => (r.i ? el('em', {}, r.text) : r.b ? el('b', {}, r.text) : r.text))));
+      if (epub) holder.append(...footer.map((l) => el('p', { class: 'ds-pp-legal-in' }, l)));
+    });
+  });
+  // draw
+  const strip = el('div', { class: 'ds-pp-strip' });
+  pages.forEach((pg, i) => {
+    const num = i - (hasCover ? 1 : 0) + 1 + (i >= tocAt + (showToc ? 1 : 0) ? tocPages - (showToc ? 1 : 0) : 0);
+    const box = el('div', { class: `ds-pp is-${pg.kind}${msf ? ' is-msf' : ''}${epub ? ' is-epub' : ''}`, style: { width: `${PREVIEW_W}px`, height: `${(ph * k).toFixed(0)}px`, 'font-family': family, 'font-size': px(fs), 'line-height': msf ? 2 : 1.42, '--pad-v': px(msf ? 72 : 54), '--pad-h': px(msf ? 72 : 50) } });
+    const bodyEl = el('div', { class: 'ds-pp-body' }); pg.build(bodyEl); box.append(bodyEl);
+    if (pg.kind !== 'cover' && !epub) {
+      if (msf && pg.kind !== 'title') box.append(el('div', { class: 'ds-pp-runhead', style: { 'font-size': px(12) } }, `${(p.author || author).split(/\s+/).pop()} / ${(o.shortTitle || p.title).toUpperCase()} / ${num}`));
+      box.append(el('div', { class: 'ds-pp-foot', style: { 'font-size': px(msf ? 8 : Math.max(6, fs * 0.62)) } },
+        !msf && pg.kind !== 'title' ? el('div', { class: 'ds-pp-num', style: { 'font-size': px(fs * 0.85) } }, String(num)) : null, footer.map((l) => el('div', {}, l))));
+    }
+    strip.append(el('div', { class: 'ds-pp-wrap' }, box, el('small', { class: 'ds-hint' }, { cover: 'Cover', title: 'Title page', front: 'Front matter', questions: 'Reader questions', toc: 'Contents', chapter: 'First chapter' }[pg.kind])));
+  });
+  wrap.append(strip); return wrap;
 }
+function headingFor(c, num, o) { return c.kind === 'chapter' ? chapterHeading(o.heading, num, titleFromName(c.title)) : isIdea(c) ? titleFromName(c.title) : sectionHeading(c); }

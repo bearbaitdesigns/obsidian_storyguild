@@ -107,10 +107,19 @@ function makeChecklists() {
   return out;
 }
 
+/** Copyright and AI wording. {year}, {author} and {title} are filled in. */
+const DEFAULT_LEGAL = {
+  draftCopyright: 'Copyright © {year} {author}. All rights reserved.\nThis is an unpublished draft of {title}, shared in confidence for review. Please do not copy, share or distribute it, in whole or in part.',
+  shortCopyright: '© {year} {author} · Unpublished draft, not for distribution',
+  aiNotice: 'Not to be used for training, prompting or developing artificial intelligence (AI) systems.',
+};
+const fillTokens = (t, p) => String(t || '').replace(/\{year\}/g, p.copyright || String(new Date().getFullYear())).replace(/\{author\}/g, p.penName || p.author || 'Author').replace(/\{title\}/g, p.title);
+/** The draft copyright notice is used until the book's stage is Published, unless you choose otherwise. */
+const draftNoticeOn = (p) => (p.compile.draftNotice == null ? p.stage !== 'Published' : !!p.compile.draftNotice);
 const DEFAULT_COMPILE = {
   format: 'pdf', chapters: 'all', statusFilter: '', titlePage: true, toc: true, frontMatter: true, draftStamp: false,
   heading: 'Chapter {n}: {title}', sceneBreak: '* * *', font: 'Times', fontSize: 11, pageSize: '6x9', manuscriptFormat: false,
-  includeQuestions: false, questionsRound: '', folder: '', smartQuotes: true, includeIdeas: false,
+  includeQuestions: false, questionsRound: '', folder: '', smartQuotes: true, includeIdeas: false, draftNotice: null, footerCopyright: true, footerAi: true,
 };
 
 function makeProject(title) {
@@ -120,7 +129,7 @@ function makeProject(title) {
     draft: 1, draftHistory: [{ n: 1, date: today(), words: null, note: 'First draft' }],
     cover: '', logline: '', blurb: '', synopsisShort: '', synopsis: '', comps: '', keywords: '', bisac: '',
     publisher: '', isbnEbook: '', isbnPrint: '', pubDate: '', copyright: String(new Date().getFullYear()),
-    dedication: '', acknowledgments: '', bio: '', extra: [],
+    dedication: '', acknowledgments: '', bio: '', extra: [], draftCopyright: DEFAULT_LEGAL.draftCopyright, shortCopyright: DEFAULT_LEGAL.shortCopyright, aiNotice: DEFAULT_LEGAL.aiNotice,
     folder: `Novels/${safeName(title || 'My Novel')}`, chaptersFolder: '', pwNovelId: '', seriesId: '', pwSeriesLinks: [],
     readers: [], rounds: [], comments: [], checklists: makeChecklists(), checklistTab: 'draft',
     compile: clone(DEFAULT_COMPILE),

@@ -41,7 +41,10 @@ function buildPdf(book) {
   const o = book.opts; const m = book.meta; const msf = !!o.manuscriptFormat;
   const [PW, PH, MV, MH] = msf ? PDF_PAGES.letter : PDF_PAGES[o.pageSize] || PDF_PAGES['6x9'];
   const fs = msf ? 12 : Number(o.fontSize) || 11; const lead = msf ? 24 : fs * 1.42; const indent = msf ? 36 : fs * 1.6;
-  const top = PH - MV, bottom = MV + (msf ? 0 : 12), left = MH, right = PW - MH, W = right - left;
+  // Footer: short copyright and AI notice on every page, page number above them (book layout).
+  const FOOT = (m.footer || []).filter(Boolean); const footSize = msf ? 8 : Math.max(6, fs * 0.62); const footFont = 'F1';
+  const footBase = MV * 0.3; const pageNumY = footBase + FOOT.length * footSize * 1.35 + (FOOT.length ? 3 : 0);
+  const top = PH - MV, bottom = Math.max(MV + (msf ? 0 : 12), (msf ? footBase + FOOT.length * footSize * 1.35 : pageNumY + fs) + 6), left = MH, right = PW - MH, W = right - left;
   const FAM = msf ? ['F5', 'F6', 'F7', 'F8'] : ['F1', 'F2', 'F3', 'F4'];
   const fontOf = (r) => FAM[(r.i ? 1 : 0) + (r.b ? 2 : 0)];
   const WT = { F1: 'Times-Roman', F2: 'Times-Italic', F3: 'Times-Bold', F4: 'Times-BoldItalic' };
@@ -99,10 +102,10 @@ function buildPdf(book) {
   let coverImg = null;
   if (book.cover && book.cover.ext === 'jpg' && !msf) { const ji = jpegInfo(book.cover.bytes); if (ji && (ji.comps === 3 || ji.comps === 1)) { coverImg = Object.assign(ji, { bytes: book.cover.bytes }); newPage('cover'); cur.ops.push(`q ${PW} 0 0 ${PH} 0 0 cm /Im1 Do Q`); } }
   if (o.titlePage) {
-    newPage('front');
+    newPage('title');
     if (msf) {
       y = top; for (const l of [m.legalName || m.author, ...(m.contact ? m.contact.split('\n') : [])]) { text(toWin(l), 'F5', 12, left, y - 12); y -= 14; }
-      const wc = `About ${fmtN(Math.round(book.words / 1000) * 1000)} words`; text(toWin(wc), 'F5', 12, right - width(toWin(wc), 'F5', 12), top - 12);
+      const wc = `About ${aboutWords(book.words)} words`; text(toWin(wc), 'F5', 12, right - width(toWin(wc), 'F5', 12), top - 12);
       y = PH / 2 + 24; center(m.title.toUpperCase(), 'F5', 12, y); y -= 24; if (m.subtitle) { center(m.subtitle, 'F5', 12, y); y -= 24; } center(`by ${m.author}`, 'F5', 12, y);
     } else {
       y = top - (PH - 2 * MV) * 0.25; centerWrap(m.title, 'F1', fs * 2.4, fs * 2.8); y -= fs;
@@ -113,13 +116,21 @@ function buildPdf(book) {
     }
   }
   if (o.frontMatter && !msf) {
-    newPage('front'); const copy = [`Copyright © ${m.copyright || new Date().getFullYear()} ${m.author}`, 'All rights reserved.', m.isbn ? `ISBN ${m.isbn}` : '', m.publisher ? `Published by ${m.publisher}` : '', m.draftLine || ''].filter(Boolean);
-    y = MV + copy.length * fs * 1.5 + fs * 2; for (const l of copy) { center(l, 'F1', fs * 0.85, y); y -= fs * 1.5; }
+    newPage('front'); const copy = m.copyLines || [];
+    const cs = fs * 0.85; const wrapped = []; for (const l of copy) { const words = toWin(l).split(' '); let line = ''; for (const w of words) { const t = line ? line + ' ' + w : w; if (width(t, 'F1', cs) > W * 0.9 && line) { wrapped.push(line); line = w; } else line = t; } wrapped.push(line); wrapped.push(''); }
+    wrapped.pop(); y = bottom + wrapped.length * cs * 1.45 + fs * 2;
+    for (const l of wrapped) { if (l) text(l, 'F1', cs, left + (W - width(l, 'F1', cs)) / 2, y); y -= cs * 1.45; }
     if (book.dedication) { newPage('front'); y = top - (PH - 2 * MV) * 0.3; for (const l of book.dedication.split(/\n+/)) centerWrap(l, 'F2', fs * 1.05, fs * 1.6); }
   }
+  // Questions for (ARC) readers come before the contents, so readers see them first.
+  if (book.questions) {
+    const q = book.questions; chapterStart(q.title, 'questions');
+    if (q.intro) { para([{ text: q.intro, i: true }], true); y -= lead * 0.5; }
+    q.items.forEach((it, i) => { ensure(lead * 2); y -= lead * 0.4; para([{ text: `${i + 1}. ${it.text}`, b: true }], true, { noIndent: true }); });
+  }
   // contents (page numbers filled in once the body is laid out)
-  const tocStart = pages.length; const perToc = Math.floor((PH - 2 * MV - fs * 6) / (fs * 1.7));
-  const tocEntries = [...book.chapters.map((c) => c.heading), ...book.back.map((s) => s.title), ...(book.questions ? [book.questions.title] : [])];
+  const tocStart = pages.length; const perToc = Math.floor((top - bottom - fs * 6) / (fs * 1.7));
+  const tocEntries = [...book.chapters.map((c) => c.heading), ...book.back.map((s) => s.title)];
   const tocPages = o.toc && !msf ? Math.max(1, Math.ceil(tocEntries.length / perToc)) : 0;
   for (let i = 0; i < tocPages; i++) newPage('toc');
 
@@ -128,30 +139,27 @@ function buildPdf(book) {
   for (const c of book.chapters) { chapterStart(c.heading); blocks(c.blocks); }
   if (msf && book.chapters.length) { ensure(lead * 3); y -= lead; center('THE END', 'F5', 12, y - fs); }
   for (const s of book.back) { chapterStart(s.title, 'back'); blocks(s.blocks); }
-  if (book.questions) {
-    const q = book.questions; chapterStart(q.title, 'back');
-    if (q.intro) { para([{ text: q.intro, i: true }], true); y -= lead * 0.5; }
-    q.items.forEach((it, i) => {
-      ensure(lead * 2); y -= lead * 0.4;
-      para([{ text: `${i + 1}. ${it.text}`, b: true }], true, { noIndent: true });
-    });
-  }
 
-  /* ---- page numbers, headers, contents ---- */
-  pages.forEach((pg, i) => { pg.num = i - firstBody + 1; });
+  /* ---- page numbers, footers, headers, contents ----
+     Every page is counted; the number is printed on all but the cover and title page.
+     The short copyright and AI notice go at the foot of every page except the cover. */
+  const coverPages = pages.filter((pg) => pg.kind === 'cover').length;
+  pages.forEach((pg, i) => { pg.num = i - coverPages + 1; });
   const surname = String(m.author || '').trim().split(/\s+/).pop() || 'Author';
-  pages.forEach((pg, i) => {
-    if (i < firstBody) return; cur = pg;
+  pages.forEach((pg) => {
+    if (pg.kind === 'cover') return; cur = pg; const isTitle = pg.kind === 'title';
+    FOOT.forEach((l, k) => { const b = toWin(l); text(b, footFont, footSize, left + (W - width(b, footFont, footSize)) / 2, footBase + (FOOT.length - 1 - k) * footSize * 1.35); });
+    if (isTitle) return;
     if (msf) { const h = toWin(`${surname} / ${(m.shortTitle || m.title).toUpperCase()} / ${pg.num}`); text(h, 'F5', 12, right - width(h, 'F5', 12), PH - MV / 2 - 6); }
-    else { const n = toWin(String(pg.num)); text(n, 'F1', fs * 0.85, left + (W - width(n, 'F1', fs * 0.85)) / 2, MV / 2); }
+    else { const n = toWin(String(pg.num)); text(n, 'F1', fs * 0.85, left + (W - width(n, 'F1', fs * 0.85)) / 2, pageNumY); }
   });
   if (tocPages) {
-    let k = 0;
+    const list = outline.filter((e) => e.page >= firstBody); let k = 0;
     for (let t = 0; t < tocPages; t++) {
       cur = pages[tocStart + t]; y = top - fs * 2;
       if (t === 0) { center('Contents', 'F1', fs * 1.5, y); y -= fs * 3.5; }
-      for (; k < outline.length && y > MV + fs; k++) {
-        const e = outline[k]; const label = toWin(e.title); const num = toWin(String(pages[e.page].num));
+      for (; k < list.length && y > bottom + fs; k++) {
+        const e = list[k]; const label = toWin(e.title); const num = toWin(String(pages[e.page].num));
         const lw = width(label, 'F1', fs), nw = width(num, 'F1', fs); const dotW = width('.', 'F1', fs);
         const dots = Math.max(0, Math.floor((W - lw - nw - fs) / dotW));
         text(label, 'F1', fs, left, y); text('.'.repeat(dots), 'F1', fs, right - nw - fs * 0.4 - dots * dotW, y); text(num, 'F1', fs, right - nw, y); y -= fs * 1.7;
@@ -187,5 +195,5 @@ function buildPdf(book) {
   });
   const xr = `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${xref.map((o2) => String(o2).padStart(10, '0') + ' 00000 n \n').join('')}trailer\n<< /Size ${objs.length + 1} /Root ${catalogId} 0 R /Info ${infoId} 0 R >>\nstartxref\n${off}\n%%EOF\n`;
   chunks.push(latin1(xr));
-  return { bytes: concatBytes(chunks), pages: pages.length };
+  return { bytes: concatBytes(chunks), pages: pages.length, outline: outline.map((e) => ({ title: e.title, num: pages[e.page].num })) };
 }

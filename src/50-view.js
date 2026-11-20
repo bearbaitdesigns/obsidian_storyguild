@@ -38,7 +38,7 @@ class DraftsmithView extends ItemView {
       el('div', { class: 'ds-cover-sm', onclick: () => this.setTab('details'), title: 'Book details' }, cov ? el('img', { src: cov }) : el('span', {}, p.title.slice(0, 1))),
       el('div', { class: 'ds-head-main' }, el('div', { class: 'ds-row' }, sel, btn('📚 Books & series', () => openLibrary(), 'ds-sm'), linkedNovel(p) ? pill('🧵 ' + linkedNovel(p).title, 'is-pw', null) : null),
         el('h1', {}, p.title), el('div', { class: 'ds-sub' }, [seriesLine(p), p.genre, p.penName || p.author].filter(Boolean).join(' · '))),
-      el('div', { class: 'ds-draftbox' }, el('small', {}, 'Manuscript draft'), el('b', {}, '#' + p.draft), stage)));
+      el('div', { class: 'ds-draftbox' }, el('small', {}, 'Manuscript draft'), el('div', { class: 'ds-draftline' }, el('b', {}, '#' + p.draft), el('span', { class: 'ds-draftwords', title: 'Total words in the manuscript (ideas not counted)' }, `${fmtN(totalWords(p))} words`)), stage)));
     root.append(el('div', { class: 'ds-tabs' }, DS_TABS.map(([k, l]) => el('button', { class: ui.tab === k ? 'is-on' : '', onclick: () => this.setTab(k) }, l))));
     const body = el('div', { class: 'ds-body' }); root.append(body);
     try {
@@ -91,7 +91,7 @@ function renderManuscript(view, p, body) {
       el('td', {}, el('a', { class: 'ds-link', onclick: () => openFile(c.file) }, c.title)),
       el('td', {}, kind),
       el('td', {}, pill('D' + c.draft, 'is-draft'), el('a', { class: 'ds-mini', title: 'Save this version and start the next chapter draft', onclick: async () => { await bumpChapterDraft(p, c); } }, '+')),
-      el('td', {}, st), el('td', { class: 'ds-r', title: isIdea(c) ? 'Ideas don’t count toward the manuscript’s words' : null }, c.words == null ? '—' : isIdea(c) ? `(${fmtN(c.words)})` : fmtN(c.words)), el('td', {}, c.pov || '—'),
+      el('td', {}, st), el('td', { class: 'ds-r', title: isIdea(c) ? 'Ideas don’t count toward the manuscript’s words' : null }, c.words == null ? '—' : isIdea(c) ? `(${fmtN(c.words)})` : fmtN(c.words)), el('td', { class: 'ds-povcell' }, povCell(c, cards)),
       el('td', {}, isIdea(c) ? hint('idea · not linked') : cards.length ? cards.slice(0, 4).map((x) => el('span', { class: 'ds-pw', title: `${x.plotline ? x.plotline.name + ': ' : ''}${x.b.title}${x.pov ? ' · POV ' + x.pov.name : ''} — open on the board`, onclick: () => HOST.plot.openBoard(novel.id, x.b.id) }, el('i', { style: { background: (x.plotline && x.plotline.color) || '#888' } }), x.b.title.length > 28 ? x.b.title.slice(0, 27) + '…' : x.b.title)) : c.pwChapter ? hint('no cards') : el('a', { class: 'ds-mini', onclick: () => linkChapterToPlot(p, c) }, novel ? 'link…' : '—')),
       el('td', {}, el('a', { class: 'ds-mini', title: 'Open', onclick: () => openFile(c.file) }, '↗')));
     tr.addEventListener('dragstart', (e) => { dragFrom = i; tr.addClass('is-dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(i)); } catch (x) { /* */ } });
@@ -114,6 +114,14 @@ function draftHistoryModal(p) {
   m.contentEl.append(el('h3', {}, 'Manuscript draft history'), el('div', { class: 'ds-hist' }, p.draftHistory.map((h) => el('div', {}, el('span', {}, el('b', {}, `Draft ${h.n}`), ' · ', h.note || ''), el('span', { class: 'ds-hint' }, `${h.date} · ${h.words == null ? 'in progress' : fmtN(h.words) + ' words'}`)))),
     hint(`Snapshots of earlier drafts are in ${projectSub(p, 'snapshotFolder')}/.`));
   m.open();
+}
+/** POV: the note's own pov property if set; otherwise the POV tags of its Plot Weaver cards. */
+function povCell(c, cards) {
+  const seen = new Map(); for (const x of cards) if (x.pov && !seen.has(x.pov.id)) seen.set(x.pov.id, x.pov);
+  const tags = [...seen.values()];
+  if (c.pov) return el('span', { title: tags.length ? `From the note’s “${DSS().keys.pov}” property · Plot Weaver: ${tags.map((t) => t.name).join(', ')}` : `From the note’s “${DSS().keys.pov}” property` }, c.pov);
+  if (!tags.length) return '—';
+  return el('span', { class: 'ds-povtags', title: 'POV tags from this chapter’s Plot Weaver cards' }, tags.map((t) => el('span', { class: 'ds-pov' }, el('i', { style: { background: t.color || '#888' } }), t.name)));
 }
 function newChapterModal(p, preset = 'chapter') {
   new FormModal(preset === 'idea' ? 'New idea' : 'New chapter', [

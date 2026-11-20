@@ -57,6 +57,41 @@ wk = patch(wk, 'wk:hero-sections', `daysLeft != null ? h('span', {}, \`\${daysLe
 wk = patch(wk, 'wk:hero-corner', `h('small', {}, 'of goal'))), h('div', { class: 'hd-pills' }, enc, atlas)));`,
   `h('small', {}, 'of goal'))), h('div', { class: 'hd-side-pills' }, enc, atlas)));`);
 wk = patch(wk, 'wk:hero-books', `pencilToggle(), changeBanner, renameTab);`, `pencilToggle(), changeBanner, renameTab, HOST.booksButton());`);
+// Gods and demons (individuals) get their own sheet templates, grouped with Characters
+// under Story. Existing characters with role Deity / Demon keep working everywhere.
+wk = patch(wk, 'wk:type-order', `const TYPE_ORDER = ['character', ...GEO, ...CROSS, ...DIVINE, 'item'];`, `const TYPE_ORDER = ['character', 'god', 'fiend', ...GEO, ...CROSS, ...DIVINE, 'item'];`);
+wk = patch(wk, 'wk:god-fiend-types', `  planet: { label: 'Planet', plural: 'Planets',`, `  god: { label: 'God', plural: 'Gods', icon: '☀️', typeValue: 'god', folder: 'Story/Gods', nested: 'Story/Gods', template: '',
+    text: [{ key: 'alias', label: 'Also called' }, { key: 'domains', label: 'Domains', tile: true }, { key: 'symbol', label: 'Holy symbol', tile: true }],
+    domain: [D('rank', 'Rank', ['Primordial', 'Greater god', 'Lesser god', 'Demigod', 'Saint']), D('gender', 'Gender', ['Female', 'Male', 'Non-binary', 'Genderless', 'Unknown']), D('alignment', 'Nature', ['Benevolent', 'Neutral', 'Capricious', 'Malevolent']), D('status', 'Worship', ['Worshipped', 'Waning', 'Forgotten', 'Forbidden', 'Ascendant'])],
+    links: [L('realm', 'Dwells in', 'header', GEO, { icon: '☁️', chain: true }), L('pantheon', 'Pantheon', 'tile', ['pantheon']), L('magic', 'Grants magic', 'tile', ['magic']), L('opposes', 'Opposed by', 'tile', ['fiend', 'demon', 'god', 'character']),
+      L('items', 'Relics', 'tab', ['item'], { icon: '🗡️' }), L('connections', 'Orders & cults', 'tab', ['organization'], { icon: '🛡️' })],
+    body: [{ heading: 'Notes', icon: '✏️' }, { heading: 'Mythology', icon: '📜' }], modules: ['relationships', 'linked'],
+    tabOrder: ['Notes', 'Mythology', 'Details', 'Relationships', 'Relics', 'Orders & cults', 'Linked here'] },
+  fiend: { label: 'Demon', plural: 'Demons', icon: '👹', typeValue: 'fiend', folder: 'Story/Demons', nested: 'Story/Demons', template: '',
+    text: [{ key: 'alias', label: 'Known as' }, { key: 'title', label: 'Title', tile: true }, { key: 'trueName', label: 'True name', tile: true }],
+    domain: [D('rank', 'Rank', ['Archdemon', 'Greater', 'Lesser', 'Fiend', 'Imp']), D('binding', 'Status', ['Free', 'Bound', 'Dormant', 'Banished', 'Slain']), D('gender', 'Gender', ['Female', 'Male', 'Non-binary', 'Genderless', 'Unknown'])],
+    links: [L('location', 'Location', 'header', GEO, { icon: '📍', chain: true }), L('species', 'Demon species', 'tile', ['demon']), L('master', 'Serves', 'tile', ['fiend', 'god', 'character']), L('boundTo', 'Bound to', 'tile', ['character', 'item']), L('magic', 'Magic', 'tile', ['magic']),
+      L('items', 'Items', 'tab', ['item'], { icon: '🗡️' })],
+    body: [{ heading: 'Notes', icon: '✏️' }, { heading: 'Backstory', icon: '📜' }], modules: ['relationships', 'linked'],
+    tabOrder: ['Notes', 'Backstory', 'Details', 'Relationships', 'Items', 'Linked here'] },
+  planet: { label: 'Planet', plural: 'Planets',`);
+// Links meant for gods also accept God sheets; links meant for demons accept Demon sheets.
+{ const re = /\['character'\](, \{[^{}]*where: \{ role: 'Deity' \} \})/g; const n = (wk.match(re) || []).length; if (n !== 5) throw new Error(`Patch "wk:deity-targets" matched ${n} times (expected 5)`); wk = wk.replace(re, "['god', 'character']$1"); }
+wk = patch(wk, 'wk:pantheon-opposes', `L('opposes', 'Opposed by', 'tile', ['demon', 'pantheon', 'character'])`, `L('opposes', 'Opposed by', 'tile', ['demon', 'fiend', 'pantheon', 'character'])`);
+wk = patch(wk, 'wk:demon-opposes', `L('opposes', 'Opposes', 'tile', ['pantheon', 'character'])`, `L('opposes', 'Opposes', 'tile', ['pantheon', 'god', 'character'])`);
+wk = patch(wk, 'wk:demon-individuals', `modules: [{ ref: 'Individuals', icon: '👹', from: 'character', via: 'species', create: { role: 'Demon', binding: 'Free' } }, 'linked'],`,
+  `modules: [{ ref: 'Individuals', icon: '👹', from: ['fiend', 'character'], via: 'species', create: { binding: 'Free' } }, 'linked'],`);
+wk = patch(wk, 'wk:refs-multi', `refsOf(f, m) { return this.notesOf(m.from).filter((c) => this.has(c, m.via, f)); },`, `refsOf(f, m) { return [].concat(m.from).flatMap((t) => this.notesOf(t)).filter((c) => this.has(c, m.via, f)); },`);
+wk = patch(wk, 'wk:refs-sheet', `const list = S.refsOf(f, m); const ft = T()[m.from]; const noun = m.create && m.create.role === 'Demon' ? 'demon' : ft.label.toLowerCase();`,
+  `const list = S.refsOf(f, m); const fromId = [].concat(m.from)[0]; const ft = T()[fromId]; const noun = m.create && m.create.role === 'Demon' ? 'demon' : ft.label.toLowerCase();`);
+{ const n = wk.split('createNote(m.from,').length - 1; if (n !== 1) throw new Error(`Patch "wk:refs-create" matched ${n} times (expected 1)`); wk = wk.replace('createNote(m.from,', 'createNote([].concat(m.from)[0],'); }
+wk = patch(wk, 'wk:is-demon', `isDemonChar(f) { const fm = this.fm(f); return fm.role === 'Demon' ||`, `isDemonChar(f) { const fm = this.fm(f); return this.typeIdOf(f) === 'fiend' || fm.role === 'Demon' ||`);
+wk = patch(wk, 'wk:pantheon-gods', `const items = S.notesOf('character').filter((c) => S.fm(c).role === 'Deity' && !have.has(c.path)).map((c) => ({ label: c.basename, value: c.path }));`,
+  `const items = [...S.notesOf('god'), ...S.notesOf('character').filter((c) => S.fm(c).role === 'Deity')].filter((c) => !have.has(c.path)).map((c) => ({ label: c.basename, value: c.path }));`);
+wk = patch(wk, 'wk:pantheon-new-god', `const c = isNew ? await createNote('character', v, { role: 'Deity', age: 'Ageless' }, { open: false })`, `const c = isNew ? await createNote('god', v, { pantheon: [S.link(f)] }, { open: false })`);
+wk = patch(wk, 'wk:pantheon-hint', `'Gods are character notes with role Deity, so each also gets a full character sheet.'`, `'Each god has its own God sheet (Story → Gods). Characters with role Deity are listed too.'`);
+wk = patch(wk, 'wk:pantheon-source', `source: 'characters where role = Deity'`, `source: 'God sheets and characters with role Deity'`);
+wk = patch(wk, 'wk:dash-story', `ap(nav, h('div', { class: 'sep' }, 'Story'), btn('character'),`, `ap(nav, h('div', { class: 'sep' }, 'Story'), btn('character'), btn('god'), btn('fiend'),`);
 // Expose a few helpers to the host.
 wk += `
 WorldkeeperPlugin.storyguild = { readTodos, writeTodos, pwLoad, mergeSettings, DEFAULT_SETTINGS, MS_STANDARD, S };

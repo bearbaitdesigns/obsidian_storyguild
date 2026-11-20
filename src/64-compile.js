@@ -6,6 +6,8 @@ function sectionHeading(c) {
   const label = KIND_LABEL[c.kind]; const t = titleFromName(String(c.title || '')).replace(new RegExp(`^\\s*${label}\\s*[:.\\-–—]?\\s*`, 'i'), '').trim();
   return t ? `${label}: ${t}` : label;
 }
+/** Manuscript-format word count: to the nearest thousand (exact below 1,000). */
+const aboutWords = (w) => fmtN(w < 1000 ? w : Math.round(w / 1000) * 1000);
 function compileChapters(p) {
   const o = p.compile; const all0 = listChapters(p); const all = o.chapters === 'pick' || o.includeIdeas ? all0 : all0.filter((c) => !isIdea(c));
   if (o.chapters === 'status' && o.statusFilter) return all.filter((c) => statusDef(c.status)?.name === o.statusFilter);
@@ -40,24 +42,35 @@ async function gatherBook(p) {
     if (r) questions = { title: o.questionsTitle || 'Questions for Readers', intro: r.focus ? `Thank you for reading! ${r.focus}` : 'Thank you for reading! Please keep these questions in mind as you read.', items: r.questions.filter((q) => q.text.trim()) };
   }
   const author = p.penName || p.author || 'Author';
+  const fill = (t) => fillTokens(t, p);
+  const draftLine = o.draftStamp ? `Draft ${p.draft} · ${fmtN(words)} words · ${today()}` : '';
+  const isbn = o.format === 'epub' ? p.isbnEbook : p.isbnPrint || p.isbnEbook;
+  const useDraft = draftNoticeOn(p);
+  // Copyright page: the custom draft notice while the book is a draft, the standard lines once published.
+  const copyLines = [
+    ...(useDraft ? fill(p.draftCopyright || DEFAULT_LEGAL.draftCopyright).split(/\n+/) : [`Copyright © ${p.copyright || new Date().getFullYear()} ${author}`, 'All rights reserved.']),
+    isbn ? `ISBN ${isbn}` : '', p.publisher ? `Published by ${p.publisher}` : '', draftLine,
+  ].map((x) => x.trim()).filter(Boolean);
+  // Printed at the foot of every page (PDF, Word) or the end of every section (EPUB).
+  const footer = [o.footerCopyright !== false ? fill(p.shortCopyright || DEFAULT_LEGAL.shortCopyright) : '', o.footerAi !== false ? fill(p.aiNotice || DEFAULT_LEGAL.aiNotice) : ''].map((x) => x.trim()).filter(Boolean);
   return {
     opts: o, words, cover, chapters, back, questions, dedication: o.frontMatter && !o.manuscriptFormat ? String(p.dedication || '').trim() : '',
     meta: {
       title: p.title, subtitle: p.subtitle, author, legalName: p.author || author, contact: o.contact || '', shortTitle: o.shortTitle || '',
       seriesLine: p.series ? `${p.series}${p.seriesNo ? `, Book ${p.seriesNo}` : ''}` : '', language: p.language || 'en', publisher: p.publisher, isbn: o.format === 'epub' ? p.isbnEbook : p.isbnPrint || p.isbnEbook,
       date: p.pubDate, copyright: p.copyright, description: p.blurb, subjects: fieldList(p.genre), uuid: p.id.padEnd(32, '0').replace(/^(.{8})(.{4})(.{4})(.{4})(.{12}).*$/, '$1-$2-$3-$4-$5'),
-      draftLine: o.draftStamp ? `Draft ${p.draft} · ${today()}` : '',
+      draftLine, copyLines, footer,
     },
   };
 }
 
 function bookMarkdown(book) {
-  const L = [`# ${book.meta.title}`, book.meta.subtitle ? `*${book.meta.subtitle}*` : '', '', `by ${book.meta.author}`, ''];
+  const L = [`# ${book.meta.title}`, book.meta.subtitle ? `*${book.meta.subtitle}*` : '', '', `by ${book.meta.author}`, '', ...book.meta.copyLines.map((x) => `> ${x}`), ...book.meta.footer.map((x) => `> *${x}*`), ''];
   const md = (bl) => bl.map((b) => b.t === 'break' ? `\n${book.opts.sceneBreak}\n` : b.t === 'h' ? `\n### ${b.text}\n` : b.runs.map((r) => (r.b && r.i ? `***${r.text}***` : r.b ? `**${r.text}**` : r.i ? `*${r.text}*` : r.text)).join('') + '\n').join('\n');
   if (book.dedication) L.push(`*${book.dedication}*`, '');
+  if (book.questions) { L.push(`## ${book.questions.title}`, '', book.questions.intro, ''); book.questions.items.forEach((q, i) => L.push(`${i + 1}. ${q.text}`)); L.push(''); }
   for (const c of book.chapters) L.push(`## ${c.heading}`, '', md(c.blocks), '');
   for (const s of book.back) L.push(`## ${s.title}`, '', md(s.blocks), '');
-  if (book.questions) { L.push(`## ${book.questions.title}`, '', book.questions.intro, ''); book.questions.items.forEach((q, i) => L.push(`${i + 1}. ${q.text}`)); }
   return L.join('\n');
 }
 
@@ -70,7 +83,12 @@ async function compileProject(p) {
   let info = '';
   if (ext === 'md') await writeText(path, bookMarkdown(book));
   else if (ext === 'epub') await writeBinary(path, buildEpub(book));
-  else if (ext === 'docx') await writeBinary(path, buildDocx(book));
+  else if (ext === 'docx') {
+    // Pre-fill the contents' page numbers from a PDF layout with the same page size and font size.
+    // Word refreshes them when the file opens; LibreOffice and Google Docs show these.
+    if (o.toc && !o.manuscriptFormat) { try { book.pageGuess = Object.fromEntries(buildPdf(book).outline.map((e) => [e.title, String(e.num)])); } catch (e) { console.error(e); } }
+    await writeBinary(path, buildDocx(book));
+  }
   else { const r = buildPdf(book); await writeBinary(path, r.bytes); info = ` · ${r.pages} pages`; }
   p.lastCompiled = [{ path, at: new Date().toISOString(), words: book.words }, ...(p.lastCompiled || []).filter((x) => x.path !== path)].slice(0, 8);
   SG.saveSoon();

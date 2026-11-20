@@ -3,7 +3,10 @@
 Write, plan and build your novel in one Obsidian plugin. Storyguild has three sections:
 
 - **Draftsmith** — your manuscript: chapter notes, draft numbers, book details, alpha/beta reader rounds with questions and answers, publishing checklists, and publishing to PDF, Word, EPUB or Markdown.
-- **Worldkeeper** — worldbuilding sheets, dashboards, encyclopedia, Home, milestones and to-do list. The Home banner has Plot Weaver and Draftsmith pills under the book's details. On the right, the goal ring sits above the Encyclopedia and World Atlas pills.
+- **Worldkeeper** — worldbuilding sheets, dashboards, encyclopedia, Home, milestones and to-do list.
+  - **Gods** and **Demons** have their own sheet templates, listed with Characters under **Story** on the dashboard.
+  - Pantheons, magic patrons, faiths and demon species accept them.
+  - The command **Give Deity and Demon characters their own God and Demon sheets** converts existing characters with role Deity or Demon. Only their `type` property changes. The Home banner has Plot Weaver and Draftsmith pills under the book's details. On the right, the goal ring sits above the Encyclopedia and World Atlas pills.
 - **Plot Weaver** — plotlines × chapters board, POVs, off-screen events, cause and effect.
 
 All three sections share **books and series**. The current book is the same everywhere. You can start a new book, create a series, or add an existing book to a series from **📚 Books & series**. It's on the ribbon, in the Draftsmith header, on the Worldkeeper Home banner and in the command palette (**New book…**, **New series…**, **Add a book to a series…**, **Switch book…**). A novel created in Plot Weaver becomes a book automatically, and switching novels in Plot Weaver switches the book everywhere.
@@ -60,6 +63,7 @@ Edit a shared field anywhere and it changes everywhere.
   - Word counts are written to the `words` property as you type. You can turn this off.
     - Only prose is counted. Left out: frontmatter properties, fenced blocks (```, ''' or ~~~), inline code, [[wiki links]] and ![[embeds]], comments (%% %% and <!-- -->), callout titles, #tags and URLs.
     - Counts are refreshed for every chapter after an update. The command **Recount words in all chapters** does it any time.
+  - The **POV** column shows the note's `pov` property, or, if that's empty, the POV tags of the chapter's Plot Weaver cards.
   - Each entry has a **type**: Chapter, Prologue, Interlude or Epilogue. Only chapters are numbered. In the # column a prologue shows as P, an interlude as I, an epilogue as E and an idea as 💡; the first real chapter is 1.
     - In Publish, headings follow the type, for example “Prologue: The Drowning” or “Chapter 1: Low Water”.
     - For chapters linked to Plot Weaver, the type is shared with the board's section.
@@ -85,7 +89,13 @@ Edit a shared field anywhere and it changes everywhere.
 - **Publishing checklist** — three tabs: **Drafting & Revision**, **Traditional** and **Self-publishing**. Steps marked ⚡ tick themselves from your data. You can add, remove or date any step. 🎯 turns a dated step into a milestone on the Worldkeeper Home Milestones & deadlines card. The to-do list keeps only to-dos from your notes and the to-do file.
 - **Publish** — PDF (book layout or standard manuscript format), Word (.docx), EPUB 3 or one Markdown note.
   - Options: title page, contents, front and back matter, chapter heading template (`{n}`, `{N}`, `{title}`), scene-break mark, page size and curly quotes.
-  - A round's questions can be added at the end of a reader copy as a plain list, with no space for answers (readers answer separately).
+  - A round's questions can be added to a reader (alpha, beta or ARC) copy as a plain list, **before the table of contents**, with no space for answers.
+  - **Page numbers**: PDF and Word number every page except the cover and title page. The contents list the page each chapter starts on. In Word the contents are a real contents field, pre-filled with the right numbers and refreshed by Word when you open the file.
+  - **Copyright & notices** (wording in Book details):
+    - The **draft copyright notice** replaces the standard copyright lines while the book's stage isn't Published. You can switch this per publish.
+    - A **short copyright line** and an **AI notice** (not to be used for AI training, prompting or development) are printed at the foot of every page. In EPUB, which has no fixed pages, they end every chapter.
+  - **Stamp the draft number and word count** adds e.g. “Draft 3 · 84,210 words” to the copyright page. The Draftsmith header also shows the total word count next to the draft number.
+  - The **preview** shows miniature pages that follow every option: format, page size, font size, manuscript format, title page, copyright page, reader questions, contents with estimated page numbers, chapter heading, scene breaks, curly quotes and the notices on every page.
 
 ### Publishing limits
 

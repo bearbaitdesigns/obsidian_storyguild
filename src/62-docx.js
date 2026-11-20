@@ -18,37 +18,54 @@ function buildDocx(book) {
   if (o.titlePage) {
     if (msf) {
       body.push(wp('NoInd', wrun(m.legalName || m.author)), ...(m.contact ? m.contact.split('\n').map((l) => wp('NoInd', wrun(l))) : []));
-      body.push(wp('NoInd', wrun(`About ${fmtN(Math.round(book.words / 1000) * 1000)} words`), '<w:jc w:val="right"/>'));
+      body.push(wp('NoInd', wrun(`About ${aboutWords(book.words)} words`), '<w:jc w:val="right"/>'));
       body.push(wp('NoInd', '', '<w:spacing w:before="3600"/>'), wp('Title', wrun(m.title.toUpperCase())), m.subtitle ? wp('Subtitle', wrun(m.subtitle)) : '', wp('Subtitle', wrun(`by ${m.author}`)), pageBreak);
     } else {
       body.push(wp('NoInd', '', '<w:spacing w:before="2800"/>'), wp('Title', wrun(m.title)), m.subtitle ? wp('Subtitle', wrun(m.subtitle)) : '', m.seriesLine ? wp('Subtitle', wrun(m.seriesLine)) : '', wp('Author', wrun(m.author)), pageBreak);
     }
   }
   if (o.frontMatter && !msf) {
-    const copy = [`Copyright © ${m.copyright || new Date().getFullYear()} ${m.author}`, 'All rights reserved.', m.isbn ? `ISBN ${m.isbn}` : '', m.publisher ? `Published by ${m.publisher}` : '', m.draftLine || ''].filter(Boolean);
-    body.push(wp('NoInd', '', '<w:spacing w:before="4000"/>'), ...copy.map((l) => wp('Center', wrun(l))), pageBreak);
+    const copy = m.copyLines || [];
+    body.push(wp('NoInd', '', '<w:spacing w:before="3600"/>'), ...copy.map((l) => wp('Center', wrun(l), '<w:spacing w:after="160"/>')), pageBreak);
     if (book.dedication) body.push(wp('NoInd', '', '<w:spacing w:before="3000"/>'), ...book.dedication.split(/\n+/).map((l) => wp('Center', wrun(l, '<w:i/>'))), pageBreak);
   }
-  if (o.toc && !msf) {
-    body.push(wp('TOCHeading', wrun('Contents')),
-      `<w:p><w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r><w:r><w:instrText xml:space="preserve"> TOC \\o "1-1" \\h \\z \\u </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>${book.chapters.map((c) => `</w:p><w:p><w:pPr><w:pStyle w:val="NoInd"/></w:pPr>${wrun(c.heading)}`).join('')}<w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>`, pageBreak);
-  }
-  const blocks = (bl) => bl.map((b) => b.t === 'break' ? wp('SceneBreak', wrun(o.sceneBreak || '#')) : b.t === 'h' ? wp('Sub', wrun(b.text)) : wp(b.first ? 'NoInd' : '', wruns(b.runs))).join('');
-  book.chapters.forEach((c) => body.push(wp('Heading1', wrun(c.heading)), blocks(c.blocks)));
-  book.back.forEach((s) => body.push(wp('Heading1', wrun(s.title)), blocks(s.blocks)));
+  // Each heading gets a bookmark so the contents can show its page number (PAGEREF).
+  let bm = 0; const heads = [];
+  const heading = (text, inToc = true) => { const id = ++bm; const name = `_Toc_sg${id}`; if (inToc) heads.push({ name, text }); return `<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:bookmarkStart w:id="${id}" w:name="${name}"/>${wrun(text)}<w:bookmarkEnd w:id="${id}"/></w:p>`; };
+  // Questions for (ARC) readers come before the contents.
   if (book.questions) {
-    const q = book.questions; body.push(wp('Heading1', wrun(q.title)), q.intro ? wp('NoInd', wrun(q.intro, '<w:i/>')) : '');
-    q.items.forEach((it, i) => {
-      body.push(wp('Question', wrun(`${i + 1}. ${it.text}`)));
-    });
+    const q = book.questions; body.push(heading(q.title, false), q.intro ? wp('NoInd', wrun(q.intro, '<w:i/>')) : '');
+    q.items.forEach((it, i) => body.push(wp('Question', wrun(`${i + 1}. ${it.text}`))));
   }
+  const tocAt = body.length;
+  const blocks = (bl) => bl.map((b) => b.t === 'break' ? wp('SceneBreak', wrun(o.sceneBreak || '#')) : b.t === 'h' ? wp('Sub', wrun(b.text)) : wp(b.first ? 'NoInd' : '', wruns(b.runs))).join('');
+  book.chapters.forEach((c) => body.push(heading(c.heading), blocks(c.blocks)));
+  book.back.forEach((s) => body.push(heading(s.title), blocks(s.blocks)));
   if (msf) body.push(wp('Center', wrun('THE END'), '<w:spacing w:before="480"/>'));
+  if (o.toc && !msf) {
+    // A real Word contents field: entries with dotted leaders and PAGEREF page numbers.
+    // Word refreshes it on opening (it asks first); LibreOffice works the numbers out itself.
+    const tab = pw - 2 * mar; const fld = (instr, cached) => `<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> ${instr} </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>${cached}</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>`;
+    const entries = heads.map((hd, i) => `<w:p><w:pPr><w:pStyle w:val="TOC1"/><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="${tab}"/></w:tabs></w:pPr>${i === 0 ? '<w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r><w:r><w:instrText xml:space="preserve"> TOC \\o "1-1" \\h \\z \\u </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>' : ''}<w:hyperlink w:anchor="${hd.name}" w:history="1">${wrun(hd.text)}<w:r><w:tab/></w:r>${fld(`PAGEREF ${hd.name} \\h`, (book.pageGuess && book.pageGuess[hd.text]) || '')}</w:hyperlink>${i === heads.length - 1 ? '<w:r><w:fldChar w:fldCharType="end"/></w:r>' : ''}</w:p>`).join('');
+    body.splice(tocAt, 0, wp('TOCHeading', wrun('Contents'), '<w:pageBreakBefore/>'), entries || '');
+  }
+  // A manual page break right before something that already starts a new page would leave a blank page.
+  const flat = body.filter((x) => x); for (let i = flat.length - 2; i >= 0; i--) if (flat[i] === pageBreak && /pageBreakBefore|w:val="Heading1"/.test(flat[i + 1].slice(0, 200))) flat.splice(i, 1);
+  body.length = 0; body.push(...flat);
   const surname = String(m.author || '').trim().split(/\s+/).pop() || 'Author';
+  const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  const pageField = '<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>';
+  const legal = (m.footer || []).map((l) => `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/></w:pPr>${wrun(l, '<w:sz w:val="14"/><w:szCs w:val="14"/><w:color w:val="666666"/>')}</w:p>`).join('');
+  const centred = (inner) => `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="40" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/></w:pPr>${inner}</w:p>`;
+  // Headers & footers: page number on every page (except the title page), notices on every page.
   const header = msf ? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="right"/></w:pPr>${wrun(`${surname} / ${(m.shortTitle || m.title).toUpperCase()} / `)}<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p></w:hdr>` : null;
-  const footer = !msf ? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>` : null;
-  const sect = `<w:sectPr>${header ? '<w:headerReference w:type="default" r:id="rIdHdr"/>' : ''}${footer ? '<w:footerReference w:type="default" r:id="rIdFtr"/>' : ''}<w:pgSz w:w="${pw}" w:h="${ph}"/><w:pgMar w:top="${mar}" w:right="${mar}" w:bottom="${mar}" w:left="${mar}" w:header="${Math.round(mar / 2)}" w:footer="${Math.round(mar / 2)}" w:gutter="0"/>${msf && o.titlePage ? '<w:titlePg/>' : ''}</w:sectPr>`;
+<w:hdr ${NS}><w:p><w:pPr><w:jc w:val="right"/></w:pPr>${wrun(`${surname} / ${(m.shortTitle || m.title).toUpperCase()} / `)}${pageField}</w:p></w:hdr>` : null;
+  const footer = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr ${NS}>${msf ? '' : centred(pageField)}${legal || (msf ? '<w:p/>' : '')}</w:ftr>`;
+  const firstHeader = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:hdr ${NS}><w:p/></w:hdr>`;
+  const firstFooter = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:ftr ${NS}>${legal || '<w:p/>'}</w:ftr>`;
+  const titlePg = !!o.titlePage;
+  const sect = `<w:sectPr>${header ? '<w:headerReference w:type="default" r:id="rIdHdr"/>' : ''}${titlePg ? '<w:headerReference w:type="first" r:id="rIdHdr1"/><w:footerReference w:type="first" r:id="rIdFtr1"/>' : ''}<w:footerReference w:type="default" r:id="rIdFtr"/><w:pgSz w:w="${pw}" w:h="${ph}"/><w:pgMar w:top="${mar}" w:right="${mar}" w:bottom="${mar}" w:left="${mar}" w:header="${Math.round(mar / 2)}" w:footer="${Math.round(mar / 2)}" w:gutter="0"/>${titlePg ? '<w:titlePg/>' : ''}</w:sectPr>`;
   const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${body.join('')}${sect}</w:body></w:document>`;
   const pPr = (extra) => `<w:pPr>${extra}</w:pPr>`;
@@ -65,17 +82,18 @@ ${style('Subtitle', 'Subtitle', '<w:ind w:firstLine="0"/><w:jc w:val="center"/><
 ${style('Author', 'Author', '<w:ind w:firstLine="0"/><w:jc w:val="center"/><w:spacing w:before="1200"/>', `<w:sz w:val="${size + 6}"/>`)}
 ${style('Heading1', 'heading 1', `<w:keepNext/><w:pageBreakBefore/><w:ind w:firstLine="0"/><w:jc w:val="center"/><w:spacing w:before="${msf ? 2880 : 2400}" w:after="${msf ? 480 : 600}"/><w:outlineLvl w:val="0"/>`, msf ? '' : `<w:sz w:val="${size + 10}"/>`, 'NoInd')}
 ${style('TOCHeading', 'TOC Heading', '<w:ind w:firstLine="0"/><w:jc w:val="center"/><w:spacing w:before="1200" w:after="480"/>', `<w:sz w:val="${size + 8}"/>`)}
+${style('TOC1', 'toc 1', '<w:ind w:firstLine="0"/><w:jc w:val="left"/><w:spacing w:after="80"/>', '', 'TOC1')}
 ${style('Sub', 'Subheading', '<w:keepNext/><w:ind w:firstLine="0"/><w:jc w:val="center"/><w:spacing w:before="240" w:after="120"/>', '<w:b/>', 'NoInd')}
 ${style('SceneBreak', 'Scene Break', '<w:keepNext/><w:ind w:firstLine="0"/><w:jc w:val="center"/><w:spacing w:before="120" w:after="120"/>', '', 'NoInd')}
 ${style('Question', 'Reader Question', '<w:keepNext/><w:ind w:firstLine="0"/><w:jc w:val="left"/><w:spacing w:before="360" w:after="120"/>', '<w:b/>', 'NoInd')}
 </w:styles>`;
-  const rels = [header ? '<Relationship Id="rIdHdr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>' : '', footer ? '<Relationship Id="rIdFtr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>' : '',
+  const rels = [header ? '<Relationship Id="rIdHdr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>' : '', '<Relationship Id="rIdFtr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>', titlePg ? '<Relationship Id="rIdHdr1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/><Relationship Id="rIdFtr1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer2.xml"/>' : '',
     '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>', '<Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>'].join('');
   const files = [
     { name: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>
 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
-${header ? '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' : ''}${footer ? '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>' : ''}
+${header ? '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' : ''}<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>${titlePg ? '<Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>' : ''}
 <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>` },
     { name: '_rels/.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>' },
     { name: 'word/_rels/document.xml.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels}</Relationships>` },
@@ -84,6 +102,7 @@ ${header ? '<Override PartName="/word/header1.xml" ContentType="application/vnd.
     { name: 'docProps/core.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${esc(m.title)}</dc:title><dc:creator>${esc(m.author)}</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString().replace(/\.\d+Z$/, 'Z')}</dcterms:created></cp:coreProperties>` },
   ];
   if (header) files.push({ name: 'word/header1.xml', data: header });
-  if (footer) files.push({ name: 'word/footer1.xml', data: footer });
+  files.push({ name: 'word/footer1.xml', data: footer });
+  if (titlePg) files.push({ name: 'word/header2.xml', data: firstHeader }, { name: 'word/footer2.xml', data: firstFooter });
   return makeZip(files);
 }

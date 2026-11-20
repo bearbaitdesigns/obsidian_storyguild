@@ -233,6 +233,11 @@ async def main():
             name = os.path.basename(r['path']).replace(' ', '_')
             open(os.path.join(OUT, name), 'wb').write(base64.b64decode(r['b64'])); outs[name] = r['notice']
         print('7. published:', outs)
+        for name, extra in [('10-preview-book', {'format': 'pdf', 'manuscriptFormat': False, 'pageSize': '6x9'}), ('11-preview-msf', {'format': 'docx', 'manuscriptFormat': True}), ('12-preview-epub', {'format': 'epub'})]:
+            await ev("""async (extra) => { const p = SGP.data.manuscript.projects[0]; Object.assign(p.compile, { includeQuestions: true, toc: true, titlePage: true, frontMatter: true, draftStamp: true }, extra);
+              const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view; v.setTab('compile'); await new Promise(r => setTimeout(r, 400)); }""", extra)
+            pv = await page.query_selector('.ds-preview')
+            await pv.screenshot(path=f'{OUT}/{name}.png')
         await page.screenshot(path=f'{OUT}/06-publish.png', full_page=True)
 
         # Worldkeeper home + Plot Weaver board still work
@@ -240,12 +245,18 @@ async def main():
           const home = document.querySelector('.wk-home'); const t = home ? home.querySelector('h1').textContent : null;
           const ms = home ? home.textContent.includes('Beta readers') : false;
           app.commands.executeCommandById('plot-weaver:open-board'); await new Promise(r => setTimeout(r, 600));
-          window.__homeShot = true; return { homeTitle: t, milestones: ms, board: !!document.querySelector('.workspace-leaf-content [class*=pw]'), cmds: Object.keys(app.commands.commands).length }; }""")
+          await app.vault.create('Story/Gods/Thalassa.md', '---\\ntype: god\\nrank: Greater god\\n---\\n'); await app.vault.create('Story/Demons/Varrow.md', '---\\ntype: fiend\\nrank: Lesser\\n---\\n');
+          app.commands.executeCommandById('worldkeeper:open-dashboards'); await new Promise(r => setTimeout(r, 700));
+          const nav = [...document.querySelectorAll('.anav')].pop(); const story = nav ? nav.textContent : '';
+          window.__homeShot = true; return { story: story.slice(0, 80), homeTitle: t, milestones: ms, board: !!document.querySelector('.workspace-leaf-content [class*=pw]'), cmds: Object.keys(app.commands.commands).length }; }""")
         print('8. other sections:', r)
         await ev("async () => { app.commands.executeCommandById('worldkeeper:open-home'); await new Promise(r => setTimeout(r, 600)); document.querySelector('.wk-home').scrollIntoView(); }")
         el = await page.query_selector('.wk-home .hd-hero')
         await el.screenshot(path=f'{OUT}/08-wk-banner.png')
         assert r['homeTitle'] == 'The Salt Lantern (rev)'
+        st = r['story']; assert st.index('Story') < st.index('Characters') < st.index('Gods1') < st.index('Demons1') < st.index('Geography')
+        nav = await page.query_selector_all('.anav')
+        await nav[-1].screenshot(path=f'{OUT}/09-wk-nav.png')
 
         # Unload cleanly
         r = await ev("""async () => { SGP.unload(); await new Promise(r => setTimeout(r, 300)); return { views: Object.keys(app.viewRegistry), blocks: Object.keys(app.codeblocks), cmds: Object.keys(app.commands.commands).length, saved: JSON.parse(app.vault.adapter.data.get('.obsidian/plugins/storyguild/data.json')).manuscript.projects.length }; }""")

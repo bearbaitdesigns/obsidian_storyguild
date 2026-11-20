@@ -36,6 +36,16 @@ class StoryguildPlugin extends Plugin {
     cmd('books-and-series', 'Books & series…', () => openLibrary());
     cmd('switch-book', 'Switch book…', () => new BookSwitcher().open());
     this.addRibbonIcon('library-big', 'Books & series', () => openLibrary());
+    cmd('convert-divine', 'Worldkeeper: give Deity and Demon characters their own God and Demon sheets', () => {
+      if (!HOST.world) { notice('Turn on the Worldkeeper section first.'); return; }
+      const S = WorldkeeperModule.storyguild.S; const list = S.notesOf('character').filter((c) => ['Deity', 'Demon'].includes(String((this.app.metadataCache.getFileCache(c) || {}).frontmatter?.role || '')));
+      if (!list.length) { notice('No characters with role Deity or Demon were found.'); return; }
+      const gods = list.filter((c) => this.app.metadataCache.getFileCache(c).frontmatter.role === 'Deity').length;
+      new ConfirmModal(`Move ${list.length} character${list.length === 1 ? '' : 's'} to God and Demon sheets?`, `${gods} with role Deity become God sheets and ${list.length - gods} with role Demon become Demon sheets. Only their “type” property changes: notes stay where they are, and links, relationships and text are kept.`, 'Convert', async () => {
+        for (const c of list) await this.app.fileManager.processFrontMatter(c, (fm) => { fm.type = fm.role === 'Deity' ? 'god' : 'fiend'; });
+        HOST.world.refreshSoon(200); notice(`Converted ${list.length} note${list.length === 1 ? '' : 's'}.`);
+      }).open();
+    });
     cmd('import-old', 'Import from Worldkeeper / Plot Weaver…', async () => { const f = await detectOld(); if (!f.world && !f.plot) notice('Worldkeeper and Plot Weaver were not found in this vault.'); else new MigrationModal(f, true).open(); });
     this.addSettingTab(new StoryguildSettingTab(this));
 

@@ -8,7 +8,9 @@ const META = [
   ['Market', [['comps', 'Comparable titles'], ['keywords', 'Keywords (comma-separated)'], ['bisac', 'BISAC codes / categories']]],
   ['Publication', [['publisher', 'Publisher / imprint'], ['isbnEbook', 'ISBN — ebook'], ['isbnPrint', 'ISBN — print'], ['pubDate', 'Publication date', 'date'], ['copyright', 'Copyright year']]],
   ['Front & back matter', [['dedication', 'Dedication', 'ta2'], ['acknowledgments', 'Acknowledgments', 'ta4'], ['bio', 'About the author', 'ta4']]],
+  ['Copyright & notices', [['draftCopyright', 'Copyright notice while the book is a draft (copyright page)', 'ta4'], ['shortCopyright', 'Short copyright line (foot of every page)'], ['aiNotice', 'AI notice (foot of every page)']]],
 ];
+const LEGAL_HINT = 'Used in Publish. {year}, {author} and {title} are filled in for you. The draft notice replaces the standard copyright lines until the book’s stage is Published (you can override this in Publish). Leave a field empty to use the default wording.';
 const SHARED_HINT = { title: 'Worldkeeper · Plot Weaver', genre: 'Worldkeeper', audience: 'Worldkeeper', logline: 'Worldkeeper', synopsisShort: 'Worldkeeper', targetWords: 'Worldkeeper', deadline: 'Worldkeeper' };
 
 function renderDetails(view, p, body) {
@@ -45,7 +47,7 @@ function renderDetails(view, p, body) {
       i.addEventListener('change', () => setProjectField(p, k, type === 'number' ? Number(i.value) || 0 : i.value));
       box.append(el('div', { class: 'ds-field' + (ta ? ' is-wide' : '') }, el('label', {}, label, SHARED_HINT[k] ? el('span', { class: 'ds-shared', title: 'Shared with ' + SHARED_HINT[k] }, ' ⇄') : null, wc), i));
     }
-    right.append(card(sec, box));
+    right.append(card(sec, sec === 'Copyright & notices' ? hint(LEGAL_HINT) : null, box, sec === 'Copyright & notices' ? el('div', { class: 'ds-row' }, btn('Reset to default wording', () => { for (const k of Object.keys(DEFAULT_LEGAL)) p[k] = DEFAULT_LEGAL[k]; SG.saveSoon(); view.render(); }, 'ds-sm')) : null));
   }
   grid.append(left, right);
 }

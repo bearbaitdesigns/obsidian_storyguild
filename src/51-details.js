@@ -15,9 +15,9 @@ const SHARED_HINT = { title: 'Worldkeeper · Plot Weaver', genre: 'Worldkeeper',
 
 function renderDetails(view, p, body) {
   const all = META.flatMap((s) => s[1]); const filled = all.filter(([k]) => String(p[k] ?? '').trim()).length + (p.cover ? 1 : 0);
-  body.append(el('div', { class: 'ds-row' }, el('p', { class: 'ds-hint ds-grow' }, 'One set of book details for the whole plugin. Fields marked ⇄ are shared with Worldkeeper or Plot Weaver; edit them anywhere and they change everywhere.'),
+  put(body, el('div', { class: 'ds-row' }, el('p', { class: 'ds-hint ds-grow' }, 'One set of book details for the whole plugin. Fields marked ⇄ are shared with Worldkeeper or Plot Weaver; edit them anywhere and they change everywhere.'),
     el('div', { class: 'ds-meter' }, el('small', {}, `${filled}/${all.length + 1} filled`), el('div', { class: 'ds-bar' }, el('i', { style: { width: (filled / (all.length + 1)) * 100 + '%' } })))));
-  const grid = el('div', { class: 'ds-meta' }); body.append(grid);
+  const grid = el('div', { class: 'ds-meta' }); put(body, grid);
   // left column: cover, project, custom fields
   const cov = resourceUrl(p.cover);
   const left = el('div', {},
@@ -45,11 +45,11 @@ function renderDetails(view, p, body) {
       const wc = ta && ['blurb', 'synopsis', 'synopsisShort', 'bio'].includes(k) ? el('span', { class: 'ds-wc' }, `${countWords(p[k] || '')} words`) : null;
       i.addEventListener('input', () => { if (wc) wc.textContent = `${countWords(i.value)} words`; });
       i.addEventListener('change', () => setProjectField(p, k, type === 'number' ? Number(i.value) || 0 : i.value));
-      box.append(el('div', { class: 'ds-field' + (ta ? ' is-wide' : '') }, el('label', {}, label, SHARED_HINT[k] ? el('span', { class: 'ds-shared', title: 'Shared with ' + SHARED_HINT[k] }, ' ⇄') : null, wc), i));
+      put(box, el('div', { class: 'ds-field' + (ta ? ' is-wide' : '') }, el('label', {}, label, SHARED_HINT[k] ? el('span', { class: 'ds-shared', title: 'Shared with ' + SHARED_HINT[k] }, ' ⇄') : null, wc), i));
     }
-    right.append(card(sec, sec === 'Copyright & notices' ? hint(LEGAL_HINT) : null, box, sec === 'Copyright & notices' ? el('div', { class: 'ds-row' }, btn('Reset to default wording', () => { for (const k of Object.keys(DEFAULT_LEGAL)) p[k] = DEFAULT_LEGAL[k]; SG.saveSoon(); view.render(); }, 'ds-sm')) : null));
+    put(right, card(sec, sec === 'Copyright & notices' ? hint(LEGAL_HINT) : null, box, sec === 'Copyright & notices' ? el('div', { class: 'ds-row' }, btn('Reset to default wording', () => { for (const k of Object.keys(DEFAULT_LEGAL)) p[k] = DEFAULT_LEGAL[k]; SG.saveSoon(); view.render(); }, 'ds-sm')) : null));
   }
-  grid.append(left, right);
+  put(grid, left, right);
 }
 
 function projectCard(view, p) {

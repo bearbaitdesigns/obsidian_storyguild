@@ -86,6 +86,12 @@ Edit a shared field anywhere and it changes everywhere.
   - Each round has its own set of questions. Readers' answers are shown side by side under each question.
   - When you add a round's first questions, Draftsmith asks whether to include them in Publish.
   - **Export round to note** writes the whole round to Markdown.
+- **Stats** (between Publishing checklist and Publish) — how the book is going:
+  - **Top numbers:** total words against the target, today's words against your daily goal, words written in the chosen period, daily average, writing streak, and a projected finish date at your 30-day pace. A note compares the projection with your draft deadline and says how many words a day would make it.
+  - **Charts:** words written per day with the goal line, manuscript growth with the target and projection, a 12-month writing calendar, words by chapter (coloured by status), words by POV, Plot Weaver cards by plotline, and words by weekday.
+  - **Tables:** draft history and reader-round summary, plus “at a glance” facts (reading time, estimated pages, average, longest and shortest chapter, best day).
+  - Choose a range (week, 30 or 90 days, 12 months, all time) and set the book's daily goal there. Every chart has a Table view.
+  - Daily history: Draftsmith saves each book's total once a day, with ideas not counted. Worldkeeper's existing daily history is imported once, so the charts start with your past days.
 - **Publishing checklist** — three tabs: **Drafting & Revision**, **Traditional** and **Self-publishing**. Steps marked ⚡ tick themselves from your data. You can add, remove or date any step. 🎯 turns a dated step into a milestone on the Worldkeeper Home Milestones & deadlines card. The to-do list keeps only to-dos from your notes and the to-do file.
 - **Publish** — PDF (book layout or standard manuscript format), Word (.docx), EPUB 3 or one Markdown note.
   - Options: title page, contents, front and back matter, chapter heading template (`{n}`, `{N}`, `{title}`), scene-break mark, page size and curly quotes.

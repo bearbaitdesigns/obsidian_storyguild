@@ -38,7 +38,7 @@ async ({ jpg }) => {
   const wk = { novel: { title: 'The Salt Lantern', series: 'Tidebound, Book 1', genre: ['Fantasy', 'Gaslamp'], audience: 'Adult', logline: 'A lamplighter must relight a drowned city.', synopsis: 'Mara inherits her father’s keys and debts.', goal: 95000, deadline: '2026-12-31', stage: 'Second draft', manualWords: 0, banner: '', milestones: [
       { id: 'm1', name: 'First draft', kind: 'Drafting', status: 'done', due: '2025-11-30', progress: 0, readers: [] },
       { id: 'm2', name: 'Beta readers', kind: 'Beta readers', status: 'active', due: '2026-12-10', start: '2026-10-20', progress: 0, readers: [{ name: 'Maeve O’Connell', status: 2 }, { name: 'Dev Kapoor', status: 1 }] } ] },
-    plotweaver: { enabled: true, novel: 'The Salt Lantern' }, todoFile: 'Worldkeeper/To-do.md', history: {} };
+    plotweaver: { enabled: true, novel: 'The Salt Lantern' }, todoFile: 'Worldkeeper/To-do.md', history: Object.fromEntries(Array.from({ length: 40 }, (_, i) => { const d = new Date(Date.now() - (40 - i) * 864e5); return [d.toISOString().slice(0, 10), 20 + i * 3 + (i % 5 ? 0 : 6)]; })) };
   const pw = { novels: [{ id: 'n1', title: 'The Salt Lantern', plotlines: [{ id: 'pl1', name: 'Mara’s Vow', color: '#a882ff' }, { id: 'pl2', name: 'The Smugglers', color: '#e0b04f' }], povs: [{ id: 'pv1', name: 'Mara' }, { id: 'pv2', name: 'Teodor' }],
       chapters: [{ id: 'plan', title: 'Planning', kind: 'planning' }, { id: 'c1', title: 'Low Water', kind: 'chapter' }, { id: 'c2', title: 'Saltglass', kind: 'chapter' }, { id: 'c3', title: 'Spring Tide', kind: 'epilogue' }],
       beats: [{ id: 'b1', title: 'Mara finds the ninth lantern dark', plotlineId: 'pl1', chapterId: 'c1', povId: 'pv1' }, { id: 'b2', title: 'Varr calls in the debt', plotlineId: 'pl2', chapterId: 'c2', povId: 'pv2' }, { id: 'b3', title: 'Saltglass changes hands', plotlineId: 'pl2', chapterId: 'c2', povId: 'pv2' }] }],
@@ -220,6 +220,21 @@ async def main():
         assert r['afterPwSwitch'] == 'The Salt Lantern (rev)' and 'Side Story' in r['adopted']
         await page.screenshot(path=f'{OUT}/07-library.png')
         await ev("() => { const m = __modals[__modals.length-1]; m.close(); }")
+
+        # Stats tab: imports Worldkeeper history, draws its charts, sits before Publish
+        r = await ev("""async () => { const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view; v.setTab('stats'); await new Promise(r => setTimeout(r, 300));
+          const tabs = [...document.querySelectorAll('.ds-tabs button')].map(b => b.textContent);
+          const cards = [...document.querySelectorAll('.ds-sgrid .ds-sch h3')].map(h => h.textContent);
+          const kpis = [...document.querySelectorAll('.ds-stats .ds-stat small')].map(x => x.textContent);
+          const p = SGP.data.manuscript.projects[0]; const nHist = Object.keys(p.history).length;
+          // table toggle and range switch
+          document.querySelector('.ds-stt').click(); await new Promise(r => setTimeout(r, 150)); const table = !!document.querySelector('.ds-stable');
+          document.querySelector('.ds-stt').click(); [...document.querySelectorAll('.ds-sfilters .ds-seg button')].find(b => b.textContent === '12 months').click(); await new Promise(r => setTimeout(r, 200));
+          return { tabs, cards, kpis, nHist, table, svgs: document.querySelectorAll('.ds-sgrid svg').length }; }""")
+        print('6c. stats:', json.dumps(r, ensure_ascii=False))
+        assert r['tabs'].index('Stats') == r['tabs'].index('Publish') - 1 and r['nHist'] >= 40 and r['table'] and r['svgs'] >= 6
+        await ev("async () => { [...document.querySelectorAll('.ds-sfilters .ds-seg button')].find(b => b.textContent === '30 days').click(); await new Promise(r => setTimeout(r, 200)); }")
+        await page.screenshot(path=f'{OUT}/14-stats.png', full_page=True)
 
         # Publish all formats
         outs = {}

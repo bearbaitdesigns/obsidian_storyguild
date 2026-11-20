@@ -97,14 +97,14 @@ class MigrationModal extends Modal {
   onOpen() {
     const { contentEl: c } = this; c.addClass('ds-modal', 'ds-migrate'); c.empty();
     const list = Object.values(this.found).filter(Boolean);
-    c.append(el('h2', {}, 'Welcome to Storyguild'),
+    put(c, el('h2', {}, 'Welcome to Storyguild'),
       el('p', {}, 'Storyguild brings ', el('b', {}, 'Draftsmith'), ', ', el('b', {}, 'Worldkeeper'), ' and ', el('b', {}, 'Plot Weaver'), ' together in one plugin. These are already in your vault:'));
     for (const x of list) {
-      c.append(el('div', { class: 'ds-mig-card' },
+      put(c, el('div', { class: 'ds-mig-card' },
         el('div', { class: 'ds-row' }, el('b', {}, x.name), x.version ? el('span', { class: 'ds-pill' }, 'v' + x.version) : null, el('span', { class: 'ds-pill ' + (x.enabled ? 'is-warn' : '') }, x.enabled ? 'turned on' : 'turned off'), x.data ? null : el('span', { class: 'ds-pill' }, 'no saved data')),
         x.summary.length ? el('ul', {}, x.summary.map((s) => el('li', {}, s))) : null));
     }
-    c.append(el('div', { class: 'ds-mig-safe' },
+    put(c, el('div', { class: 'ds-mig-safe' },
       el('b', {}, 'What happens if you import'),
       el('ul', {},
         el('li', {}, 'Your notes are not changed. Sheets, scene notes, to-do files and code blocks keep working as they are.'),
@@ -112,14 +112,14 @@ class MigrationModal extends Modal {
         el('li', {}, 'A backup of every settings file is saved first, in .obsidian/plugins/storyguild/backups/.'),
         el('li', {}, 'The separate plugins are turned off (not uninstalled). They can’t run alongside Storyguild, because both would claim the same views and code blocks.'),
         el('li', {}, 'Your novel’s title, word goal, deadline and stage become shared fields, and Worldkeeper reader milestones become Draftsmith reader rounds.'))));
-    if (this.manual && SG.data.migration.state === 'done') c.append(el('p', { class: 'ds-warn' }, 'You already set up Storyguild. Importing again replaces the current Worldkeeper and Plot Weaver data inside Storyguild with the data from the old plugins (a backup is made first).'));
+    if (this.manual && SG.data.migration.state === 'done') put(c, el('p', { class: 'ds-warn' }, 'You already set up Storyguild. Importing again replaces the current Worldkeeper and Plot Weaver data inside Storyguild with the data from the old plugins (a backup is made first).'));
     const row = el('div', { class: 'ds-modal-actions' });
     const go = (mode) => async () => { this.close(); await runMigration(this.found, mode); };
-    row.append(
+    put(row, 
       el('button', { onclick: () => { SG.data.migration = { state: 'postponed' }; SG.saveSoon(); this.close(); SG.pausedNotice(); } }, 'Not now'),
       el('button', { onclick: () => { new ConfirmModal('Start fresh?', 'Storyguild won’t import anything. The old plugins are turned off, and their data stays in their own folders untouched.', 'Start fresh', go('fresh')).open(); } }, 'Start fresh'),
       el('button', { class: 'mod-cta', onclick: go('import') }, 'Import and switch'));
-    c.append(row);
+    put(c, row);
   }
   onClose() { this.contentEl.empty(); }
 }

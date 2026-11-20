@@ -139,19 +139,19 @@ class LibraryModal extends Modal {
         s ? [btn('↑', () => { moveInSeries(p, -1); redraw(); }, 'clickable-icon ds-sm', 'Earlier in the series'), btn('↓', () => { moveInSeries(p, 1); redraw(); }, 'clickable-icon ds-sm', 'Later in the series'), btn('Remove', () => { removeFromSeries(p); redraw(); }, 'ds-sm', 'Make it a standalone book (nothing is deleted)')]
           : allSeries().length ? ((sel) => { sel.addEventListener('change', () => { if (sel.value) { addToSeries(p, sel.value); redraw(); } }); return sel; })(el('select', { class: 'dropdown ds-sm' }, el('option', { value: '' }, 'Add to series…'), allSeries().map((x) => el('option', { value: x.id }, x.name)))) : null);
     };
-    c.append(el('div', { class: 'ds-row' }, el('h2', { class: 'ds-grow' }, '📚 Books & series'),
+    put(c, el('div', { class: 'ds-row' }, el('h2', { class: 'ds-grow' }, '📚 Books & series'),
       btn('+ New book', () => { this.close(); newBookModal(); }, 'mod-cta'), btn('+ New series', () => { this.close(); newSeriesModal(); })),
     el('p', { class: 'ds-hint' }, 'The current book is the same in Draftsmith, Worldkeeper Home and Plot Weaver. Your world (sheets, encyclopedia) is shared by every book.'));
     for (const s of allSeries()) {
       const name = el('input', { type: 'text', value: s.name, class: 'ds-ghost ds-lib-sname' }); name.addEventListener('change', () => { s.name = name.value.trim() || s.name; syncSeries(); SG.refreshAll(); });
-      c.append(el('div', { class: 'ds-lib-series' },
+      put(c, el('div', { class: 'ds-lib-series' },
         el('div', { class: 'ds-row' }, el('span', {}, '📖'), name, el('span', { class: 'ds-hint' }, `${s.books.length} book${s.books.length === 1 ? '' : 's'}`),
           btn('+ New book in series', () => { this.close(); newBookModal({ seriesId: s.id }); }, 'ds-sm'), btn('+ Add existing book', () => { this.close(); addBookToSeriesModal(s.id); }, 'ds-sm'),
           btn('Delete series', () => new ConfirmModal(`Delete the series “${s.name}”?`, 'Its books become standalone books. No book, note or board is deleted.', 'Delete series', () => { deleteSeries(s); redraw(); }).open(), 'ds-sm mod-warning')),
         s.books.length ? s.books.map((id) => bookRow(projectById(id), s)) : el('p', { class: 'ds-hint' }, 'No books yet.')));
     }
     const solo = DS().projects.filter((p) => !seriesOf(p));
-    if (solo.length) c.append(el('div', { class: 'ds-lib-series' }, el('div', { class: 'ds-row' }, el('span', {}, '📘'), el('b', {}, 'Standalone books')), solo.map((p) => bookRow(p, null))));
+    if (solo.length) put(c, el('div', { class: 'ds-lib-series' }, el('div', { class: 'ds-row' }, el('span', {}, '📘'), el('b', {}, 'Standalone books')), solo.map((p) => bookRow(p, null))));
   }
 }
 /** Quick switcher for the command palette. */
@@ -168,8 +168,8 @@ function sectionPills() {
   const p = activeProject(); const n = linkedNovel(p);
   const wrap = document.createElement('div'); wrap.className = 'hd-sections';
   const mk = (icon, label, count, onclick, title) => el('button', { class: 'apill hd-enc hd-sec', onclick, title }, el('span', {}, icon), label, count != null ? el('b', {}, String(count)) : null);
-  if (HOST.plot) wrap.append(mk('🧵', 'Plot Weaver', n ? (n.beats || []).filter((b) => b.chapterId && (!b.status || b.status === 'active')).length : null, () => (n ? HOST.plot.openBoard(n.id) : HOST.plot.activateView()), n ? `Open the board for “${n.title}”` : 'Open Plot Weaver'));
-  wrap.append(mk('✒️', 'Draftsmith', p ? 'D' + p.draft : null, () => SG.openDraftsmith(), 'Open the manuscript, readers, checklist and publishing'));
+  if (HOST.plot) put(wrap, mk('🧵', 'Plot Weaver', n ? (n.beats || []).filter((b) => b.chapterId && (!b.status || b.status === 'active')).length : null, () => (n ? HOST.plot.openBoard(n.id) : HOST.plot.activateView()), n ? `Open the board for “${n.title}”` : 'Open Plot Weaver'));
+  put(wrap, mk('✒️', 'Draftsmith', p ? 'D' + p.draft : null, () => SG.openDraftsmith(), 'Open the manuscript, readers, checklist and publishing'));
   return wrap;
 }
 function booksButton() { return el('button', { title: 'Switch book, start a new book or manage series', onclick: () => openLibrary() }, '📚 Books & series'); }

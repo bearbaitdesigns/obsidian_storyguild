@@ -9,11 +9,11 @@ const save = () => { SG.saveSoon(); syncRoundsToWorld(); };
 
 function renderReaders(view, p, body) {
   const ui = DS().ui; let rd = roundOf(p, ui.round) || p.rounds[p.rounds.length - 1];
-  body.append(el('div', { class: 'ds-row' }, el('p', { class: 'ds-hint ds-grow' }, 'Group readers into as many alpha and beta rounds as you need. Each send records when, in what format and which version of the manuscript a reader got. Rounds also show on Worldkeeper’s Milestones card.'),
+  put(body, el('div', { class: 'ds-row' }, el('p', { class: 'ds-hint ds-grow' }, 'Group readers into as many alpha and beta rounds as you need. Each send records when, in what format and which version of the manuscript a reader got. Rounds also show on Worldkeeper’s Milestones card.'),
     btn('+ New round', () => newRoundModal(view, p)), btn('+ Send to a reader', () => sendModal(view, p, rd), 'mod-cta')));
-  if (!rd) { body.append(card(null, el('p', {}, 'No reader rounds yet.'), btn('Create the first round', () => newRoundModal(view, p), 'mod-cta'))); readerDirectory(view, p, body); return; }
+  if (!rd) { put(body, card(null, el('p', {}, 'No reader rounds yet.'), btn('Create the first round', () => newRoundModal(view, p), 'mod-cta'))); readerDirectory(view, p, body); return; }
   ui.round = rd.id;
-  body.append(el('div', { class: 'ds-chips' }, p.rounds.map((r) => el('button', { class: 'ds-chip' + (r.id === rd.id ? ' is-on' : ''), onclick: () => { ui.round = r.id; SG.saveSoon(); view.render(); } },
+  put(body, el('div', { class: 'ds-chips' }, p.rounds.map((r) => el('button', { class: 'ds-chip' + (r.id === rd.id ? ' is-on' : ''), onclick: () => { ui.round = r.id; SG.saveSoon(); view.render(); } },
     el('i', { class: 'is-' + r.type }), r.name, el('small', {}, ` · ${r.version} · ${r.sends.length}`)))));
 
   // round settings
@@ -21,7 +21,7 @@ function renderReaders(view, p, body) {
   const type = el('select', { class: 'dropdown' }, [['alpha', 'Alpha'], ['beta', 'Beta']].map(([v, l]) => el('option', { value: v, selected: rd.type === v }, l))); type.addEventListener('change', () => { rd.type = type.value; save(); view.render(); });
   const ver = el('select', { class: 'dropdown' }, [...new Set([...versions(p), rd.version])].map((v) => el('option', { selected: v === rd.version }, v))); ver.addEventListener('change', () => { rd.version = ver.value; save(); });
   const fb = rd.sends.filter((s) => s.status === 'Feedback in').length; const live = rd.sends.filter((s) => s.status !== 'Dropped').length;
-  body.append(card(null,
+  put(body, card(null,
     el('div', { class: 'ds-roundgrid' },
       el('div', { class: 'ds-field' }, el('label', {}, 'Round'), inp('name')), el('div', { class: 'ds-field' }, el('label', {}, 'Type'), type),
       el('div', { class: 'ds-field' }, el('label', {}, 'Manuscript version'), ver), el('div', { class: 'ds-field' }, el('label', {}, 'Feedback due'), inp('due', 'date')),
@@ -32,7 +32,7 @@ function renderReaders(view, p, body) {
 
   // sends
   const tbl = el('table', { class: 'ds-table' }, el('thead', {}, el('tr', {}, ['Reader', 'Sent', 'Format', 'Version', 'Due', 'Status', 'Attachments', ''].map((x) => el('th', {}, x)))));
-  const tb = el('tbody'); tbl.append(tb);
+  const tb = el('tbody'); put(tbl, tb);
   rd.sends.forEach((s, i) => {
     const r = readerOf(p, s.r); const d = daysUntil(s.due); const late = d != null && d < 0 && !['Feedback in', 'Dropped'].includes(s.status);
     const set = (k) => (e) => { s[k] = e.target.value; save(); if (k === 'status') view.render(); };
@@ -42,21 +42,21 @@ function renderReaders(view, p, body) {
     const due = el('input', { type: 'date', value: s.due || '' }); due.addEventListener('change', set('due'));
     const v = el('input', { type: 'text', value: s.version || '', class: 'ds-w90' }); v.addEventListener('change', set('version'));
     const files = el('div', { class: 'ds-files' }, s.files.map((path, fi) => fileChip(view, p, rd, s, path, fi)), el('a', { class: 'ds-mini', title: 'Attach the reader’s comments: PDF, Markdown, Word, text, images…', onclick: (e) => attachMenu(e, view, p, rd, s) }, '📎 attach'));
-    tb.append(el('tr', {},
+    put(tb, el('tr', {},
       el('td', {}, el('div', { class: 'ds-who' }, el('span', { class: 'ds-av', style: { '--c': r.color } }, r.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2)), el('div', {}, el('b', {}, r.name), r.contact ? el('small', {}, r.contact) : null))),
       el('td', {}, sent), el('td', {}, fmt), el('td', {}, v), el('td', {}, due, late ? el('small', { class: 'ds-late' }, `${-d}d overdue`) : null), el('td', {}, st), el('td', {}, files),
       el('td', {}, el('div', { class: 'ds-row ds-nowrap' }, btn('Answers', () => answersModal(view, p, rd, s), 'ds-sm', 'Enter this reader’s answers'), btn('+ Note', () => noteModal(view, p, rd, s.r), 'ds-sm'),
         btn('✕', () => new ConfirmModal(`Remove ${r.name} from this round?`, 'Their answers in this round are removed too. Notes and attached files stay.', 'Remove', () => { rd.sends.splice(i, 1); save(); view.render(); }).open(), 'clickable-icon ds-sm')))));
   });
-  body.append(rd.sends.length ? el('div', { class: 'ds-tablewrap' }, tbl) : card(null, el('p', {}, 'Nobody in this round yet.'), btn('Send the manuscript to someone', () => sendModal(view, p, rd), 'mod-cta')));
+  put(body, rd.sends.length ? el('div', { class: 'ds-tablewrap' }, tbl) : card(null, el('p', {}, 'Nobody in this round yet.'), btn('Send the manuscript to someone', () => sendModal(view, p, rd), 'mod-cta')));
 
   renderQuestions(view, p, rd, body);
   renderAnswers(view, p, rd, body);
 
   // notes
   const notes = p.comments.filter((c) => c.round === rd.id);
-  body.append(el('div', { class: 'ds-row' }, el('h2', { class: 'ds-grow' }, 'Reader notes'), btn('+ Add note', () => noteModal(view, p, rd))));
-  body.append(notes.length ? el('div', {}, notes.map((c) => noteEl(view, p, c))) : hint('No notes yet. Add them by hand, or import the bullet points from a Markdown or text attachment (📎 → click the file).'));
+  put(body, el('div', { class: 'ds-row' }, el('h2', { class: 'ds-grow' }, 'Reader notes'), btn('+ Add note', () => noteModal(view, p, rd))));
+  put(body, notes.length ? el('div', {}, notes.map((c) => noteEl(view, p, c))) : hint('No notes yet. Add them by hand, or import the bullet points from a Markdown or text attachment (📎 → click the file).'));
   readerDirectory(view, p, body);
 }
 
@@ -64,13 +64,13 @@ function renderReaders(view, p, body) {
 function renderQuestions(view, p, rd, body) {
   const qs = rd.questions;
   const inc = rd.includeInCompile;
-  body.append(el('div', { class: 'ds-row' }, el('h2', { class: 'ds-grow' }, 'Questions for this round'),
+  put(body, el('div', { class: 'ds-row' }, el('h2', { class: 'ds-grow' }, 'Questions for this round'),
     qs.length ? el('label', { class: 'ds-toggle', title: 'Add these questions at the end of reader copies made in Publish' }, ((c) => { c.addEventListener('change', () => { rd.includeInCompile = c.checked; save(); }); return c; })(el('input', { type: 'checkbox', checked: !!inc })), ' Include in Publish') : null));
   const box = card(null, hint('Ask every reader in this round the same questions. Their answers appear below, side by side.'));
   qs.forEach((q, i) => {
     const t = el('input', { type: 'text', value: q.text, class: 'ds-grow', placeholder: 'Question…' }); t.addEventListener('change', () => { q.text = t.value; save(); });
     const mv = (d) => () => { const j = i + d; if (j < 0 || j >= qs.length) return; [qs[i], qs[j]] = [qs[j], qs[i]]; save(); view.render(); };
-    box.append(el('div', { class: 'ds-q' }, el('span', { class: 'ds-qn' }, `${i + 1}.`), t, btn('↑', mv(-1), 'clickable-icon ds-sm'), btn('↓', mv(1), 'clickable-icon ds-sm'), btn('✕', () => { qs.splice(i, 1); save(); view.render(); }, 'clickable-icon ds-sm')));
+    put(box, el('div', { class: 'ds-q' }, el('span', { class: 'ds-qn' }, `${i + 1}.`), t, btn('↑', mv(-1), 'clickable-icon ds-sm'), btn('↓', mv(1), 'clickable-icon ds-sm'), btn('✕', () => { qs.splice(i, 1); save(); view.render(); }, 'clickable-icon ds-sm')));
   });
   const add = (texts) => {
     const was = qs.length;
@@ -79,10 +79,10 @@ function renderQuestions(view, p, rd, body) {
     if (!was && qs.length && rd.includeInCompile == null) askIncludeInPublish(view, rd);
   };
   const others = p.rounds.filter((r) => r !== rd && r.questions.length);
-  box.append(el('div', { class: 'ds-row' }, btn('+ Add question', () => add([''])), qs.length ? null : btn(`Use suggested ${rd.type} questions`, () => add(DEFAULT_QUESTIONS[rd.type])),
+  put(box, el('div', { class: 'ds-row' }, btn('+ Add question', () => add([''])), qs.length ? null : btn(`Use suggested ${rd.type} questions`, () => add(DEFAULT_QUESTIONS[rd.type])),
     others.length ? btn('Copy from another round…', () => new FormModal('Copy questions', [{ key: 'r', label: 'From round', type: 'select', options: others.map((r) => [r.id, `${r.name} (${r.questions.length})`]) }], 'Copy', (v) => add(roundOf(p, v.r).questions.map((q) => q.text))).open()) : null));
-  if (qs.length) box.append(hint(rd.includeInCompile ? 'These questions are added at the end of reader copies you make in Publish.' : 'Not included in Publish. Turn on “Include in Publish” to add them to reader copies.'));
-  body.append(box);
+  if (qs.length) put(box, hint(rd.includeInCompile ? 'These questions are added at the end of reader copies you make in Publish.' : 'Not included in Publish. Turn on “Include in Publish” to add them to reader copies.'));
+  put(body, box);
 }
 function askIncludeInPublish(view, rd) {
   new ConfirmModal('Include these questions in Publish?', `When you make a reader copy in Publish, Draftsmith can add “${rd.name}” questions at the end, so readers answer them as they finish. You can change this any time with the “Include in Publish” switch.`,
@@ -93,17 +93,17 @@ function askIncludeInPublish(view, rd) {
 function renderAnswers(view, p, rd, body) {
   if (!rd.questions.length) return;
   const people = rd.sends.filter((s) => s.status !== 'Dropped');
-  body.append(el('h2', {}, 'Answers'));
-  if (!people.length) { body.append(hint('Answers show here once readers are added to the round.')); return; }
+  put(body, el('h2', {}, 'Answers'));
+  if (!people.length) { put(body, hint('Answers show here once readers are added to the round.')); return; }
   const box = el('div', { class: 'ds-answers' });
   rd.questions.forEach((q, i) => {
     const vals = people.map((s) => s.answers[q.id]).filter((v) => v != null && v !== '');
-    box.append(el('div', { class: 'ds-ans' }, el('div', { class: 'ds-ans-q' }, el('b', {}, `${i + 1}. ${q.text || '(no text)'}`), el('span', { class: 'ds-hint' }, `${vals.length}/${people.length} answered`)),
+    put(box, el('div', { class: 'ds-ans' }, el('div', { class: 'ds-ans-q' }, el('b', {}, `${i + 1}. ${q.text || '(no text)'}`), el('span', { class: 'ds-hint' }, `${vals.length}/${people.length} answered`)),
       people.map((s) => { const r = readerOf(p, s.r); const v = s.answers[q.id];
         return el('div', { class: 'ds-ans-row' }, el('span', { class: 'ds-ans-who', style: { '--c': r.color } }, r.name),
           v == null || v === '' ? el('span', { class: 'ds-hint ds-click', onclick: () => answersModal(view, p, rd, s) }, 'no answer yet') : el('span', { class: 'ds-ans-text' }, String(v))); })));
   });
-  body.append(box);
+  put(body, box);
 }
 function answersModal(view, p, rd, s) {
   if (!rd.questions.length) { notice('Add questions to this round first.'); return; }
@@ -203,16 +203,16 @@ function sendModal(view, p, rd) {
 }
 function readerDirectory(view, p, body) {
   if (!p.readers.length) return;
-  body.append(el('h2', {}, 'Reader directory'));
+  put(body, el('h2', {}, 'Reader directory'));
   const tbl = el('table', { class: 'ds-table' }, el('thead', {}, el('tr', {}, ['Reader', 'Contact', 'Rounds', 'Notes', ''].map((x) => el('th', {}, x)))));
-  const tb = el('tbody'); tbl.append(tb);
+  const tb = el('tbody'); put(tbl, tb);
   for (const r of p.readers) {
     const rs = p.rounds.filter((x) => x.sends.some((s) => s.r === r.id));
-    tb.append(el('tr', {}, el('td', {}, el('span', { class: 'ds-dot', style: { background: r.color } }), ' ', r.name), el('td', { class: 'ds-hint' }, r.contact || '—'),
+    put(tb, el('tr', {}, el('td', {}, el('span', { class: 'ds-dot', style: { background: r.color } }), ' ', r.name), el('td', { class: 'ds-hint' }, r.contact || '—'),
       el('td', {}, rs.map((x) => pill(x.name))), el('td', {}, String(p.comments.filter((c) => c.r === r.id).length)),
       el('td', {}, btn('Edit', () => new FormModal('Edit reader', [{ key: 'name', label: 'Name', value: r.name, required: true }, { key: 'contact', label: 'Contact', value: r.contact }], 'Save', (v) => { r.name = v.name.trim(); r.contact = v.contact; save(); view.render(); }).open(), 'ds-sm'))));
   }
-  body.append(el('div', { class: 'ds-tablewrap' }, tbl));
+  put(body, el('div', { class: 'ds-tablewrap' }, tbl));
 }
 
 /** Write a round's sends, questions & answers and notes to a Markdown note. */

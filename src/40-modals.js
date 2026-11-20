@@ -4,7 +4,7 @@
 class ConfirmModal extends Modal {
   constructor(title, text, okLabel, onOk, cancelLabel = 'Cancel', onCancel = null) { super(SG.app); Object.assign(this, { title, text, okLabel, onOk, cancelLabel, onCancel }); }
   onOpen() {
-    const c = this.contentEl; c.addClass('ds-modal'); c.append(el('h3', {}, this.title), this.text ? el('p', {}, this.text) : null,
+    const c = this.contentEl; c.addClass('ds-modal'); put(c, el('h3', {}, this.title), this.text ? el('p', {}, this.text) : null,
       el('div', { class: 'ds-modal-actions' },
         el('button', { onclick: () => { this.close(); if (this.onCancel) this.onCancel(); } }, this.cancelLabel),
         el('button', { class: 'mod-cta', onclick: () => { this.close(); this.onOk(); } }, this.okLabel)));
@@ -16,7 +16,7 @@ class ConfirmModal extends Modal {
 class FormModal extends Modal {
   constructor(title, fields, okLabel, onOk, intro) { super(SG.app); Object.assign(this, { title, fields, okLabel, onOk, intro }); }
   onOpen() {
-    const c = this.contentEl; c.addClass('ds-modal'); c.append(el('h3', {}, this.title), this.intro ? el('p', { class: 'ds-hint' }, this.intro) : null);
+    const c = this.contentEl; c.addClass('ds-modal'); put(c, el('h3', {}, this.title), this.intro ? el('p', { class: 'ds-hint' }, this.intro) : null);
     const inputs = {};
     for (const f of this.fields) {
       let i;
@@ -27,14 +27,14 @@ class FormModal extends Modal {
       inputs[f.key] = i;
       const wrap = el('div', { class: 'ds-field' + (f.type === 'checkbox' ? ' is-check' : '') }, f.type === 'checkbox' ? el('label', {}, i, ' ', f.label) : [el('label', {}, f.label), i], f.desc ? el('div', { class: 'ds-hint' }, f.desc) : null);
       if (f.showIf) { const upd = () => { wrap.style.display = f.showIf(inputs) ? '' : 'none'; }; setTimeout(() => { upd(); Object.values(inputs).forEach((x) => x.addEventListener('change', upd)); }); }
-      c.append(wrap);
+      put(c, wrap);
     }
     const submit = () => {
       const out = {}; for (const f of this.fields) { const i = inputs[f.key]; out[f.key] = f.type === 'checkbox' ? i.checked : f.type === 'number' ? Number(i.value) : i.value; }
       if (this.fields.some((f) => f.required && !String(out[f.key] || '').trim())) { notice('Please fill in the required fields.'); return; }
       this.close(); this.onOk(out);
     };
-    c.append(el('div', { class: 'ds-modal-actions' }, el('button', { onclick: () => this.close() }, 'Cancel'), el('button', { class: 'mod-cta', onclick: submit }, this.okLabel || 'Save')));
+    put(c, el('div', { class: 'ds-modal-actions' }, el('button', { onclick: () => this.close() }, 'Cancel'), el('button', { class: 'mod-cta', onclick: submit }, this.okLabel || 'Save')));
     const first = Object.values(inputs)[0]; if (first && first.focus) setTimeout(() => first.focus(), 30);
     c.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); submit(); } });
   }
@@ -56,7 +56,7 @@ function chooseLocalFiles(accept, multiple = true) {
   return new Promise((resolve) => {
     const i = el('input', { type: 'file', accept, multiple, style: { display: 'none' } });
     i.addEventListener('change', () => { resolve([...i.files]); i.remove(); });
-    document.body.append(i); i.click();
+    put(document.body, i); i.click();
   });
 }
 async function saveLocalFile(file, folder) {

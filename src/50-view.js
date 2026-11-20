@@ -1,7 +1,7 @@
 /* =====================================================================
    Draftsmith view: header + tabs
    ===================================================================== */
-const DS_TABS = [['manuscript', 'Manuscript', 'book-open'], ['details', 'Book details', 'id-card'], ['readers', 'Readers', 'users'], ['checklist', 'Publishing checklist', 'list-checks'], ['compile', 'Publish', 'file-output']];
+const DS_TABS = [['manuscript', 'Manuscript', 'book-open'], ['details', 'Book details', 'id-card'], ['readers', 'Readers', 'users'], ['checklist', 'Publishing checklist', 'list-checks'], ['stats', 'Stats', 'bar-chart'], ['compile', 'Publish', 'file-output']];
 const btn = (label, onclick, cls = '', title = '') => el('button', { class: cls, onclick, title: title || null }, label);
 const pill = (text, cls = '', style) => el('span', { class: 'ds-pill ' + cls, style }, text);
 const hint = (t) => el('div', { class: 'ds-hint' }, t);
@@ -15,7 +15,8 @@ class DraftsmithView extends ItemView {
   getDisplayText() { const p = activeProject(); return p ? `Draftsmith — ${p.title}` : 'Draftsmith'; }
   getIcon() { return 'feather'; }
   async onOpen() { this.render(); }
-  async onClose() { this.contentEl.empty(); }
+  async onClose() { this.contentEl.empty(); tipHide(); }
+  onResize() { if (DS().ui.tab === 'stats') { clearTimeout(this._rz); this._rz = setTimeout(() => this.render(), 200); } }
   setTab(t) { DS().ui.tab = t; SG.saveSoon(); this.render(); }
 
   render() {
@@ -34,16 +35,16 @@ class DraftsmithView extends ItemView {
     const stage = el('select', { class: 'dropdown' }, STAGES.map((s) => el('option', { selected: s === p.stage }, s)));
     stage.addEventListener('change', () => setProjectField(p, 'stage', stage.value));
     const cov = resourceUrl(p.cover);
-    root.append(el('div', { class: 'ds-head' },
+    put(root, el('div', { class: 'ds-head' },
       el('div', { class: 'ds-cover-sm', onclick: () => this.setTab('details'), title: 'Book details' }, cov ? el('img', { src: cov }) : el('span', {}, p.title.slice(0, 1))),
       el('div', { class: 'ds-head-main' }, el('div', { class: 'ds-row' }, sel, btn('📚 Books & series', () => openLibrary(), 'ds-sm'), linkedNovel(p) ? pill('🧵 ' + linkedNovel(p).title, 'is-pw', null) : null),
         el('h1', {}, p.title), el('div', { class: 'ds-sub' }, [seriesLine(p), p.genre, p.penName || p.author].filter(Boolean).join(' · '))),
       el('div', { class: 'ds-draftbox' }, el('small', {}, 'Manuscript draft'), el('div', { class: 'ds-draftline' }, el('b', {}, '#' + p.draft), el('span', { class: 'ds-draftwords', title: 'Total words in the manuscript (ideas not counted)' }, `${fmtN(totalWords(p))} words`)), stage)));
-    root.append(el('div', { class: 'ds-tabs' }, DS_TABS.map(([k, l]) => el('button', { class: ui.tab === k ? 'is-on' : '', onclick: () => this.setTab(k) }, l))));
-    const body = el('div', { class: 'ds-body' }); root.append(body);
+    put(root, el('div', { class: 'ds-tabs' }, DS_TABS.map(([k, l]) => el('button', { class: ui.tab === k ? 'is-on' : '', onclick: () => this.setTab(k) }, l))));
+    const body = el('div', { class: 'ds-body' }); put(root, body);
     try {
-      ({ manuscript: renderManuscript, details: renderDetails, readers: renderReaders, checklist: renderChecklist, compile: renderCompile })[ui.tab](this, p, body);
-    } catch (e) { console.error(e); body.append(el('p', { class: 'ds-warn' }, 'Something went wrong drawing this tab: ' + e.message)); }
+      ({ manuscript: renderManuscript, details: renderDetails, readers: renderReaders, checklist: renderChecklist, stats: renderStats, compile: renderCompile })[ui.tab](this, p, body);
+    } catch (e) { console.error(e); put(body, el('p', { class: 'ds-warn' }, 'Something went wrong drawing this tab: ' + e.message)); }
     root.scrollTop = scroll;
   }
 }
@@ -53,7 +54,7 @@ function renderManuscript(view, p, body) {
   const chs = listChapters(p); const tw = chs.filter((c) => !isIdea(c)).reduce((a, c) => a + (c.words || 0), 0); const pct = p.targetWords ? Math.min(100, Math.round((tw / p.targetWords) * 100)) : 0;
   const cur = p.rounds[p.rounds.length - 1]; const next = nextDatedStep(p); const novel = linkedNovel(p);
   const counts = {}; for (const c of chs.filter((x) => !isIdea(x))) { const d = statusDef(c.status); const k = d ? d.name : c.status || 'No status'; counts[k] = (counts[k] || 0) + 1; }
-  body.append(el('div', { class: 'ds-stats' },
+  put(body, el('div', { class: 'ds-stats' },
     el('div', { class: 'ds-stat' }, el('small', {}, 'Words'), el('b', {}, fmtN(tw)), el('span', {}, `of ${fmtN(p.targetWords)} · ${pct}%`), el('div', { class: 'ds-bar' }, el('i', { style: { width: pct + '%' } }))),
     el('div', { class: 'ds-stat' }, el('small', {}, 'Chapters'), el('b', {}, String(chs.filter((c) => c.kind === 'chapter').length)), el('span', {}, [chs.filter((c) => !['chapter', 'idea'].includes(c.kind)).map((c) => c.label.toLowerCase()).join(', '), chs.some(isIdea) ? `${chs.filter(isIdea).length} idea${chs.filter(isIdea).length === 1 ? '' : 's'}` : '', Object.entries(counts).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(' · ')].filter(Boolean).join(' · ') || 'none yet')),
     el('div', { class: 'ds-stat is-click', onclick: () => { if (cur) DS().ui.round = cur.id; view.setTab('readers'); } }, el('small', {}, cur ? `${cur.name} · ${cur.version}` : 'Readers'), el('b', {}, cur ? `${cur.sends.filter((s) => s.status === 'Feedback in').length}/${cur.sends.length}` : '—'), el('span', {}, cur ? `feedback in · ${p.comments.filter((c) => c.round === cur.id && !c.resolved).length} open notes` : 'no reader rounds yet')),
@@ -67,9 +68,9 @@ function renderManuscript(view, p, body) {
     btn('Draft history', () => draftHistoryModal(p)),
     btn(`Start draft #${p.draft + 1}`, () => new FormModal(`Start manuscript draft #${p.draft + 1}`, [{ key: 'note', label: 'What is this draft for?', placeholder: 'e.g. Post-beta revision' }, { key: 'bump', label: 'Also add 1 to every chapter’s draft number', type: 'checkbox', value: false }], 'Start draft', (v) => startManuscriptDraft(p, v.note, v.bump),
       `A read-only copy of all ${chs.length} chapter notes is saved to ${projectSub(p, 'snapshotFolder')}/Draft ${p.draft}/ first.`).open(), 'mod-cta'));
-  body.append(tools);
+  put(body, tools);
   if (!chs.length) {
-    body.append(card(null, el('p', {}, `No chapter notes yet. Draftsmith looks for notes in `, el('code', {}, chaptersFolder(p)), '.'),
+    put(body, card(null, el('p', {}, `No chapter notes yet. Draftsmith looks for notes in `, el('code', {}, chaptersFolder(p)), '.'),
       el('div', { class: 'ds-row' }, btn('⇪ Import existing chapter notes…', () => new ImportChaptersModal(p).open(), 'mod-cta'), novel ? btn('↻ Chapters from Plot Weaver', async () => { await chaptersFromPlot(p); setTimeout(() => view.render(), 400); }) : null, btn('+ New chapter', () => newChapterModal(p))),
       hint('Already writing in Obsidian? Import moves your chapter notes into this book (links stay intact) or uses their folder as is.')));
     return;
@@ -77,7 +78,7 @@ function renderManuscript(view, p, body) {
   const K = DSS().keys; const sk = statusKey();
   const tbl = el('table', { class: 'ds-table ds-chtable' }, el('thead', {}, el('tr', {}, ['', '#', 'Chapter', 'Type', 'Draft', 'Status', 'Words', 'POV', 'Plot Weaver', ''].map((x) => el('th', {}, x)))));
   let dragFrom = null;
-  const tb = el('tbody'); tbl.append(tb);
+  const tb = el('tbody'); put(tbl, tb);
   chs.forEach((c, i) => {
     const st = el('select', { class: 'dropdown ds-st' }, el('option', { value: '' }, '—'), statusDefs().map((d) => el('option', { selected: statusDef(c.status)?.name === d.name }, d.name)), c.status && !statusDef(c.status) ? el('option', { selected: true }, c.status) : null);
     const def = statusDef(c.status); if (def) st.style.setProperty('--c', def.color || '#888');
@@ -99,10 +100,10 @@ function renderManuscript(view, p, body) {
     tr.addEventListener('dragover', (e) => { if (dragFrom == null) return; e.preventDefault(); tr.addClass('is-over'); });
     tr.addEventListener('dragleave', () => tr.removeClass('is-over'));
     tr.addEventListener('drop', async (e) => { e.preventDefault(); tr.removeClass('is-over'); const from = dragFrom; dragFrom = null; if (from == null || from === i) return; const a = chs.slice(); const [x] = a.splice(from, 1); a.splice(i, 0, x); await reorderChapters(p, a); });
-    tb.append(tr);
+    put(tb, tr);
   });
-  body.append(el('div', { class: 'ds-tablewrap' }, tbl));
-  body.append(hint(`Drag rows by ⋮⋮ to reorder. Only chapters are numbered: P = prologue, I = interlude, E = epilogue, 💡 = idea. Status and words use Plot Weaver’s fields (“${sk}”, “${wordsKey()}”), so all three sections read the same properties.${plotOrder ? ' Reordering here also reorders the Plot Weaver board, and type changes are shared with it.' : ''}`));
+  put(body, el('div', { class: 'ds-tablewrap' }, tbl));
+  put(body, hint(`Drag rows by ⋮⋮ to reorder. Only chapters are numbered: P = prologue, I = interlude, E = epilogue, 💡 = idea. Status and words use Plot Weaver’s fields (“${sk}”, “${wordsKey()}”), so all three sections read the same properties.${plotOrder ? ' Reordering here also reorders the Plot Weaver board, and type changes are shared with it.' : ''}`));
 }
 function daysText(iso) { const d = daysUntil(iso); return d == null ? '' : d < 0 ? `${-d} days overdue` : d === 0 ? 'today' : `in ${d} days`; }
 function nextDatedStep(p) {
@@ -111,7 +112,7 @@ function nextDatedStep(p) {
 }
 function draftHistoryModal(p) {
   const m = new Modal(SG.app); m.contentEl.addClass('ds-modal');
-  m.contentEl.append(el('h3', {}, 'Manuscript draft history'), el('div', { class: 'ds-hist' }, p.draftHistory.map((h) => el('div', {}, el('span', {}, el('b', {}, `Draft ${h.n}`), ' · ', h.note || ''), el('span', { class: 'ds-hint' }, `${h.date} · ${h.words == null ? 'in progress' : fmtN(h.words) + ' words'}`)))),
+  put(m.contentEl, el('h3', {}, 'Manuscript draft history'), el('div', { class: 'ds-hist' }, p.draftHistory.map((h) => el('div', {}, el('span', {}, el('b', {}, `Draft ${h.n}`), ' · ', h.note || ''), el('span', { class: 'ds-hint' }, `${h.date} · ${h.words == null ? 'in progress' : fmtN(h.words) + ' words'}`)))),
     hint(`Snapshots of earlier drafts are in ${projectSub(p, 'snapshotFolder')}/.`));
   m.open();
 }

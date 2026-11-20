@@ -23,6 +23,8 @@ function el(tag, a = {}, ...kids) {
   for (const c of kids.flat(5)) { if (c == null || c === false) continue; e.append(c.nodeType ? c : document.createTextNode(String(c))); }
   return e;
 }
+/** Append children, skipping null/false (Element.append would print them as the text "null"). */
+function put(target, ...kids) { for (const c of kids.flat(5)) { if (c == null || c === false) continue; target.append(c.nodeType ? c : document.createTextNode(String(c))); } return target; }
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const daysUntil = (iso) => (iso ? Math.round((new Date(iso + 'T00:00:00') - new Date(today() + 'T00:00:00')) / 864e5) : null);
@@ -129,7 +131,7 @@ function makeProject(title) {
     draft: 1, draftHistory: [{ n: 1, date: today(), words: null, note: 'First draft' }],
     cover: '', logline: '', blurb: '', synopsisShort: '', synopsis: '', comps: '', keywords: '', bisac: '',
     publisher: '', isbnEbook: '', isbnPrint: '', pubDate: '', copyright: String(new Date().getFullYear()),
-    dedication: '', acknowledgments: '', bio: '', extra: [], draftCopyright: DEFAULT_LEGAL.draftCopyright, shortCopyright: DEFAULT_LEGAL.shortCopyright, aiNotice: DEFAULT_LEGAL.aiNotice,
+    dedication: '', acknowledgments: '', bio: '', extra: [], dailyGoal: 500, history: {}, draftCopyright: DEFAULT_LEGAL.draftCopyright, shortCopyright: DEFAULT_LEGAL.shortCopyright, aiNotice: DEFAULT_LEGAL.aiNotice,
     folder: `Novels/${safeName(title || 'My Novel')}`, chaptersFolder: '', pwNovelId: '', seriesId: '', pwSeriesLinks: [],
     readers: [], rounds: [], comments: [], checklists: makeChecklists(), checklistTab: 'draft',
     compile: clone(DEFAULT_COMPILE),

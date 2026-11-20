@@ -191,6 +191,7 @@ async function recount(f) {
     const fm = fmOf(f); const k = wordsKey(); const cur = fm[k] == null ? null : +String(fm[k]).replace(/[,\s_]/g, '');
     if (cur !== n) await setFm(f, (x) => { x[k] = n; });
   }
+  for (const p of DS().projects) if (f.path.startsWith(chaptersFolder(p) + '/')) recordHistory(p);
   SG.refreshDraftsmithSoon();
 }
 
@@ -250,36 +251,36 @@ class ImportChaptersModal extends Modal {
   }
   draw() {
     const c = this.contentEl; c.empty(); c.addClass('ds-modal', 'ds-import'); const p = this.p; const novel = linkedNovel(p); const dest = chaptersFolder(p);
-    c.append(el('h2', {}, 'Bring in existing chapter notes'), el('p', { class: 'ds-hint' }, `Turn notes you already have into chapters of “${p.title}”. Your text and properties are kept; Draftsmith only adds what’s missing (chapter number, draft, status, word count).`));
+    put(c, el('h2', {}, 'Bring in existing chapter notes'), el('p', { class: 'ds-hint' }, `Turn notes you already have into chapters of “${p.title}”. Your text and properties are kept; Draftsmith only adds what’s missing (chapter number, draft, status, word count).`));
     const fsel = el('select', { class: 'dropdown' }, el('option', { value: '' }, 'Choose the folder your chapters are in…'), this.folders().map(([d, n]) => el('option', { value: d || '/', selected: (this.folder || null) === d || (d === '' && this.folder === '/') }, `${d || '(vault root)'} — ${n} note${n === 1 ? '' : 's'}`)));
     fsel.addEventListener('change', () => { this.folder = fsel.value === '/' ? '' : fsel.value; this.picked = !!fsel.value; this.load(); this.draw(); });
     const sub = el('input', { type: 'checkbox', checked: this.sub }); sub.addEventListener('change', () => { this.sub = sub.checked; if (this.picked) this.load(); this.draw(); });
-    c.append(el('div', { class: 'ds-field' }, el('label', {}, 'Source folder'), fsel), el('label', { class: 'ds-toggle' }, sub, ' Include notes in sub-folders'),
+    put(c, el('div', { class: 'ds-field' }, el('label', {}, 'Source folder'), fsel), el('label', { class: 'ds-toggle' }, sub, ' Include notes in sub-folders'),
       el('div', { class: 'ds-row' }, el('span', { class: 'ds-hint ds-grow' }, 'Or add notes one at a time:'), btn('+ Add a note…', () => new FilePick((f) => f.extension === 'md' && !this.files.includes(f) && !f.path.startsWith(dest + '/'), (f) => { this.files.push(f); this.on.add(f.path); this.picked = true; this.draw(); }, 'Add a note as a chapter…').open(), 'ds-sm')));
-    if (!this.files.length) { c.append(el('p', { class: 'ds-hint' }, this.picked ? 'No notes there that aren’t chapters already.' : '')); return; }
+    if (!this.files.length) { put(c, el('p', { class: 'ds-hint' }, this.picked ? 'No notes there that aren’t chapters already.' : '')); return; }
     const list = el('div', { class: 'ds-import-list' });
     this.files.forEach((f, i) => {
       const cb = el('input', { type: 'checkbox', checked: this.on.has(f.path) }); cb.addEventListener('change', () => { cb.checked ? this.on.add(f.path) : this.on.delete(f.path); this.draw(); });
       const mv = (d) => () => { const j = i + d; if (j < 0 || j >= this.files.length) return; [this.files[i], this.files[j]] = [this.files[j], this.files[i]]; this.draw(); };
       const n = [...this.files.slice(0, i + 1)].filter((x) => this.on.has(x.path)).length;
-      list.append(el('div', { class: 'ds-import-row' + (this.on.has(f.path) ? '' : ' is-off') }, cb, el('span', { class: 'ds-lib-no' }, this.on.has(f.path) ? String(n) : '–'),
+      put(list, el('div', { class: 'ds-import-row' + (this.on.has(f.path) ? '' : ' is-off') }, cb, el('span', { class: 'ds-lib-no' }, this.on.has(f.path) ? String(n) : '–'),
         el('span', { class: 'ds-grow' }, f.basename, el('small', { class: 'ds-hint' }, `  ${f.path.split('/').slice(0, -1).join('/') || '/'}`)), btn('↑', mv(-1), 'clickable-icon ds-sm'), btn('↓', mv(1), 'clickable-icon ds-sm')));
     });
-    c.append(el('div', { class: 'ds-row' }, el('b', { class: 'ds-grow' }, `Chapter order (${this.on.size} selected)`), el('span', { class: 'ds-hint' }, 'Sorted by file name; use ↑ ↓ to change.')), list);
+    put(c, el('div', { class: 'ds-row' }, el('b', { class: 'ds-grow' }, `Chapter order (${this.on.size} selected)`), el('span', { class: 'ds-hint' }, 'Sorted by file name; use ↑ ↓ to change.')), list);
     const oneFolder = new Set(this.files.filter((f) => this.on.has(f.path)).map((f) => f.path.split('/').slice(0, -1).join('/')));
     const canUse = oneFolder.size === 1 && !this.sub && listChapters(p).length === 0;
     if (!canUse && this.mode === 'folder') this.mode = 'move';
     const radio = (v, label, desc, disabled) => { const r = el('input', { type: 'radio', name: 'ds-imp-mode', checked: this.mode === v, disabled }); r.addEventListener('change', () => { this.mode = v; this.draw(); }); return el('label', { class: 'ds-radio' + (disabled ? ' is-off' : '') }, r, el('div', {}, el('b', {}, label), el('div', { class: 'ds-hint' }, desc))); };
-    c.append(el('div', { class: 'ds-field' }, el('label', {}, 'How'),
+    put(c, el('div', { class: 'ds-field' }, el('label', {}, 'How'),
       radio('move', `Move them into ${dest}`, 'Obsidian updates every link to these notes, so nothing breaks.', false),
       radio('folder', `Keep them where they are`, canUse ? `“${[...oneFolder][0] || '/'}” becomes this book’s chapters folder. Nothing moves.` : 'Only when all chosen notes are in one folder (no sub-folders) and this book has no chapters yet.', !canUse)));
     if (novel) {
       const m = el('input', { type: 'checkbox', checked: this.matchPlot }); m.addEventListener('change', () => { this.matchPlot = m.checked; this.draw(); });
       const cp = el('input', { type: 'checkbox', checked: this.createPlot, disabled: !this.matchPlot }); cp.addEventListener('change', () => { this.createPlot = cp.checked; });
-      c.append(el('label', { class: 'ds-toggle' }, m, ` Link to Plot Weaver chapters with the same title (“${novel.title}”)`), el('br'), el('label', { class: 'ds-toggle' }, cp, ' Add a Plot Weaver chapter for any note without a match'));
+      put(c, el('label', { class: 'ds-toggle' }, m, ` Link to Plot Weaver chapters with the same title (“${novel.title}”)`), el('br'), el('label', { class: 'ds-toggle' }, cp, ' Add a Plot Weaver chapter for any note without a match'));
     }
     const chosen = this.files.filter((f) => this.on.has(f.path));
-    c.append(el('div', { class: 'ds-modal-actions' }, btn('Cancel', () => this.close()), el('button', { class: 'mod-cta', disabled: !chosen.length, onclick: async () => {
+    put(c, el('div', { class: 'ds-modal-actions' }, btn('Cancel', () => this.close()), el('button', { class: 'mod-cta', disabled: !chosen.length, onclick: async () => {
       this.close(); const r = await importChapters(p, chosen, { mode: this.mode, folder: [...oneFolder][0], matchPlot: this.matchPlot, createPlot: this.createPlot, append: true });
       notice(`Imported ${r.count} chapter${r.count === 1 ? '' : 's'}${r.moved ? ` (moved ${r.moved})` : ''}${r.linked ? ` · linked ${r.linked} to Plot Weaver` : ''}${r.made ? ` · ${r.made} new Plot Weaver chapters` : ''}.`, 8000);
     } }, `Import ${chosen.length} chapter${chosen.length === 1 ? '' : 's'}`)));

@@ -26,7 +26,7 @@ function renderCompile(view, p, body) {
   left.append(card('Layout',
     msfAllowed ? toggle('manuscriptFormat', 'Standard manuscript format', 'Courier 12, double-spaced, 1-inch margins, name / TITLE / page header — what agents and editors expect.') : null,
     msfAllowed && o.manuscriptFormat ? [textOpt('contact', 'Contact block (title page)', 'email · phone · agent'), textOpt('shortTitle', 'Short title for the header', p.title)] : null,
-    !(msfAllowed && o.manuscriptFormat) ? [toggle('titlePage', 'Title page'), toggle('toc', 'Table of contents'), toggle('frontMatter', 'Copyright, dedication, acknowledgments & author bio', 'Taken from Book details')] : null,
+    !(msfAllowed && o.manuscriptFormat) ? [p.cover ? toggle('includeCover', 'Cover page', o.format === 'epub' ? 'The cover image from Book details' : 'The cover from Book details, fitted inside a 1-inch margin without stretching') : el('div', { class: 'ds-opt' }, el('div', {}, el('div', {}, 'Cover page'), el('small', { class: 'ds-hint' }, 'Add a cover image in Book details to include it'))), toggle('titlePage', 'Title page'), toggle('toc', 'Table of contents'), toggle('frontMatter', 'Copyright, dedication, acknowledgments & author bio', 'Taken from Book details')] : null,
     msfAllowed && !o.manuscriptFormat ? [select('pageSize', 'Page size', [['6x9', '6 × 9 in (trade)'], ['5.5x8.5', '5.5 × 8.5 in'], ['5x8', '5 × 8 in'], ['letter', 'US Letter'], ['a4', 'A4']]), select('fontSize', 'Font size', ['10', '10.5', '11', '11.5', '12'].map((x) => [x, x + ' pt']))] : null,
     o.format === 'docx' && !o.manuscriptFormat ? select('font', 'Font', ['Times', 'Garamond', 'Georgia']) : null,
     toggle('draftStamp', 'Stamp the draft number and word count', `Adds “Draft ${p.draft} · ${fmtN(totalWords(p))} words” to the copyright page, and the draft to the file name`),
@@ -58,11 +58,12 @@ function renderCompile(view, p, body) {
    format, title page, copyright notices, reader questions, contents with (estimated) page
    numbers, chapter heading, scene break, curly quotes, and the notices at the foot of each page. */
 const PREVIEW_W = 250;
+const PAGE_LABEL = { '6x9': '6 × 9 in', '5.5x8.5': '5.5 × 8.5 in', '5x8': '5 × 8 in', letter: 'US Letter', a4: 'A4' };
 const PAGE_PT = { '6x9': [432, 648], '5.5x8.5': [396, 612], '5x8': [360, 576], letter: [612, 792], a4: [595, 842] };
 const WORDS_PER_PAGE = { '6x9': 300, '5.5x8.5': 270, '5x8': 235, letter: 520, a4: 540 };
 function previewPage(p, sel) {
   const o = p.compile; const fmt = o.format; const msf = !!o.manuscriptFormat && (fmt === 'pdf' || fmt === 'docx'); const epub = fmt === 'epub';
-  const wrap = el('div', { class: 'ds-preview' }, el('div', { class: 'ds-row' }, el('b', { class: 'ds-grow' }, 'Preview'), el('small', { class: 'ds-hint' }, epub ? 'e-reader screens' : fmt === 'md' ? 'one note' : `${msf ? 'US Letter, manuscript format' : (o.pageSize || '6x9').replace('x', ' × ') + (/\d/.test(o.pageSize || '6') ? ' in' : '')} · page numbers estimated`)));
+  const wrap = el('div', { class: 'ds-preview' }, el('div', { class: 'ds-row' }, el('b', { class: 'ds-grow' }, 'Preview'), el('small', { class: 'ds-hint' }, epub ? 'e-reader screens' : fmt === 'md' ? 'one note' : `${msf ? 'US Letter, manuscript format' : PAGE_LABEL[o.pageSize] || PAGE_LABEL['6x9']} · page numbers estimated`)));
   if (!sel.length) { wrap.append(hint('No chapters selected.')); return wrap; }
   const author = p.penName || p.author || 'Author';
   const fs = msf ? 12 : Number(o.fontSize) || 11;
@@ -80,8 +81,8 @@ function previewPage(p, sel) {
   }
   // Page plan, mirroring the PDF writer.
   const pages = []; const add = (kind, build) => pages.push({ kind, build });
-  const hasCover = !msf && p.cover && resourceUrl(p.cover) && (epub || /\.jpe?g$/i.test(p.cover));
-  if (hasCover) add('cover', (b) => b.append(el('img', { class: 'ds-pp-cover', src: resourceUrl(p.cover) })));
+  const hasCover = !msf && o.includeCover !== false && p.cover && resourceUrl(p.cover);
+  if (hasCover) add('cover', (b) => b.append(el('img', { class: 'ds-pp-cover' + (epub ? '' : ' is-fitted'), src: resourceUrl(p.cover) })));
   if (o.titlePage || msf) add('title', (b) => {
     if (msf) { b.append(el('div', { class: 'ds-pp-msfhead' }, el('div', {}, p.author || author, o.contact ? el('div', {}, o.contact) : null), el('div', {}, `About ${aboutWords(totalWords(p))} words`)), el('div', { class: 'ds-pp-center', style: { 'margin-top': '38%' } }, el('div', {}, p.title.toUpperCase()), p.subtitle ? el('div', {}, p.subtitle) : null, el('div', {}, `by ${author}`))); return; }
     b.append(el('div', { class: 'ds-pp-center', style: { 'margin-top': '22%' } }, el('div', { style: { 'font-size': px(fs * 2.4), 'line-height': 1.15 } }, p.title), p.subtitle ? el('i', { style: { 'font-size': px(fs * 1.3) } }, p.subtitle) : null, p.series ? el('i', {}, seriesLine(p)) : null),

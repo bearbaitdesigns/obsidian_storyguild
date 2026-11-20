@@ -90,6 +90,9 @@ Edit a shared field anywhere and it changes everywhere.
 - **Publish** — PDF (book layout or standard manuscript format), Word (.docx), EPUB 3 or one Markdown note.
   - Options: title page, contents, front and back matter, chapter heading template (`{n}`, `{N}`, `{title}`), scene-break mark, page size and curly quotes.
   - A round's questions can be added to a reader (alpha, beta or ARC) copy as a plain list, **before the table of contents**, with no space for answers.
+  - **Cover page** (optional): the cover image from Book details.
+    - In PDF and Word it's fitted inside a 1-inch margin, centred, and never stretched or cropped. EPUB uses it as the e-book cover.
+    - PDF takes JPEG and PNG covers without transparency. Word takes JPEG, PNG and GIF.
   - **Page numbers**: PDF and Word number every page except the cover and title page. The contents list the page each chapter starts on. In Word the contents are a real contents field, pre-filled with the right numbers and refreshed by Word when you open the file.
   - **Copyright & notices** (wording in Book details):
     - The **draft copyright notice** replaces the standard copyright lines while the book's stage isn't Published. You can switch this per publish.

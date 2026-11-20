@@ -119,7 +119,7 @@ const draftNoticeOn = (p) => (p.compile.draftNotice == null ? p.stage !== 'Publi
 const DEFAULT_COMPILE = {
   format: 'pdf', chapters: 'all', statusFilter: '', titlePage: true, toc: true, frontMatter: true, draftStamp: false,
   heading: 'Chapter {n}: {title}', sceneBreak: '* * *', font: 'Times', fontSize: 11, pageSize: '6x9', manuscriptFormat: false,
-  includeQuestions: false, questionsRound: '', folder: '', smartQuotes: true, includeIdeas: false, draftNotice: null, footerCopyright: true, footerAi: true,
+  includeQuestions: false, questionsRound: '', folder: '', smartQuotes: true, includeIdeas: false, draftNotice: null, footerCopyright: true, footerAi: true, includeCover: true,
 };
 
 function makeProject(title) {

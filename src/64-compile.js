@@ -27,7 +27,7 @@ async function gatherBook(p) {
     chapters.push({ title: c.title, kind: c.kind, heading, blocks: mdToBlocks(md, c.title, { smart }) });
   }
   let cover = null;
-  if (p.cover && o.format !== 'docx') {
+  if (p.cover && o.includeCover !== false && !(o.manuscriptFormat && o.format !== 'epub')) {
     const f = app().vault.getAbstractFileByPath(normalizePath(p.cover));
     if (f instanceof TFile) { const ext = f.extension.toLowerCase() === 'jpeg' ? 'jpg' : f.extension.toLowerCase(); const mime = { jpg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' }[ext]; if (mime) cover = { ext, mime, bytes: new Uint8Array(await app().vault.readBinary(f)) }; }
   }
@@ -93,5 +93,6 @@ async function compileProject(p) {
   p.lastCompiled = [{ path, at: new Date().toISOString(), words: book.words }, ...(p.lastCompiled || []).filter((x) => x.path !== path)].slice(0, 8);
   SG.saveSoon();
   notice(`Published ${path} (${fmtN(book.words)} words${info})`, 8000);
+  for (const w of book.warnings || []) notice(w, 10000);
   return path;
 }

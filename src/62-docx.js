@@ -15,6 +15,17 @@ function buildDocx(book) {
   const font = msf ? 'Courier New' : o.font === 'Garamond' ? 'Garamond' : o.font === 'Georgia' ? 'Georgia' : 'Times New Roman';
   const size = msf ? 24 : Math.round((o.fontSize || 11) * 2); const line = msf ? 480 : 300; const indent = msf ? 720 : 360;
   const body = [];
+  // Cover page: the image fitted inside a 1-inch margin (and the page margins), centred, never stretched.
+  let coverPart = null;
+  if (book.cover && !msf) {
+    const sz = imageSize(book.cover); const ext = book.cover.ext === 'jpg' ? 'jpeg' : book.cover.ext;
+    if (sz && ['jpeg', 'png', 'gif'].includes(ext)) {
+      const bw = Math.min(pw - 2880, pw - 2 * mar), bh = Math.min(ph - 2880, ph - 2 * mar) - 240; const box = fitInside(sz.w, sz.h, bw, bh);
+      const cx = Math.round(box.w * 635), cy = Math.round(box.h * 635); const before = Math.max(0, Math.round((ph - 2 * mar - box.h) / 2) - 120);
+      coverPart = { name: `word/media/cover.${ext}`, ext, bytes: book.cover.bytes };
+      body.push(`<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="${before}" w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="1" name="Cover"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="1" name="cover.${ext}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdCover"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`, pageBreak);
+    } else book.warnings = [...(book.warnings || []), 'The cover isn’t a JPEG, PNG or GIF, so Word output leaves it out.'];
+  }
   if (o.titlePage) {
     if (msf) {
       body.push(wp('NoInd', wrun(m.legalName || m.author)), ...(m.contact ? m.contact.split('\n').map((l) => wp('NoInd', wrun(l))) : []));
@@ -67,7 +78,7 @@ function buildDocx(book) {
   const titlePg = !!o.titlePage;
   const sect = `<w:sectPr>${header ? '<w:headerReference w:type="default" r:id="rIdHdr"/>' : ''}${titlePg ? '<w:headerReference w:type="first" r:id="rIdHdr1"/><w:footerReference w:type="first" r:id="rIdFtr1"/>' : ''}<w:footerReference w:type="default" r:id="rIdFtr"/><w:pgSz w:w="${pw}" w:h="${ph}"/><w:pgMar w:top="${mar}" w:right="${mar}" w:bottom="${mar}" w:left="${mar}" w:header="${Math.round(mar / 2)}" w:footer="${Math.round(mar / 2)}" w:gutter="0"/>${titlePg ? '<w:titlePg/>' : ''}</w:sectPr>`;
   const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${body.join('')}${sect}</w:body></w:document>`;
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>${body.join('')}${sect}</w:body></w:document>`;
   const pPr = (extra) => `<w:pPr>${extra}</w:pPr>`;
   const style = (id, name, ppr, rpr = '', next = 'Normal', extra = '') => `<w:style w:type="paragraph" w:styleId="${id}"><w:name w:val="${name}"/><w:basedOn w:val="Normal"/><w:next w:val="${next}"/>${extra}<w:qFormat/>${pPr(ppr)}${rpr ? `<w:rPr>${rpr}</w:rPr>` : ''}</w:style>`;
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -88,10 +99,10 @@ ${style('SceneBreak', 'Scene Break', '<w:keepNext/><w:ind w:firstLine="0"/><w:jc
 ${style('Question', 'Reader Question', '<w:keepNext/><w:ind w:firstLine="0"/><w:jc w:val="left"/><w:spacing w:before="360" w:after="120"/>', '<w:b/>', 'NoInd')}
 </w:styles>`;
   const rels = [header ? '<Relationship Id="rIdHdr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>' : '', '<Relationship Id="rIdFtr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>', titlePg ? '<Relationship Id="rIdHdr1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/><Relationship Id="rIdFtr1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer2.xml"/>' : '',
-    '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>', '<Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>'].join('');
+    coverPart ? `<Relationship Id="rIdCover" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/cover.${coverPart.ext}"/>` : '', '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>', '<Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>'].join('');
   const files = [
     { name: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${coverPart ? `<Default Extension="${coverPart.ext}" ContentType="image/${coverPart.ext}"/>` : ''}
 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
 ${header ? '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' : ''}<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>${titlePg ? '<Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>' : ''}
 <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>` },
@@ -103,6 +114,7 @@ ${header ? '<Override PartName="/word/header1.xml" ContentType="application/vnd.
   ];
   if (header) files.push({ name: 'word/header1.xml', data: header });
   files.push({ name: 'word/footer1.xml', data: footer });
+  if (coverPart) files.push({ name: coverPart.name, data: coverPart.bytes });
   if (titlePg) files.push({ name: 'word/header2.xml', data: firstHeader }, { name: 'word/footer2.xml', data: firstFooter });
   return makeZip(files);
 }

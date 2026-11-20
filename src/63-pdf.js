@@ -37,6 +37,35 @@ function jpegInfo(b) {
   return null;
 }
 
+function pngInfo(b) {
+  if (!b || b[0] !== 0x89 || b[1] !== 0x50 || b[2] !== 0x4e || b[3] !== 0x47) return null;
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength); let i = 8; const out = { idat: [] };
+  while (i + 8 <= b.length) {
+    const len = dv.getUint32(i); const type = String.fromCharCode(b[i + 4], b[i + 5], b[i + 6], b[i + 7]); const data = b.subarray(i + 8, i + 8 + len);
+    if (type === 'IHDR') Object.assign(out, { w: dv.getUint32(i + 8), h: dv.getUint32(i + 12), bits: b[i + 16], ctype: b[i + 17], interlace: b[i + 20] });
+    else if (type === 'PLTE') out.plte = data; else if (type === 'IDAT') out.idat.push(data); else if (type === 'IEND') break;
+    i += 12 + len;
+  }
+  return out.w ? out : null;
+}
+const gifInfo = (b) => (b && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 ? { w: b[6] | (b[7] << 8), h: b[8] | (b[9] << 8) } : null);
+/** Pixel size of a cover image (JPEG, PNG or GIF). */
+function imageSize(cover) { const b = cover && cover.bytes; return jpegInfo(b) || pngInfo(b) || gifInfo(b) || null; }
+/** Fit w×h inside a box without distortion. */
+function fitInside(w, h, bw, bh) { const k = Math.min(bw / w, bh / h); return { w: w * k, h: h * k }; }
+/** A PDF image object for a cover: JPEG as is; PNG (no transparency) through its own compressed data. */
+function pdfImage(cover) {
+  const b = cover.bytes; const j = jpegInfo(b);
+  if (j && (j.comps === 3 || j.comps === 1)) return { w: j.w, h: j.h, dict: `/Width ${j.w} /Height ${j.h} /ColorSpace /${j.comps === 1 ? 'DeviceGray' : 'DeviceRGB'} /BitsPerComponent 8 /Filter /DCTDecode`, bytes: b };
+  const p = pngInfo(b);
+  if (p && !p.interlace && [0, 2, 3].includes(p.ctype) && p.bits <= 8) {
+    const data = concatBytes(p.idat); const colors = p.ctype === 2 ? 3 : 1;
+    let cs = p.ctype === 2 ? '/DeviceRGB' : '/DeviceGray';
+    if (p.ctype === 3 && p.plte) { let hex = ''; for (const x of p.plte) hex += x.toString(16).padStart(2, '0'); cs = `[/Indexed /DeviceRGB ${p.plte.length / 3 - 1} <${hex}>]`; }
+    return { w: p.w, h: p.h, dict: `/Width ${p.w} /Height ${p.h} /ColorSpace ${cs} /BitsPerComponent ${p.bits} /Filter /FlateDecode /DecodeParms << /Predictor 15 /Colors ${colors} /BitsPerComponent ${p.bits} /Columns ${p.w} >>`, bytes: data };
+  }
+  return null; // PNG with transparency, WebP…: not embeddable without re-encoding
+}
 function buildPdf(book) {
   const o = book.opts; const m = book.meta; const msf = !!o.manuscriptFormat;
   const [PW, PH, MV, MH] = msf ? PDF_PAGES.letter : PDF_PAGES[o.pageSize] || PDF_PAGES['6x9'];
@@ -100,7 +129,12 @@ function buildPdf(book) {
 
   /* ---- cover, title, copyright, dedication ---- */
   let coverImg = null;
-  if (book.cover && book.cover.ext === 'jpg' && !msf) { const ji = jpegInfo(book.cover.bytes); if (ji && (ji.comps === 3 || ji.comps === 1)) { coverImg = Object.assign(ji, { bytes: book.cover.bytes }); newPage('cover'); cur.ops.push(`q ${PW} 0 0 ${PH} 0 0 cm /Im1 Do Q`); } }
+  // Cover page: the image fitted inside a 1-inch margin, centred, never stretched.
+  if (book.cover && !msf) {
+    coverImg = pdfImage(book.cover);
+    if (coverImg) { newPage('cover'); const box = fitInside(coverImg.w, coverImg.h, PW - 144, PH - 144); const x0 = (PW - box.w) / 2, y0 = (PH - box.h) / 2; cur.ops.push(`q ${box.w.toFixed(2)} 0 0 ${box.h.toFixed(2)} ${x0.toFixed(2)} ${y0.toFixed(2)} cm /Im1 Do Q`); }
+    else book.warnings = [...(book.warnings || []), 'The cover is a PNG with transparency or another format PDF can’t embed directly, so it was left out. Save it as a JPEG (or a PNG without transparency).'];
+  }
   if (o.titlePage) {
     newPage('title');
     if (msf) {
@@ -172,7 +206,7 @@ function buildPdf(book) {
   const catalogId = add(null); const pagesId = add(null);
   const fontIds = {}; const FONTS = { F1: 'Times-Roman', F2: 'Times-Italic', F3: 'Times-Bold', F4: 'Times-BoldItalic', F5: 'Courier', F6: 'Courier-Oblique', F7: 'Courier-Bold', F8: 'Courier-BoldOblique' };
   for (const [k, n] of Object.entries(FONTS)) fontIds[k] = add(`<< /Type /Font /Subtype /Type1 /BaseFont /${n} /Encoding /WinAnsiEncoding >>`);
-  const imgId = coverImg ? add({ dict: `<< /Type /XObject /Subtype /Image /Width ${coverImg.w} /Height ${coverImg.h} /ColorSpace /${coverImg.comps === 1 ? 'DeviceGray' : 'DeviceRGB'} /BitsPerComponent 8 /Filter /DCTDecode /Length ${coverImg.bytes.length} >>`, bytes: coverImg.bytes }) : null;
+  const imgId = coverImg ? add({ dict: `<< /Type /XObject /Subtype /Image ${coverImg.dict} /Length ${coverImg.bytes.length} >>`, bytes: coverImg.bytes }) : null;
   const res = `<< /Font << ${Object.entries(fontIds).map(([k, id]) => `/${k} ${id} 0 R`).join(' ')} >>${imgId ? ` /XObject << /Im1 ${imgId} 0 R >>` : ''} >>`;
   const resId = add(res);
   const pageIds = [];

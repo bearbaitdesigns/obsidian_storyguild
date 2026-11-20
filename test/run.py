@@ -232,6 +232,18 @@ async def main():
               let s = ''; for (const x of bytes) s += String.fromCharCode(x); return { path, b64: btoa(s), notice: __notices[__notices.length - 1] }; }""", {'fmt': fmt, 'extra': extra})
             name = os.path.basename(r['path']).replace(' ', '_')
             open(os.path.join(OUT, name), 'wb').write(base64.b64decode(r['b64'])); outs[name] = r['notice']
+        # PNG cover in a PDF, and turning the cover off
+        from PIL import Image as _I; _b = io.BytesIO(); _I.new('RGB', (300, 480), (120, 30, 40)).save(_b, 'PNG')
+        r = await ev("""async (png) => { const bin = Uint8Array.from(atob(png), (c) => c.charCodeAt(0)); await app.vault.createBinary('Assets/cover.png', bin.buffer);
+          const p = SGP.data.manuscript.projects[0]; p.cover = 'Assets/cover.png'; Object.assign(p.compile, { format: 'pdf', manuscriptFormat: false, includeCover: true });
+          const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view; v.setTab('compile'); await new Promise(r => setTimeout(r, 200));
+          [...document.querySelectorAll('.ds-root button')].find(b => b.textContent.startsWith('Publish ')).click(); await new Promise(r => setTimeout(r, 700));
+          const withCover = __notices.slice(-2); p.compile.includeCover = false; v.render(); await new Promise(r => setTimeout(r, 100));
+          [...document.querySelectorAll('.ds-root button')].find(b => b.textContent.startsWith('Publish ')).click(); await new Promise(r => setTimeout(r, 700));
+          const path = p.lastCompiled[0].path; const bytes = app.vault.bin.get(path); let s = ''; for (const x of bytes) s += String.fromCharCode(x);
+          const pngPdf = p.lastCompiled.find(x => true); p.compile.includeCover = true; p.cover = 'Assets/cover.jpg'; return { withCover, noCover: __notices[__notices.length - 1], b64: btoa(s) }; }""", base64.b64encode(_b.getvalue()).decode())
+        print('7b. covers:', r['withCover'], '|', r['noCover'])
+        assert '13 pages' in r['withCover'][-1] and '12 pages' in r['noCover'] and not any('left out' in n for n in r['withCover'])
         print('7. published:', outs)
         for name, extra in [('10-preview-book', {'format': 'pdf', 'manuscriptFormat': False, 'pageSize': '6x9'}), ('11-preview-msf', {'format': 'docx', 'manuscriptFormat': True}), ('12-preview-epub', {'format': 'epub'})]:
             await ev("""async (extra) => { const p = SGP.data.manuscript.projects[0]; Object.assign(p.compile, { includeQuestions: true, toc: true, titlePage: true, frontMatter: true, draftStamp: true }, extra);

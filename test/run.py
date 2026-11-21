@@ -287,6 +287,25 @@ async def main():
         nav = await page.query_selector_all('.anav')
         await nav[-1].screenshot(path=f'{OUT}/09-wk-nav.png')
 
+        # Encyclopedia: Mermaid diagram tools, live preview, canvases
+        r = await ev("""async () => { const W = (ms) => new Promise(r => setTimeout(r, ms));
+          await app.vault.create('Worldkeeper/Encyclopedia/Lantern Law.md', '---\\ntype: entry\\ncategory: Law & custom\\n---\\n```worldkeeper-entry\\n```\\n\\nEvery lantern is a debt.\\n');
+          await app.vault.create('Maps/Harbour.canvas', '{\"nodes\":[],\"edges\":[]}');
+          app.commands.executeCommandById('worldkeeper:open-encyclopedia'); await W(700);
+          [...document.querySelectorAll('.enc-item')].find(x => x.textContent.includes('Lantern Law')).click(); await W(500);
+          [...document.querySelectorAll('.enc-title-row button')].find(b => b.textContent.includes('Edit')).click(); await W(400);
+          const tools = [...document.querySelectorAll('.enc-editor .cs-section-actions button')].map(b => b.textContent);
+          const ta = document.querySelector('.enc-editor textarea');
+          [...document.querySelectorAll('.enc-editor button')].find(b => b.textContent.includes('Diagram')).click();
+          const diagrams = __lastMenu.items.map(i => i.title); await __lastMenu.items.find(i => i.title === 'Family tree').cb(); await W(900);
+          const hasMermaid = /```mermaid\\nflowchart TD/.test(ta.value); const preview = document.querySelector('.sg-enc-dpreview'); const pv = preview && preview.style.display !== 'none' && preview.textContent.includes('Aldo Vell');
+          [...document.querySelectorAll('.enc-editor button')].find(b => b.textContent.includes('Canvas')).click(); const canvasMenu = __lastMenu.items.map(i => i.title);
+          const canvases = SGP.sections.world && HOST_canvas();
+          return { tools, diagrams: diagrams.length, hasMermaid, pv, canvasMenu, canvases }; }""".replace('HOST_canvas()', "app.vault.getFiles().filter(f => f.extension === 'canvas').map(f => f.path)"))
+        print('10. encyclopedia extras:', json.dumps(r, ensure_ascii=False))
+        assert 'Diagram' in ' '.join(r['tools']) and 'Canvas' in ' '.join(r['tools']) and r['diagrams'] >= 8 and r['hasMermaid'] and r['pv']
+        assert any('Show a canvas' in x for x in r['canvasMenu']) and 'Maps/Harbour.canvas' in r['canvases']
+
         # Unload cleanly
         r = await ev("""async () => { SGP.unload(); await new Promise(r => setTimeout(r, 300)); return { views: Object.keys(app.viewRegistry), blocks: Object.keys(app.codeblocks), cmds: Object.keys(app.commands.commands).length, saved: JSON.parse(app.vault.adapter.data.get('.obsidian/plugins/storyguild/data.json')).manuscript.projects.length }; }""")
         print('9. unload:', r)

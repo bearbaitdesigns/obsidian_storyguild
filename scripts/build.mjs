@@ -18,10 +18,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (...p) => readFileSync(join(root, ...p), 'utf8');
 const manifest = JSON.parse(read('manifest.json'));
 
-function patch(src, name, find, replace) {
+function patch(src, name, find, replace, times = 1) {
   const n = src.split(find).length - 1;
-  if (n !== 1) throw new Error(`Patch "${name}" matched ${n} times (expected 1)`);
-  return src.replace(find, () => replace);
+  if (n !== times) throw new Error(`Patch "${name}" matched ${n} times (expected ${times})`);
+  return src.split(find).join(replace);
 }
 
 /* ------------------------------ Worldkeeper ------------------------------ */
@@ -102,6 +102,17 @@ wk = patch(wk, 'wk:enc-phone-back', `ap(main, h('div', { class: 'note-path' }, '
 wk = patch(wk, 'wk:enc-phone-mode', `this.body.replaceChildren(h('div', { class: 'enc' }, side, main));`,
   `this.body.replaceChildren(h('div', { class: 'enc' + (HOST.isPhone() ? (this.phoneEntry && cur ? ' sg-enc-entry' : ' sg-enc-list') : '') }, side, main));`);
 wk = patch(wk, 'wk:enc-phone-show', `  show(f) { this.cur = f ? f.path : this.cur; this.run && this.run(); }`, `  show(f) { this.cur = f ? f.path : this.cur; if (f) this.phoneEntry = true; this.run && this.run(); }`);
+// Encyclopedia: Mermaid diagrams and canvases.
+wk = patch(wk, 'wk:enc-link-canvas', `const items = S.files().filter((x) => S.managed(x)).sort(byName).map((x) => ({ label: x.basename, sub: typeIcon(x) + ' ' + typeLabel(x), value: x.path }));`,
+  `const items = [...S.files().filter((x) => S.managed(x)), ...HOST.canvasFiles()].sort(byName).map((x) => ({ label: x.basename, sub: x.extension === 'canvas' ? '🧩 Canvas' : typeIcon(x) + ' ' + typeLabel(x), value: x.path }));`);
+wk = patch(wk, 'wk:enc-canvas-chip', `lks.forEach((l) => ap(body, chip(l.name, f.path, { file: l.file, label: (l.file ? typeIcon(l.file) + ' ' : '') + display(l.name),`,
+  `lks.forEach((l) => ap(body, chip(l.name, f.path, { file: l.file, label: l.file && l.file.extension === 'canvas' ? '🧩 ' + l.file.basename : (l.file ? typeIcon(l.file) + ' ' : '') + display(l.name),`);
+wk = patch(wk, 'wk:enc-suggest-canvas', `suggest({ items: S.files().filter((x) => S.managed(x) || S.isEntry(x)).sort(byName).map((x) => ({ label: x.basename, sub: typeLabel(x), value: x.basename })), placeholder: 'Link a note…'`,
+  `suggest({ items: [...S.files().filter((x) => S.managed(x) || S.isEntry(x)), ...HOST.canvasFiles()].sort(byName).map((x) => ({ label: x.basename, sub: x.extension === 'canvas' ? 'Canvas' : typeLabel(x), value: x.extension === 'canvas' ? x.name : x.basename })), placeholder: 'Link a note or canvas…'`, 2); // entry editor and sheet text tabs
+wk = patch(wk, 'wk:enc-editor-tools', `return h('div', { class: 'enc-editor' }, h('div', { class: 'cs-section-actions' }, h('span', { class: 'cs-hint' }, 'Saves as you type · Esc to finish · links you type are suggested under “Mentioned but not linked”'), doneBtn), ta);`,
+  `return h('div', { class: 'enc-editor' }, h('div', { class: 'cs-section-actions' }, h('span', { class: 'cs-hint' }, 'Saves as you type · Esc to finish · links you type are suggested under “Mentioned but not linked”'), HOST.encTools(ta, f), doneBtn), ta, HOST.encPreview(ta, f));`);
+wk = patch(wk, 'wk:enc-enhance', `md.addEventListener('dblclick', (e) => { if (!e.target.closest('a')) { this.editing = cur.path; this.run(); } });`,
+  `md.addEventListener('dblclick', (e) => { if (!e.target.closest('a') && !e.target.closest('.mermaid')) { this.editing = cur.path; this.run(); } }); HOST.encEnhance(md, cur);`);
 wk = patch(wk, 'wk:enc-toc-fold', `h('div', { class: 'enc-toc-title' }, 'Contents')`, `h('div', { class: 'enc-toc-title', onclick: (e) => e.currentTarget.parentElement.classList.toggle('is-open') }, 'Contents')`);
 
 // Expose a few helpers to the host.
@@ -157,7 +168,7 @@ const header = `/*
 const HOST = {
   plugin: null, world: null, plot: null, plotVersion: '${JSON.parse(read('vendor', 'plot-weaver', 'manifest.json')).version}',
   worldVersion: '${JSON.parse(read('vendor', 'worldkeeper', 'manifest.json')).version}',
-  sharedWords: (w) => w, coverPath: () => '', sectionPills: () => null, booksButton: () => null, isPhone: () => false, phoneBoard: null,
+  sharedWords: (w) => w, coverPath: () => '', sectionPills: () => null, booksButton: () => null, isPhone: () => false, phoneBoard: null, canvasFiles: () => [], encTools: () => null, encPreview: () => null, encEnhance: () => {},
 };
 `;
 const main = header + wrap('WorldkeeperModule', wk) + wrap('PlotWeaverModule', pw)

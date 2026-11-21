@@ -3,7 +3,7 @@
    ===================================================================== */
 class StoryguildPlugin extends Plugin {
   async onload() {
-    SG = this; HOST.plugin = this; HOST.sharedWords = sharedWords; HOST.coverPath = coverPath; HOST.sectionPills = sectionPills; HOST.booksButton = booksButton; HOST.isPhone = isPhone; HOST.phoneBoard = phoneBoard;
+    SG = this; HOST.plugin = this; HOST.sharedWords = sharedWords; HOST.coverPath = coverPath; HOST.sectionPills = sectionPills; HOST.booksButton = booksButton; HOST.isPhone = isPhone; HOST.phoneBoard = phoneBoard; HOST.canvasFiles = canvasFiles; HOST.encTools = encTools; HOST.encPreview = encPreview; HOST.encEnhance = encEnhance;
     this.wordCache = new Map(); this.sections = {}; this._timers = {};
     const raw = (await this.loadData()) || {};
     this.data = Object.assign(clone(DEFAULT_DATA), raw);

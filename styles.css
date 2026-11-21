@@ -481,6 +481,16 @@
 .sg-phone .ds-pubbar > * { flex: none; }
 .sg-phone .ds-recent { flex-wrap: wrap; overflow-wrap: anywhere; }
 
+/* ---------- Encyclopedia: diagrams and canvases ---------- */
+.wk .enc-md .mermaid { cursor: zoom-in; overflow-x: auto; text-align: center; }
+.wk .enc-md .mermaid svg { max-width: 100%; height: auto; }
+.wk .sg-enc-dpreview { margin-top: 10px; border: 1px dashed var(--background-modifier-border); border-radius: 10px; padding: 10px; }
+.sg-diagram-modal { width: min(1100px, 96vw); }
+.sg-diagram-stage { overflow: auto; max-height: 75vh; border: 1px solid var(--background-modifier-border); border-radius: 8px; padding: 12px; margin-top: 8px; background: var(--background-primary); touch-action: pan-x pan-y pinch-zoom; }
+.sg-diagram-stage svg { display: block; margin: 0 auto; }
+.wk .enc-md .internal-embed[src$=".canvas"], .wk .enc-md .canvas-embed { min-height: 320px; border-radius: 10px; }
+.sg-phone .wk .enc-editor .cs-section-actions { flex-wrap: wrap; gap: 6px; }
+
 /* ---- Worldkeeper ---- */
 /* ==========================================================================
    Worldkeeper — by bearbaitdesigns

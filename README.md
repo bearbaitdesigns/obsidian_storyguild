@@ -112,6 +112,12 @@ Edit a shared field anywhere and it changes everywhere.
 - **PDF cover:** JPEG, or PNG without transparency. EPUB takes JPEG, PNG, GIF or WebP.
 - **Word contents page:** Word fills in the page numbers when the file is opened.
 
+## Encyclopedia: diagrams and canvases
+
+- **◇ Diagram** (while editing an entry) inserts a ready-made Mermaid diagram to change: flowchart (cause and effect), timeline, family tree, relationships, hierarchy, mind map or sequence. Diagrams are drawn live under the text as you type, and in the entry. Tap or click a diagram to see it full size and zoom.
+- **🧩 Canvas** shows a canvas inside the entry (`![[Map.canvas]]`), links to one, or makes a new canvas next to the entry.
+- **Linked to** and the `[[` suggestions list canvases as well as notes, in entries and in sheet text tabs.
+
 ## On a phone
 
 Storyguild has a layout made for phones in all three sections. It switches on by itself in Obsidian for Android and iPhone. Settings → Storyguild → **Phone layout** can also turn it on everywhere (handy in a narrow pane on a tablet) or off.

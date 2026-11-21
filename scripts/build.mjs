@@ -136,10 +136,22 @@ pw = patch(pw, 'pw:cell-cache-clear', `    this.svgEl = svg('svg', { class: 'pw-
     grid.appendChild(this.svgEl);`, `    this._cellCache = null;
     this.svgEl = svg('svg', { class: 'pw-svg' });
     grid.appendChild(this.svgEl);`);
-pw = patch(pw, 'pw:phone-board', `    else this.renderBoard(main, n);`, `    else if (HOST.isPhone()) HOST.phoneBoard(this, main, n, NV);
-    else this.renderBoard(main, n);`);
-pw = patch(pw, 'pw:phone-shelf', `    if (this.ui.shelfCollapsed) this.renderShelfRail(body.createDiv('pw-shelf-rail'), n);`,
-  `    if (this.ui.shelfCollapsed) { if (!HOST.isPhone()) this.renderShelfRail(body.createDiv('pw-shelf-rail'), n); }`);
+// Modes: Board, Outline, Draft plot (a scratch canvas, see src/47-draftplot.js); phones get a one-chapter-at-a-time board.
+pw = patch(pw, 'pw:modes', `    if (this.ui.mode === 'outline') this.renderOutline(main, n);
+    else this.renderBoard(main, n);
+    if (this.ui.shelfCollapsed) this.renderShelfRail(body.createDiv('pw-shelf-rail'), n);
+    else this.renderShelf(body.createDiv('pw-shelf'), n);`, `    root.classList.toggle('sg-pw-draft', this.ui.mode === 'draft');
+    if (this.ui.mode === 'outline') this.renderOutline(main, n);
+    else if (this.ui.mode === 'draft') HOST.draftPlot(this, main, n);
+    else if (HOST.isPhone()) HOST.phoneBoard(this, main, n, NV);
+    else this.renderBoard(main, n);
+    if (this.ui.mode === 'draft') { /* the draft plot has no idea shelf */ }
+    else if (this.ui.shelfCollapsed) { if (!HOST.isPhone()) this.renderShelfRail(body.createDiv('pw-shelf-rail'), n); }
+    else this.renderShelf(body.createDiv('pw-shelf'), n);`);
+pw = patch(pw, 'pw:draft-button', `    this.tbButton(seg, 'list-ordered', 'Outline', () => this.setUi({ mode: 'outline' }), this.ui.mode === 'outline', 'Manuscript order, grouped by chapter');`,
+  `    this.tbButton(seg, 'list-ordered', 'Outline', () => this.setUi({ mode: 'outline' }), this.ui.mode === 'outline', 'Manuscript order, grouped by chapter');
+    this.tbButton(seg, 'shapes', 'Draft plot', () => this.setUi({ mode: 'draft' }), this.ui.mode === 'draft', 'A scratch canvas for working out a plot: cards and arrows not linked to anything');`);
+pw = patch(pw, 'pw:board-button', `'Board', () => this.setUi({ mode: 'board' }), this.ui.mode !== 'outline',`, `'Board', () => this.setUi({ mode: 'board' }), this.ui.mode !== 'outline' && this.ui.mode !== 'draft',`);
 pw = patch(pw, 'pw:phone-tap', `    card.addEventListener('contextmenu', e => {`,
   `    if (HOST.isPhone()) card.addEventListener('click', e => { if (e.target.closest('.pw-icon-btn, .pw-note-status, .pw-link-handle')) return; e.stopPropagation(); if (external) new BeatModal(this.plugin, n, b, false).open(); else this.editBeat(b); });
     card.addEventListener('contextmenu', e => {`);
@@ -168,7 +180,7 @@ const header = `/*
 const HOST = {
   plugin: null, world: null, plot: null, plotVersion: '${JSON.parse(read('vendor', 'plot-weaver', 'manifest.json')).version}',
   worldVersion: '${JSON.parse(read('vendor', 'worldkeeper', 'manifest.json')).version}',
-  sharedWords: (w) => w, coverPath: () => '', sectionPills: () => null, booksButton: () => null, isPhone: () => false, phoneBoard: null, canvasFiles: () => [], encTools: () => null, encPreview: () => null, encEnhance: () => {},
+  sharedWords: (w) => w, coverPath: () => '', sectionPills: () => null, booksButton: () => null, isPhone: () => false, phoneBoard: null, canvasFiles: () => [], encTools: () => null, encPreview: () => null, encEnhance: () => {}, draftPlot: null,
 };
 `;
 const main = header + wrap('WorldkeeperModule', wk) + wrap('PlotWeaverModule', pw)

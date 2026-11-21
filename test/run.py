@@ -306,6 +306,31 @@ async def main():
         assert 'Diagram' in ' '.join(r['tools']) and 'Canvas' in ' '.join(r['tools']) and r['diagrams'] >= 8 and r['hasMermaid'] and r['pv']
         assert any('Show a canvas' in x for x in r['canvasMenu']) and 'Maps/Harbour.canvas' in r['canvases']
 
+        # Plot Weaver · Draft plot: a scratch canvas not linked to anything
+        r = await ev("""async () => { const W = (ms) => new Promise(r => setTimeout(r, ms));
+          app.commands.executeCommandById('plot-weaver:open-board'); await W(500);
+          const beatsBefore = SGP.sections.plot.data.novels.reduce((a, n) => a + n.beats.length, 0);
+          [...document.querySelectorAll('.pw-toolbar button')].find(b => b.textContent.includes('Draft plot')).click(); await W(400);
+          const dp = app.workspace.getLeavesOfType('plot-weaver-board')[0].view._dp; const st = dp.stage;
+          const out = { mode: SGP.sections.plot.data.ui ? SGP.sections.plot.data.ui.mode : app.workspace.getLeavesOfType('plot-weaver-board')[0].view.ui.mode, cards0: dp.P.cards.length };
+          dp.addCard(); await W(50); document.activeElement.textContent = 'Second card'; document.activeElement.blur(); await W(50);
+          const [a, b] = dp.P.cards; dp.P.edges.push({ id: 'x1', a: a.id, b: b.id }); dp.draw();
+          dp.edgeWords(dp.P.edges[0]); const inl = st.querySelector('.sg-dp-inl'); inl.value = 'because'; inl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); await W(50);
+          dp.sel = { type: 'card', id: a.id }; dp.addGroup(); await W(50); const g = dp.P.groups[0];
+          dp.cardEl(b.id).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 })); await W(50);
+          const picked = g.ids.slice(); st.querySelector('.sg-dp-banner button').click(); await W(50);
+          dp.renameGroup(g); const gi = st.querySelector('.sg-dp-inl'); gi.value = 'Act I'; gi.blur(); await W(50);
+          dp.setLayout('TD'); await W(700);
+          const mm = dp.mermaid();
+          await SGP.saveNow(); const saved = JSON.parse(app.vault.adapter.data.get('.obsidian/plugins/storyguild/data.json')).draftPlots;
+          const beatsAfter = SGP.sections.plot.data.novels.reduce((a, n) => a + n.beats.length, 0);
+          Object.assign(out, { cards: dp.P.cards.map(c => c.t), label: dp.P.edges[0].l, picked, group: g.t, layout: dp.P.layout, mm: mm.split('\\n').slice(0, 6), savedPlots: Object.values(saved)[0].plots.length, beatsSame: beatsBefore === beatsAfter, svgEdges: st.querySelectorAll('.sg-dp-line').length });
+          return out; }""")
+        print('11. draft plot:', json.dumps(r, ensure_ascii=False))
+        assert r['cards'] == ['Start here', 'Second card'] and r['label'] == 'because' and len(r['picked']) == 2 and r['group'] == 'Act I' and r['layout'] == 'TD'
+        assert any('subgraph' in x and 'Act I' in x for x in r['mm']) and any('|"because"|' in x for x in r['mm']) and r['savedPlots'] == 1 and r['beatsSame'] and r['svgEdges'] == 1
+        await page.screenshot(path=f'{OUT}/15-draft-plot.png')
+
         # Unload cleanly
         r = await ev("""async () => { SGP.unload(); await new Promise(r => setTimeout(r, 300)); return { views: Object.keys(app.viewRegistry), blocks: Object.keys(app.codeblocks), cmds: Object.keys(app.commands.commands).length, saved: JSON.parse(app.vault.adapter.data.get('.obsidian/plugins/storyguild/data.json')).manuscript.projects.length }; }""")
         print('9. unload:', r)

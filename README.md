@@ -118,6 +118,18 @@ Edit a shared field anywhere and it changes everywhere.
 - **🧩 Canvas** shows a canvas inside the entry (`![[Map.canvas]]`), links to one, or makes a new canvas next to the entry.
 - **Linked to** and the `[[` suggestions list canvases as well as notes, in entries and in sheet text tabs.
 
+## Plot Weaver: Draft plot
+
+**Draft plot** (beside Board and Outline) is a scratch canvas for working out a plot, drawn like Obsidian Canvas or a Mermaid flowchart. Its cards are **not linked** to notes, the board or Draftsmith, so you can try ideas without changing anything.
+
+- **Several draft plots per novel.** Double-click a name to rename it; **⋯** duplicates or deletes one.
+- **Cards:** double-click (or long-press on a phone) empty space. Shapes: scene ▭, event ⬭, choice ◇, idea ◯ and sticky note 🗒, in 7 colours. Double-click a card to write on it.
+- **Arrows:** drag a card's dot onto another card. Let go on empty space and a new, connected card appears there. Arrows can be solid or dashed, carry words (double-click them) and be reversed.
+- **Groups** (e.g. “Act II”) wrap the cards in them. Click a group, then **Choose cards** to put cards in or take them out — or drag a card into a group, or pick its group from the card's bar.
+- **Free canvas / Flowchart ↓ / Flowchart →:** arrange the cards the way Mermaid would, or go back to where you put them. Cards with no arrows wait in a column beside the chart.
+- **⟨/⟩ Mermaid** shows the draft as Mermaid text as you draw. Copy it, add it to an Encyclopedia entry, or save it as a note (a copy: later changes to the draft plot don't update it).
+- Move around by dragging empty space; zoom with Ctrl/⌘ + scroll, pinch, or ＋ － ⤢.
+
 ## On a phone
 
 Storyguild has a layout made for phones in all three sections. It switches on by itself in Obsidian for Android and iPhone. Settings → Storyguild → **Phone layout** can also turn it on everywhere (handy in a narrow pane on a tablet) or off.
@@ -133,7 +145,7 @@ Storyguild has a layout made for phones in all three sections. It switches on by
 - **Dashboards:** the categories are one row you swipe; the notes are below.
 - **Sheets** (characters, gods, demons and every worldbuilding type): tiles in two columns, tabs that scroll sideways and stay on screen, details as a list, gallery three across.
 - **Encyclopedia:** the list of entries first, then the entry you tap, with **‹ All entries** to go back. Its contents fold into a **Contents** button.
-- **Plot Weaver:** the board shows one chapter at a time. Swipe sideways or tap a chapter at the top. Cards are grouped by plotline; tap one to edit it or move it to another chapter or plotline. **＋ Add a card here** adds to the chapter you're looking at.
+- **Plot Weaver:** the draft plot works by touch (long-press for a card, pinch to zoom). The board shows one chapter at a time. Swipe sideways or tap a chapter at the top. Cards are grouped by plotline; tap one to edit it or move it to another chapter or plotline. **＋ Add a card here** adds to the chapter you're looking at.
 
 ## Releasing
 

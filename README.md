@@ -109,8 +109,25 @@ Edit a shared field anywhere and it changes everywhere.
 ### Publishing limits
 
 - **PDF text:** uses the built-in PDF fonts (Times and Courier), so it supports Western European characters only. Anything else prints as `?`. For other scripts, publish to Word or EPUB.
-- **PDF cover:** only a JPEG cover is placed in a PDF. EPUB takes JPEG, PNG, GIF or WebP.
+- **PDF cover:** JPEG, or PNG without transparency. EPUB takes JPEG, PNG, GIF or WebP.
 - **Word contents page:** Word fills in the page numbers when the file is opened.
+
+## On a phone
+
+Storyguild has a layout made for phones in all three sections. It switches on by itself in Obsidian for Android and iPhone. Settings → Storyguild → **Phone layout** can also turn it on everywhere (handy in a narrow pane on a tablet) or off.
+
+- **Moving around:** a Draftsmith / Worldkeeper / Plot Weaver switcher sits at the top. Draftsmith's tabs are one row that scrolls sideways and stays on screen.
+- **Chapters:** one card per chapter with its number, status, draft, POV and words. Tap a card for its type, status, new draft, POV and Plot Weaver cards. **Reorder** gives each card ↑ ↓ buttons, since dragging doesn't work well on a touchscreen. **＋** adds a chapter; **⋯** holds the other actions.
+- **Wide tables** (readers, reader directory) become one card per row, each value labelled.
+- **Book details:** one column of sections that open and close, each showing how many fields are filled.
+- **Checklists:** the date sits under each step so the step's name has room.
+- **Stats:** charts are full width; tap a bar or a point to see its numbers.
+- **Publish:** the preview comes first as a row of pages you swipe through, and the Publish button stays on screen.
+- **Worldkeeper Home:** the banner stacks, with the goal ring in the corner and the Plot Weaver, Draftsmith, Encyclopedia and World Atlas buttons in a 2 × 2 grid.
+- **Dashboards:** the categories are one row you swipe; the notes are below.
+- **Sheets** (characters, gods, demons and every worldbuilding type): tiles in two columns, tabs that scroll sideways and stay on screen, details as a list, gallery three across.
+- **Encyclopedia:** the list of entries first, then the entry you tap, with **‹ All entries** to go back. Its contents fold into a **Contents** button.
+- **Plot Weaver:** the board shows one chapter at a time. Swipe sideways or tap a chapter at the top. Cards are grouped by plotline; tap one to edit it or move it to another chapter or plotline. **＋ Add a card here** adds to the chapter you're looking at.
 
 ## Releasing
 
@@ -126,10 +143,11 @@ The **Release** GitHub Action builds the plugin and publishes `main.js`, `manife
 ```
 node scripts/build.mjs      # builds main.js and styles.css
 python3 test/run.py         # end-to-end test in headless Chrome with a mock Obsidian API
+python3 test/phone.py       # every screen at phone size (Galaxy S22 Ultra); fails if anything is wider than the screen
 ```
 
 - `vendor/worldkeeper/src/` and `vendor/plot-weaver/main.js` are the original plugins, unchanged. Each is wrapped in its own scope.
-- `scripts/build.mjs` makes five small, named patches to Worldkeeper. Each patch must match exactly once, so if the original code changes, the build stops instead of patching in the wrong place.
+- `scripts/build.mjs` makes small, named patches to Worldkeeper and Plot Weaver. Each patch must match exactly once, so if the original code changes, the build stops instead of patching in the wrong place.
 - `src/` is the Storyguild host and Draftsmith.
 
 MIT © bearbaitdesigns

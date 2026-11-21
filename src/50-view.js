@@ -35,7 +35,9 @@ class DraftsmithView extends ItemView {
     const stage = el('select', { class: 'dropdown' }, STAGES.map((s) => el('option', { selected: s === p.stage }, s)));
     stage.addEventListener('change', () => setProjectField(p, 'stage', stage.value));
     const cov = resourceUrl(p.cover);
-    put(root, el('div', { class: 'ds-head' },
+    const phone = isPhone();
+    if (phone) put(root, sectionBar('ds'), phoneHeader(this, p));
+    else put(root, el('div', { class: 'ds-head' },
       el('div', { class: 'ds-cover-sm', onclick: () => this.setTab('details'), title: 'Book details' }, cov ? el('img', { src: cov }) : el('span', {}, p.title.slice(0, 1))),
       el('div', { class: 'ds-head-main' }, el('div', { class: 'ds-row' }, sel, btn('📚 Books & series', () => openLibrary(), 'ds-sm'), linkedNovel(p) ? pill('🧵 ' + linkedNovel(p).title, 'is-pw', null) : null),
         el('h1', {}, p.title), el('div', { class: 'ds-sub' }, [seriesLine(p), p.genre, p.penName || p.author].filter(Boolean).join(' · '))),
@@ -45,6 +47,7 @@ class DraftsmithView extends ItemView {
     try {
       ({ manuscript: renderManuscript, details: renderDetails, readers: renderReaders, checklist: renderChecklist, stats: renderStats, compile: renderCompile })[ui.tab](this, p, body);
     } catch (e) { console.error(e); put(body, el('p', { class: 'ds-warn' }, 'Something went wrong drawing this tab: ' + e.message)); }
+    if (phone) { labelTables(body); if (ui.tab === 'details') foldCards(this, body, 'details'); const on = root.querySelector('.ds-tabs .is-on'); if (on && on.parentElement) on.parentElement.scrollLeft = Math.max(0, on.offsetLeft - 12); }
     root.scrollTop = scroll;
   }
 }
@@ -61,13 +64,19 @@ function renderManuscript(view, p, body) {
     el('div', { class: 'ds-stat is-click', onclick: () => { if (next) p.checklistTab = next.list; view.setTab('checklist'); } }, el('small', {}, next ? `Next step · ${CHECKLIST_NAMES[next.list]}` : 'Next step'), el('b', { class: 'is-text' }, next ? next.it.t : 'Nothing dated'), el('span', {}, next ? `${next.it.due} · ${daysText(next.it.due)}` : 'add target dates in the checklist'))));
 
   const plotOrder = DSS().followPlotOrder && novel;
-  const tools = el('div', { class: 'ds-row' }, el('h2', { class: 'ds-grow' }, 'Chapters'),
-    btn('+ New chapter', () => newChapterModal(p)), btn('💡 New idea', () => newChapterModal(p, 'idea')),
-    novel ? btn('↻ Chapters from Plot Weaver', async () => { const n = await chaptersFromPlot(p); notice(n ? `Created ${n} chapter note${n === 1 ? '' : 's'} from Plot Weaver.` : 'Every Plot Weaver chapter already has a note.'); setTimeout(() => view.render(), 400); }, '', 'Create a note for each Plot Weaver chapter that has none') : null,
-    btn('⇪ Import chapter notes', () => new ImportChaptersModal(p).open(), '', 'Turn notes you already have into chapters'),
-    btn('Draft history', () => draftHistoryModal(p)),
-    btn(`Start draft #${p.draft + 1}`, () => new FormModal(`Start manuscript draft #${p.draft + 1}`, [{ key: 'note', label: 'What is this draft for?', placeholder: 'e.g. Post-beta revision' }, { key: 'bump', label: 'Also add 1 to every chapter’s draft number', type: 'checkbox', value: false }], 'Start draft', (v) => startManuscriptDraft(p, v.note, v.bump),
-      `A read-only copy of all ${chs.length} chapter notes is saved to ${projectSub(p, 'snapshotFolder')}/Draft ${p.draft}/ first.`).open(), 'mod-cta'));
+  const startDraft = () => new FormModal(`Start manuscript draft #${p.draft + 1}`, [{ key: 'note', label: 'What is this draft for?', placeholder: 'e.g. Post-beta revision' }, { key: 'bump', label: 'Also add 1 to every chapter’s draft number', type: 'checkbox', value: false }], 'Start draft', (v) => startManuscriptDraft(p, v.note, v.bump),
+    `A read-only copy of all ${chs.length} chapter notes is saved to ${projectSub(p, 'snapshotFolder')}/Draft ${p.draft}/ first.`).open();
+  const fromPlot = async () => { const n = await chaptersFromPlot(p); notice(n ? `Created ${n} chapter note${n === 1 ? '' : 's'} from Plot Weaver.` : 'Every Plot Weaver chapter already has a note.'); setTimeout(() => view.render(), 400); };
+  const actions = [
+    { label: '+ New chapter', fn: () => newChapterModal(p) },
+    { label: '💡 New idea', fn: () => newChapterModal(p, 'idea') },
+    novel ? { label: '↻ Chapters from Plot Weaver', fn: fromPlot, title: 'Create a note for each Plot Weaver chapter that has none' } : null,
+    { label: '⇪ Import chapter notes', fn: () => new ImportChaptersModal(p).open(), title: 'Turn notes you already have into chapters' },
+    { label: 'Draft history', fn: () => draftHistoryModal(p) },
+    { label: `Start draft #${p.draft + 1}`, fn: startDraft, cls: 'mod-cta' },
+  ].filter(Boolean);
+  const tools = isPhone() ? phoneChapterTools(view, actions)
+    : el('div', { class: 'ds-row' }, el('h2', { class: 'ds-grow' }, 'Chapters'), actions.map((a) => btn(a.label, a.fn, a.cls || '', a.title || '')));
   put(body, tools);
   if (!chs.length) {
     put(body, card(null, el('p', {}, `No chapter notes yet. Draftsmith looks for notes in `, el('code', {}, chaptersFolder(p)), '.'),
@@ -75,6 +84,7 @@ function renderManuscript(view, p, body) {
       hint('Already writing in Obsidian? Import moves your chapter notes into this book (links stay intact) or uses their folder as is.')));
     return;
   }
+  if (isPhone()) { phoneChapterCards(view, p, body, chs); return; }
   const K = DSS().keys; const sk = statusKey();
   const tbl = el('table', { class: 'ds-table ds-chtable' }, el('thead', {}, el('tr', {}, ['', '#', 'Chapter', 'Type', 'Draft', 'Status', 'Words', 'POV', 'Plot Weaver', ''].map((x) => el('th', {}, x)))));
   let dragFrom = null;

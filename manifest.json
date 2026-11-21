@@ -1,7 +1,7 @@
 {
   "id": "storyguild",
   "name": "Storyguild",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "minAppVersion": "1.4.0",
   "description": "Write, plan and build your novel in one place: Draftsmith (manuscript, drafts, readers, publishing checklists, compile to PDF/Word/EPUB), Worldkeeper (worldbuilding) and Plot Weaver (plotlines and chapters).",
   "author": "bearbaitdesigns",

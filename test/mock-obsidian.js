@@ -101,7 +101,7 @@
     _index(f) {
       if (f.extension !== 'md') return; const t = VAULT.text.get(f.path) || ''; const s = splitFm(t);
       const links = [...t.matchAll(/\[\[([^\]|#]+)/g)].map((m) => ({ link: m[1], original: m[0] }));
-      const headings = [...s.body.matchAll(/^(#{1,6})\s+(.*)$/gm)].map((m) => ({ heading: m[2], level: m[1].length }));
+      const headings = [...t.matchAll(/^(#{1,6})\s+(.*)$/gm)].map((m) => ({ heading: m[2], level: m[1].length, position: { start: { offset: m.index }, end: { offset: m.index + m[0].length } } }));
       const fmLinks = s.fm ? Object.entries(s.fm).flatMap(([k, v]) => [].concat(v).filter((x) => typeof x === 'string' && /^\[\[/.test(x)).map((x) => ({ key: k, link: x.slice(2, -2).split('|')[0], original: x }))) : [];
       const tags = [...s.body.matchAll(/(^|\s)#([\w/-]+)/g)].map((m) => ({ tag: '#' + m[2] }));
       const listItems = [...t.split('\n').entries()].filter(([, l]) => /^\s*[-*+] \[.\] /.test(l)).map(([i, l]) => ({ task: l.match(/\[(.)\]/)[1], position: { start: { line: i } } }));
@@ -195,6 +195,6 @@
   // Test guard: Element.append(null) prints the word "null" in Obsidian. Flag it.
   for (const P of [Element.prototype, DocumentFragment.prototype]) { const orig = P.append; P.append = function (...a) { if (a.some((x) => x === null || x === undefined || x === false)) window.__errors.push('append(null) into <' + (this.className || this.tagName) + '>: ' + new Error().stack.split('\n').slice(2, 4).join(' | ')); return orig.apply(this, a); }; }
   window.__obsidian = { Plugin, Component, ItemView, View, Modal, SuggestModal, FuzzySuggestModal, Setting, Notice, PluginSettingTab, TFile, TFolder, TAbstractFile, normalizePath, Menu, MarkdownRenderChild, MarkdownRenderer, Keymap, stringifyYaml, parseYaml, setIcon, Events, WorkspaceLeaf,
-    debounce: (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }, Platform: { isMobile: false, isDesktop: true }, moment: () => ({ format: () => '' }), requestUrl: async () => ({}), getAllTags: () => [], parseFrontMatterAliases: () => [], sanitizeHTMLToDom: (h) => { const d = document.createElement('div'); d.innerHTML = h; const f = document.createDocumentFragment(); f.append(...d.childNodes); return f; } };
+    debounce: (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }, Platform: window.__MOBILE ? { isMobile: true, isPhone: true, isTablet: false, isDesktop: false, isAndroidApp: true, isMobileApp: true, isDesktopApp: false } : { isMobile: false, isDesktop: true, isDesktopApp: true }, moment: () => ({ format: () => '' }), requestUrl: async () => ({}), getAllTags: () => [], parseFrontMatterAliases: () => [], sanitizeHTMLToDom: (h) => { const d = document.createElement('div'); d.innerHTML = h; const f = document.createDocumentFragment(); f.append(...d.childNodes); return f; } };
   window.require = (m) => { if (m === 'obsidian') return window.__obsidian; throw new Error('require ' + m); };
 })();

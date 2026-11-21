@@ -27,6 +27,9 @@ class StoryguildSettingTab extends PluginSettingTab {
     key('pov', 'POV property', 'Optional. Shown on the Manuscript tab.');
     key('pwChapter', 'Plot Weaver chapter property', 'Links a chapter note to a chapter on the Plot Weaver board.');
     key('project', 'Project property', 'Added to new chapter notes, linking them to the book.');
+    c.createEl('h3', { text: 'Layout' });
+    new Setting(c).setName('Phone layout').setDesc('A layout made for phones in all three sections: cards instead of wide tables, one Plot Weaver chapter at a time, bigger buttons. “Automatic” uses it on phones only; “Always” is handy in a narrow pane on a tablet or computer.')
+      .addDropdown((d) => d.addOptions({ auto: 'Automatic', on: 'Always', off: 'Never' }).setValue(s.phoneLayout || 'auto').onChange((v) => { s.phoneLayout = v; save(); applyPhoneClass(); if (isPhone()) tapToHideTips(); else untapToHideTips(); SG.refreshDraftsmith(); for (const l of SG.app.workspace.getLeavesOfType('plot-weaver-board')) l.view.render && l.view.render(); }));
     new Setting(c).setName('Keep word counts up to date').setDesc(`Writes the word count of each chapter note into its “${wordsKey()}” property as you write, so Worldkeeper and Plot Weaver always see current numbers. Only notes in a project’s chapters folder are changed.`)
       .addToggle((t) => t.setValue(!!s.autoWords).onChange((v) => { s.autoWords = v; save(); }));
     new Setting(c).setName('Chapter order follows Plot Weaver').setDesc('When a project is linked to a Plot Weaver novel, chapters are listed in board order.').addToggle((t) => t.setValue(!!s.followPlotOrder).onChange((v) => { s.followPlotOrder = v; save(); SG.refreshDraftsmith(); }));

@@ -47,7 +47,7 @@ function sv(tag, a = {}, text) { const e = document.createElementNS(SVGNS, tag);
 function statTip() { let t = document.body.querySelector(':scope > .ds-stat-tip'); if (!t) { t = el('div', { class: 'ds-stat-tip' }); document.body.append(t); } return t; }
 function tipShow(e, html) { const t = statTip(); t.empty(); put(t, ...html); t.style.opacity = '1'; const x = Math.min(e.clientX + 14, window.innerWidth - t.offsetWidth - 8); t.style.left = `${x}px`; t.style.top = `${e.clientY + 14}px`; }
 const tipHide = () => { const t = document.body.querySelector(':scope > .ds-stat-tip'); if (t) t.style.opacity = '0'; };
-function hover(node, fn) { node.addEventListener('mousemove', (e) => tipShow(e, fn())); node.addEventListener('mouseleave', tipHide); return node; }
+function hover(node, fn) { node.addEventListener('mousemove', (e) => tipShow(e, fn())); node.addEventListener('click', (e) => tipShow(e, fn())); node.addEventListener('mouseleave', tipHide); return node; }
 function niceTicks(min, max, n = 4) {
   const raw = Math.max(1, (max - min) / n); const p = 10 ** Math.floor(Math.log10(raw)); const step = [1, 2, 2.5, 5, 10].map((m) => m * p).find((x) => x >= raw);
   const out = []; for (let v = Math.floor(min / step) * step; v <= max + step * 0.001; v += step) out.push(v); if (out[out.length - 1] < max) out.push(out[out.length - 1] + step); return out;
@@ -151,9 +151,10 @@ function renderStats(view, p, body) {
     const cross = sv('line', { y1: T, y2: T + ph, class: 'ds-cross', opacity: 0 }); const dot = sv('circle', { r: 4, class: 'ds-dot', opacity: 0 }); put(svg, cross, dot);
     if (pts.length) {
       const hit = sv('rect', { x: L, y: T, width: Math.max(1, nowX - L), height: ph, fill: 'transparent' }); put(svg, hit);
-      hit.addEventListener('mousemove', (e) => { const bb = svg.getBoundingClientRect(); const mx = ((e.clientX - bb.left) * w) / bb.width; const tt = t0 + ((mx - L) / pw) * (t1 - t0); let b = pts[0]; for (const d of pts) if (Math.abs(d.d - tt) < Math.abs(b.d - tt)) b = d;
+      const onHit = (e) => { const bb = svg.getBoundingClientRect(); const mx = ((e.clientX - bb.left) * w) / bb.width; const tt = t0 + ((mx - L) / pw) * (t1 - t0); let b = pts[0]; for (const d of pts) if (Math.abs(d.d - tt) < Math.abs(b.d - tt)) b = d;
         cross.setAttribute('x1', x(b.d)); cross.setAttribute('x2', x(b.d)); cross.setAttribute('opacity', 1); dot.setAttribute('cx', x(b.d)); dot.setAttribute('cy', y(b.total)); dot.setAttribute('opacity', 1);
-        tipShow(e, [el('b', {}, shortDate(b.d, { day: 'numeric', month: 'short', year: 'numeric' })), `${fmtN(b.total)} words`, target ? el('span', { class: 'ds-hint' }, ` · ${pctOf(b.total, target)}% of target`) : null]); });
+        tipShow(e, [el('b', {}, shortDate(b.d, { day: 'numeric', month: 'short', year: 'numeric' })), `${fmtN(b.total)} words`, target ? el('span', { class: 'ds-hint' }, ` · ${pctOf(b.total, target)}% of target`) : null]); };
+      hit.addEventListener('mousemove', onHit); hit.addEventListener('click', onHit);
       hit.addEventListener('mouseleave', () => { tipHide(); cross.setAttribute('opacity', 0); dot.setAttribute('opacity', 0); });
     }
     const months = []; for (let d = new Date(new Date(t0).getFullYear(), new Date(t0).getMonth() + 1, 1); d.getTime() <= t1; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) months.push(d);

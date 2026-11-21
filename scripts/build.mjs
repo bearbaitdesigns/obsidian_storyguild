@@ -92,6 +92,18 @@ wk = patch(wk, 'wk:pantheon-new-god', `const c = isNew ? await createNote('chara
 wk = patch(wk, 'wk:pantheon-hint', `'Gods are character notes with role Deity, so each also gets a full character sheet.'`, `'Each god has its own God sheet (Story → Gods). Characters with role Deity are listed too.'`);
 wk = patch(wk, 'wk:pantheon-source', `source: 'characters where role = Deity'`, `source: 'God sheets and characters with role Deity'`);
 wk = patch(wk, 'wk:dash-story', `ap(nav, h('div', { class: 'sep' }, 'Story'), btn('character'),`, `ap(nav, h('div', { class: 'sep' }, 'Story'), btn('character'), btn('god'), btn('fiend'),`);
+// Phone: the encyclopedia shows the list, then the entry (with a back button); its contents fold away.
+wk = patch(wk, 'wk:enc-phone-item', `h('button', { class: 'enc-item' + (cur && f.path === cur.path ? ' is-on' : ''), onclick: () => { this.cur = f.path; this.run(); } }`,
+  `h('button', { class: 'enc-item' + (cur && f.path === cur.path ? ' is-on' : ''), onclick: () => { this.cur = f.path; this.phoneEntry = true; this.run(); } }`);
+wk = patch(wk, 'wk:enc-phone-new', `if (f) { this.cur = f.path; this.pending = f.path; this.editing = f.path; this.run(); }`,
+  `if (f) { this.cur = f.path; this.pending = f.path; this.editing = f.path; this.phoneEntry = true; this.run(); }`);
+wk = patch(wk, 'wk:enc-phone-back', `ap(main, h('div', { class: 'note-path' }, '📁 ' + cur.path),`,
+  `ap(main, HOST.isPhone() ? h('button', { class: 'sg-back', onclick: () => { this.phoneEntry = false; this.editing = null; this.run(); } }, '‹ All entries') : null, h('div', { class: 'note-path' }, '📁 ' + cur.path),`);
+wk = patch(wk, 'wk:enc-phone-mode', `this.body.replaceChildren(h('div', { class: 'enc' }, side, main));`,
+  `this.body.replaceChildren(h('div', { class: 'enc' + (HOST.isPhone() ? (this.phoneEntry && cur ? ' sg-enc-entry' : ' sg-enc-list') : '') }, side, main));`);
+wk = patch(wk, 'wk:enc-phone-show', `  show(f) { this.cur = f ? f.path : this.cur; this.run && this.run(); }`, `  show(f) { this.cur = f ? f.path : this.cur; if (f) this.phoneEntry = true; this.run && this.run(); }`);
+wk = patch(wk, 'wk:enc-toc-fold', `h('div', { class: 'enc-toc-title' }, 'Contents')`, `h('div', { class: 'enc-toc-title', onclick: (e) => e.currentTarget.parentElement.classList.toggle('is-open') }, 'Contents')`);
+
 // Expose a few helpers to the host.
 wk += `
 WorldkeeperPlugin.storyguild = { readTodos, writeTodos, pwLoad, mergeSettings, DEFAULT_SETTINGS, MS_STANDARD, S };
@@ -99,7 +111,14 @@ WorldkeeperPlugin.storyguild = { readTodos, writeTodos, pwLoad, mergeSettings, D
 
 /* ------------------------------ Plot Weaver ------------------------------ */
 let pw = read('vendor', 'plot-weaver', 'main.js');
-// (no source patches needed: the host wraps commit() on the instance)
+// The host wraps commit() on the instance; these patches only add the phone layout.
+pw = patch(pw, 'pw:phone-board', `    else this.renderBoard(main, n);`, `    else if (HOST.isPhone()) HOST.phoneBoard(this, main, n, NV);
+    else this.renderBoard(main, n);`);
+pw = patch(pw, 'pw:phone-shelf', `    if (this.ui.shelfCollapsed) this.renderShelfRail(body.createDiv('pw-shelf-rail'), n);`,
+  `    if (this.ui.shelfCollapsed) { if (!HOST.isPhone()) this.renderShelfRail(body.createDiv('pw-shelf-rail'), n); }`);
+pw = patch(pw, 'pw:phone-tap', `    card.addEventListener('contextmenu', e => {`,
+  `    if (HOST.isPhone()) card.addEventListener('click', e => { if (e.target.closest('.pw-icon-btn, .pw-note-status, .pw-link-handle')) return; e.stopPropagation(); if (external) new BeatModal(this.plugin, n, b, false).open(); else this.editBeat(b); });
+    card.addEventListener('contextmenu', e => {`);
 
 const wrap = (name, code) => `/* ============================== ${name} ============================== */
 const ${name} = (function () {
@@ -125,7 +144,7 @@ const header = `/*
 const HOST = {
   plugin: null, world: null, plot: null, plotVersion: '${JSON.parse(read('vendor', 'plot-weaver', 'manifest.json')).version}',
   worldVersion: '${JSON.parse(read('vendor', 'worldkeeper', 'manifest.json')).version}',
-  sharedWords: (w) => w, coverPath: () => '', sectionPills: () => null, booksButton: () => null,
+  sharedWords: (w) => w, coverPath: () => '', sectionPills: () => null, booksButton: () => null, isPhone: () => false, phoneBoard: null,
 };
 `;
 const main = header + wrap('WorldkeeperModule', wk) + wrap('PlotWeaverModule', pw)

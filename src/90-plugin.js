@@ -3,7 +3,7 @@
    ===================================================================== */
 class StoryguildPlugin extends Plugin {
   async onload() {
-    SG = this; HOST.plugin = this; HOST.sharedWords = sharedWords; HOST.coverPath = coverPath; HOST.sectionPills = sectionPills; HOST.booksButton = booksButton;
+    SG = this; HOST.plugin = this; HOST.sharedWords = sharedWords; HOST.coverPath = coverPath; HOST.sectionPills = sectionPills; HOST.booksButton = booksButton; HOST.isPhone = isPhone; HOST.phoneBoard = phoneBoard;
     this.wordCache = new Map(); this.sections = {}; this._timers = {};
     const raw = (await this.loadData()) || {};
     this.data = Object.assign(clone(DEFAULT_DATA), raw);
@@ -14,6 +14,7 @@ class StoryguildPlugin extends Plugin {
     ms.ui = Object.assign({ tab: 'manuscript', round: '' }, ms.ui || {});
     ms.projects = (ms.projects || []).map(normalizeProject); ms.series = Array.isArray(ms.series) ? ms.series : [];
     adoptLegacySeries();
+    applyPhoneClass(); if (isPhone()) tapToHideTips();
 
     /** A small public API (also used by the tests). */
     this.api = { importChapters: (files, opts) => importChapters(ensureProject(), files, opts), activeBook: () => activeProject(), books: () => DS().projects, series: () => allSeries(), createBook, createSeries, addToSeries, removeFromSeries, setActiveProject, openLibrary, newBookModal, newSeriesModal };
@@ -112,7 +113,7 @@ class StoryguildPlugin extends Plugin {
   }
   unloadSection(key) { const sub = this.sections[key]; if (!sub) return; this.removeChild(sub); delete this.sections[key]; HOST[key] = null; this.refreshAll(); }
 
-  onunload() { for (const t of Object.values(this._timers)) clearTimeout(t); if (this._saveT) { clearTimeout(this._saveT); this.saveData(this.data); } HOST.world = HOST.plot = null; }
+  onunload() { document.body.classList.remove('sg-phone'); untapToHideTips(); for (const t of Object.values(this._timers)) clearTimeout(t); if (this._saveT) { clearTimeout(this._saveT); this.saveData(this.data); } HOST.world = HOST.plot = null; }
 
   saveSoon(ms = 400) { clearTimeout(this._saveT); this._saveT = setTimeout(() => { this._saveT = null; this.saveNow(); }, ms); }
   saveNow() { clearTimeout(this._saveT); this._saveT = null; this._saving = (this._saving || Promise.resolve()).then(() => this.saveData(this.data)).catch((e) => console.error('Storyguild save', e)); return this._saving; }

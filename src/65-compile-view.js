@@ -43,7 +43,7 @@ function renderCompile(view, p, body) {
     qRounds.length ? [toggle('includeQuestions', 'Add reader questions', 'For alpha, beta and ARC reader copies. They’re printed before the table of contents.'),
       o.includeQuestions ? select('questionsRound', 'Questions from', qRounds.map((r) => [r.id, `${r.name} (${r.questions.length})`]).reverse()) : null]
       : hint(p.rounds.some((r) => r.questions.length) ? 'Your rounds have questions, but none are set to “Include in Publish”. Turn that on in Readers.' : 'Add questions to a reader round (Readers tab) to offer them here.')));
-  put(left, el('div', { class: 'ds-row' }, btn(`Publish ${({ pdf: 'PDF', docx: 'Word', epub: 'EPUB', md: 'Markdown' })[o.format]}`, async (e) => { e.target.disabled = true; try { await compileProject(p); } catch (err) { console.error(err); notice('Publishing failed: ' + err.message); } view.render(); }, 'mod-cta ds-big')));
+  put(left, el('div', { class: 'ds-row ds-pubbar' }, btn(`Publish ${({ pdf: 'PDF', docx: 'Word', epub: 'EPUB', md: 'Markdown' })[o.format]}`, async (e) => { e.target.disabled = true; try { await compileProject(p); } catch (err) { console.error(err); notice('Publishing failed: ' + err.message); } view.render(); }, 'mod-cta ds-big')));
 
   // right: preview + recent
   const right = el('div', {});

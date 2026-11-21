@@ -4,7 +4,8 @@ import asyncio, base64, io, json, os, sys
 from playwright.async_api import async_playwright
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, 'out'); os.makedirs(OUT, exist_ok=True)
+MOBILE = bool(os.environ.get('MOBILE'))  # Galaxy S22 Ultra: 384×824 CSS px, touch
+OUT = os.path.join(HERE, 'out-phone' if MOBILE else 'out'); os.makedirs(OUT, exist_ok=True)
 
 def jpeg_b64():
     from PIL import Image, ImageDraw
@@ -63,7 +64,8 @@ async def main():
     errors = []
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--allow-file-access-from-files'])
-        page = await b.new_page(viewport={'width': 1280, 'height': 1000})
+        page = await b.new_page(viewport={'width': 384, 'height': 824}, device_scale_factor=2, is_mobile=True, has_touch=True) if MOBILE else await b.new_page(viewport={'width': 1280, 'height': 1000})
+        if MOBILE: await page.add_init_script('window.__MOBILE = true')
         page.on('pageerror', lambda e: errors.append('pageerror: ' + str(e)))
         page.on('console', lambda m: errors.append('console: ' + m.text) if m.type == 'error' else None)
         await page.goto('file://' + os.path.join(HERE, 'harness.html'))

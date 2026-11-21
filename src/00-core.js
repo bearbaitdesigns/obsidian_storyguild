@@ -150,7 +150,7 @@ function normalizeProject(p) {
 const DEFAULT_DS_SETTINGS = {
   keys: { chapter: 'chapter', kind: 'chapter-type', draft: 'draft', pov: 'pov', pwChapter: 'plotweaver-chapter', project: 'manuscript' },
   autoWords: true, followPlotOrder: true, chapterTemplate: '', snapshotFolder: 'Drafts', compiledFolder: 'Compiled',
-  readersFolder: 'Readers', assetsFolder: 'Assets', wordSource: 'auto',
+  readersFolder: 'Readers', assetsFolder: 'Assets', wordSource: 'auto', phoneLayout: 'auto',
 };
 const DEFAULT_DATA = {
   version: 1,

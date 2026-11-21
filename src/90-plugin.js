@@ -18,6 +18,7 @@ class StoryguildPlugin extends Plugin {
 
     /** A small public API (also used by the tests). */
     this.api = { importChapters: (files, opts) => importChapters(ensureProject(), files, opts), activeBook: () => activeProject(), books: () => DS().projects, series: () => allSeries(), createBook, createSeries, addToSeries, removeFromSeries, setActiveProject, openLibrary, newBookModal, newSeriesModal };
+    this.api.diagramFromMermaid = diagramFromMermaid; this.api.editDiagram = editDiagram;
     this.registerView(VIEW_DS, (leaf) => new DraftsmithView(leaf));
     this.addRibbonIcon('feather', 'Open Draftsmith', () => this.openDraftsmith());
     const cmd = (id, name, fn) => this.addCommand({ id, name, callback: fn });

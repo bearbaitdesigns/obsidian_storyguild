@@ -81,7 +81,9 @@ function encTools(ta, entry) {
   const diagram = el('button', { title: 'Insert a Mermaid diagram' }, '◇ Diagram');
   diagram.addEventListener('click', (e) => {
     const m = new Menu();
-    for (const [name, desc, code] of DIAGRAMS) m.addItem((it) => it.setTitle(name).onClick(() => insertAtCursor(ta, '```mermaid\n' + code + '\n```')));
+    m.addItem((it) => it.setTitle('✏️ Draw a diagram… (no code)').onClick(() => editDiagram(null, (blk) => insertAtCursor(ta, blk))));
+    m.addSeparator && m.addSeparator();
+    for (const [name, desc, code] of DIAGRAMS) m.addItem((it) => it.setTitle(`Text: ${name}`).onClick(() => insertAtCursor(ta, '```mermaid\n' + code + '\n```')));
     m.addSeparator && m.addSeparator();
     m.addItem((it) => it.setTitle('How to write diagrams (mermaid.js.org)').onClick(() => window.open('https://mermaid.js.org/intro/syntax-reference.html')));
     m.showAtMouseEvent(e);
@@ -99,18 +101,22 @@ function encTools(ta, entry) {
   return [diagram, canvas];
 }
 
-/** While editing, Mermaid diagrams are drawn live under the text, so you can see them as you type. */
+/** While editing, Mermaid diagrams are drawn live under the text, each with “Edit as drawing”. */
 function encPreview(ta, entry) {
-  const box = el('div', { class: 'sg-enc-dpreview' }); let comp = null; let t = 0; let last = null;
+  const box = el('div', { class: 'sg-enc-dpreview' }); let comps = []; let t = 0; let last = null;
   const draw = async () => {
-    const blocks = [...ta.value.matchAll(/```mermaid[^\n]*\n([\s\S]*?)```/g)].map((m) => '```mermaid\n' + m[1] + '```');
-    const md = blocks.join('\n\n'); if (md === last) return; last = md;
-    if (comp) comp.unload(); box.empty ? box.empty() : (box.innerHTML = '');
+    const blocks = mermaidBlocks(ta.value); const key = blocks.map((x) => x.code).join('\u0000'); if (key === last) return; last = key;
+    comps.forEach((c) => c.unload()); comps = []; box.replaceChildren();
     if (!blocks.length) { box.style.display = 'none'; return; }
     box.style.display = ''; put(box, el('div', { class: 'cs-tile-label' }, blocks.length === 1 ? 'Diagram preview' : `Diagram previews (${blocks.length})`));
-    const out = el('div', { class: 'enc-md markdown-rendered' }); put(box, out);
-    comp = new ob.Component(); comp.load();
-    try { await ob.MarkdownRenderer.render(app(), md, out, entry.path, comp); } catch (e) { put(out, el('div', { class: 'cs-hint' }, 'This diagram has a mistake: ' + e.message)); }
+    for (let i = 0; i < blocks.length; i++) {
+      const out = el('div', { class: 'enc-md markdown-rendered' });
+      const edit = el('button', { onclick: () => editDiagram(blocks[i].code, (blk) => { const cur = mermaidBlocks(ta.value)[i]; if (!cur) return; ta.value = ta.value.slice(0, cur.start) + blk + ta.value.slice(cur.end); ta.dispatchEvent(new Event('input', { bubbles: true })); }) }, '✎ Edit as drawing');
+      edit.addEventListener('mousedown', (e) => e.preventDefault());
+      put(box, el('div', { class: 'sg-enc-dp-item' }, el('div', { class: 'ds-row' }, el('span', { class: 'ds-hint ds-grow' }, `Diagram ${i + 1}`), edit), out));
+      const comp = new ob.Component(); comp.load(); comps.push(comp);
+      try { await ob.MarkdownRenderer.render(app(), '```mermaid\n' + blocks[i].code + '```', out, entry.path, comp); } catch (e) { put(out, el('div', { class: 'cs-hint' }, 'This diagram has a mistake: ' + e.message)); }
+    }
   };
   ta.addEventListener('input', () => { clearTimeout(t); t = setTimeout(draw, 700); });
   setTimeout(draw, 50);
@@ -123,18 +129,26 @@ function encEnhance(md, entry) {
     const a = e.target.closest && e.target.closest('a.internal-link');
     if (a) { e.preventDefault(); e.stopPropagation(); app().workspace.openLinkText(a.getAttribute('data-href') || a.getAttribute('href') || a.textContent, entry.path, ob.Keymap ? ob.Keymap.isModEvent(e) : false); return; }
     const d = e.target.closest && e.target.closest('.mermaid');
-    if (d && d.querySelector('svg')) { e.stopPropagation(); new DiagramModal(d.querySelector('svg')).open(); }
+    if (d) { e.stopPropagation(); new DiagramModal(entry, [...md.querySelectorAll('.mermaid')].indexOf(d)).open(); }
   });
 }
+/** A diagram full size. It's drawn again from the entry's text: a copy of the picture would lose Obsidian's diagram colours. */
 class DiagramModal extends Modal {
-  constructor(svg) { super(SG.app); this.svg = svg; this.z = 1; }
-  onOpen() {
+  constructor(entry, index) { super(SG.app); this.entry = entry; this.index = Math.max(0, index); this.z = 1; this.comp = null; }
+  async onOpen() {
     this.modalEl.addClass('sg-diagram-modal'); this.titleEl.setText('Diagram');
-    const stage = el('div', { class: 'sg-diagram-stage' }); const pic = this.svg.cloneNode(true); pic.removeAttribute('style'); pic.style.maxWidth = 'none';
-    const w = this.svg.getBoundingClientRect().width || 600; const fit = () => { pic.style.width = `${Math.round(w * this.z)}px`; pic.style.height = 'auto'; };
-    put(stage, pic); fit();
+    const blocks = mermaidBlocks(await app().vault.cachedRead(this.entry)); const blk = blocks[this.index];
+    const stage = el('div', { class: 'sg-diagram-stage' }); const pic = el('div', { class: 'markdown-rendered sg-diagram-pic' }); put(stage, pic);
+    const fit = () => { const svg = pic.querySelector('svg'); if (!svg) return; if (!this.w) this.w = svg.getBoundingClientRect().width || 600; svg.style.maxWidth = 'none'; svg.style.width = `${Math.round(this.w * this.z)}px`; svg.style.height = 'auto'; };
     const zoom = (k) => { this.z = Math.min(6, Math.max(0.3, this.z * k)); fit(); };
-    put(this.contentEl, el('div', { class: 'ds-row' }, el('button', { onclick: () => zoom(1 / 1.3) }, '－'), el('button', { onclick: () => zoom(1.3) }, '＋'), el('button', { onclick: () => { this.z = 1; fit(); } }, 'Fit'), el('span', { class: 'ds-hint ds-grow' }, 'Pinch or use ＋ － to zoom; drag to move around.')), stage);
+    put(this.contentEl, el('div', { class: 'ds-row' }, el('button', { onclick: () => zoom(1 / 1.3) }, '－'), el('button', { onclick: () => zoom(1.3) }, '＋'), el('button', { onclick: () => { this.z = 1; fit(); } }, 'Fit'),
+      blk ? el('button', { onclick: () => editDiagram(blk.code, async (nb) => { await app().vault.process(this.entry, (t) => { const cur = mermaidBlocks(t)[this.index]; return cur ? t.slice(0, cur.start) + nb + t.slice(cur.end) : t; }); this.close(); notice('Diagram saved.'); }) }, '✎ Edit as drawing') : null,
+      el('span', { class: 'ds-hint ds-grow' }, 'Pinch or use ＋ － to zoom; drag to move around.')), stage);
+    if (!blk) { put(pic, hint('This diagram couldn’t be found in the entry’s text.')); return; }
+    this.comp = new ob.Component(); this.comp.load();
+    await ob.MarkdownRenderer.render(app(), '```mermaid\n' + blk.code + '```', pic, this.entry.path, this.comp);
+    // Mermaid draws after a moment: size it once the picture is there
+    const t0 = Date.now(); const wait = () => { if (pic.querySelector('svg')) fit(); else if (Date.now() - t0 < 4000) setTimeout(wait, 80); }; wait();
   }
-  onClose() { this.contentEl.empty(); }
+  onClose() { if (this.comp) this.comp.unload(); this.contentEl.empty(); }
 }

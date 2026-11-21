@@ -114,7 +114,10 @@ Edit a shared field anywhere and it changes everywhere.
 
 ## Encyclopedia: diagrams and canvases
 
-- **◇ Diagram** (while editing an entry) inserts a ready-made Mermaid diagram to change: flowchart (cause and effect), timeline, family tree, relationships, hierarchy, mind map or sequence. Diagrams are drawn live under the text as you type, and in the entry. Tap or click a diagram to see it full size and zoom.
+- **◇ Diagram → Draw a diagram… (no code)** opens a drawing board: add cards, connect them with arrows, give them shapes, colours, words and groups. **Save diagram** writes the Mermaid for you.
+- **✎ Edit as drawing** (under each diagram while editing, or in the full-size view) reopens a diagram on the drawing board. Diagrams you drew come back exactly; flowcharts written by hand are read too (boxes, shapes, arrows and their words, groups, colours) and laid out neatly. Other kinds (timeline, mind map, sequence) are edited as text.
+- **◇ Diagram → Text: …** still inserts a ready-made diagram as Mermaid text: flowchart, timeline, family tree, relationships, hierarchy, mind map or sequence.
+- Diagrams are drawn live under the text as you type, and in the entry. Tap or click one to see it full size and zoom.
 - **🧩 Canvas** shows a canvas inside the entry (`![[Map.canvas]]`), links to one, or makes a new canvas next to the entry.
 - **Linked to** and the `[[` suggestions list canvases as well as notes, in entries and in sheet text tabs.
 

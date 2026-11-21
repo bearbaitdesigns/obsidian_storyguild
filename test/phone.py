@@ -82,6 +82,9 @@ async def main():
         await shot('wk-encyclopedia')
         await ev(f"async () => {{ const b = [...document.querySelectorAll('.enc-item')].find(x => x.textContent.includes('Lantern Law')); b && b.click(); await {WAIT % 700}; }}")
         await shot('wk-entry')
+        await ev(f"async () => {{ SGP.api.editDiagram('flowchart TD\\n  A[The ninth lantern goes dark] --> B[The Guild calls in the debt]\\n  B --> C{{Does Mara pay?}}\\n  C -- yes --> D[She loses the house]\\n  C -- no --> E[The Tide Court takes the town]\\n', () => {{}}); await {WAIT % 600}; }}")
+        await shot('wk-diagram-editor')
+        await ev("() => { const m = [...__modals].pop(); m && m.close(); }")
         # Plot Weaver
         await ev(f"async () => {{ app.commands.executeCommandById('plot-weaver:open-board'); await {WAIT % 800}; }}")
         await shot('pw-board')

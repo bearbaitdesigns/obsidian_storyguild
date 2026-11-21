@@ -570,6 +570,13 @@
 .sg-phone .sg-dp-main { flex-direction: column; }
 .sg-phone .sg-dp-side { width: auto; margin: 8px 0 0; max-height: 45%; }
 .sg-phone .sg-dp-note { display: none; }
+.sg-diagram-pic { text-align: center; }
+.sg-diagram-pic .mermaid { cursor: default; }
+.sg-enc-dp-item + .sg-enc-dp-item { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--background-modifier-border); }
+.sg-diagram-editor { width: min(1200px, 96vw); height: min(820px, 92vh); }
+.sg-diagram-editor .modal-content { display: flex; flex-direction: column; gap: 8px; height: calc(100% - 40px); }
+.sg-dp.is-single { height: auto; flex: 1; min-height: 300px; }
+.sg-phone .sg-diagram-editor { width: 100vw; height: 100vh; }
 
 /* ---- Worldkeeper ---- */
 /* ==========================================================================

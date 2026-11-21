@@ -31,10 +31,11 @@ function draftPlot(view, main, n) {
 }
 
 class DraftPlotCanvas {
-  constructor(view, store, n) {
-    this.view = view; this.store = store; this.novel = n.id; this.sel = null; this.picking = null; this.pointers = new Map();
-    this.root = el('div', { class: 'sg-dp' }); this.isConnected = true;
-    this.save = () => SG.saveSoon(600);
+  /** opts.single: one diagram, no list of draft plots or Plot Weaver extras (the Encyclopedia's diagram editor). */
+  constructor(view, store, n, opts = {}) {
+    this.view = view; this.store = store; this.novel = n && n.id; this.opts = opts; this.sel = null; this.picking = null; this.pointers = new Map();
+    this.root = el('div', { class: 'sg-dp' + (opts.single ? ' is-single' : '') }); this.isConnected = true;
+    this.save = opts.save || (() => SG.saveSoon(600));
   }
   get P() { return this.store.plots.find((p) => p.id === this.store.active) || this.store.plots[0]; }
   destroy() { this.isConnected = false; this.root.remove(); }
@@ -64,13 +65,13 @@ class DraftPlotCanvas {
     this.fmt = el('div', { class: 'sg-dp-fmt' }); this.stage.appendChild(this.fmt);
     this.info = el('div', { class: 'sg-dp-info' }); this.stage.appendChild(this.info);
     put(this.stage, el('div', { class: 'sg-dp-zoom' }, el('button', { 'aria-label': 'Zoom in', onclick: () => this.zoomBy(1.2) }, '＋'), el('button', { 'aria-label': 'Zoom out', onclick: () => this.zoomBy(1 / 1.2) }, '－'), el('button', { 'aria-label': 'Fit everything', onclick: () => this.fit() }, '⤢')));
-    if (!this.store.helpSeen) put(this.stage, el('div', { class: 'sg-dp-help' }, el('span', {}, isPhone() ? 'Not linked to anything. Long-press empty space for a card · drag a card’s dot to connect · double-tap to write · pinch to zoom.' : DP_HELP), el('button', { onclick: (e) => { this.store.helpSeen = true; this.save(); e.currentTarget.parentElement.remove(); } }, 'Got it')));
+    if (!this.store.helpSeen && !this.opts.single) put(this.stage, el('div', { class: 'sg-dp-help' }, el('span', {}, isPhone() ? 'Not linked to anything. Long-press empty space for a card · drag a card’s dot to connect · double-tap to write · pinch to zoom.' : DP_HELP), el('button', { onclick: (e) => { this.store.helpSeen = true; this.save(); e.currentTarget.parentElement.remove(); } }, 'Got it')));
     // mermaid panel
     this.code = el('pre', { class: 'sg-dp-code' });
     const side = this.store.code ? el('div', { class: 'sg-dp-side' }, el('div', { class: 'sg-dp-sidehd' }, el('b', {}, 'Mermaid'), el('span', { class: 'ds-hint' }, ' · updates as you draw')), this.code,
       el('div', { class: 'ds-row' }, el('button', { onclick: () => { navigator.clipboard.writeText(this.mermaid()).then(() => notice('Copied. Paste it into a note inside ```mermaid … ```.')); } }, 'Copy'),
-        HOST.world ? el('button', { onclick: () => this.toEntry() }, 'Add to an Encyclopedia entry…') : null, el('button', { onclick: () => this.toNewNote() }, 'Save as a note…'))) : null;
-    put(this.root, tools, list, el('div', { class: 'sg-dp-main' }, this.stage, side));
+        HOST.world && !this.opts.single ? el('button', { onclick: () => this.toEntry() }, 'Add to an Encyclopedia entry…') : null, this.opts.single ? null : el('button', { onclick: () => this.toNewNote() }, 'Save as a note…'))) : null;
+    put(this.root, tools, this.opts.single ? null : list, el('div', { class: 'sg-dp-main' }, this.stage, side));
     this.bindStage(); this.applyView(); this.draw();
     if (!P.view) requestAnimationFrame(() => this.fit());
   }
@@ -329,6 +330,7 @@ class DraftPlotCanvas {
     const used = [...new Set(P.cards.map((c) => c.c))];
     used.forEach((k) => lines.push(`  classDef ${k} stroke:${DP_COLORS[k] || DP_COLORS.grey},stroke-width:2px`));
     used.forEach((k) => lines.push(`  class ${P.cards.filter((c) => c.c === k).map((c) => key.get(c.id)).join(',')} ${k}`));
+    if (this.opts.single) lines.push(`  %% storyguild-diagram ${JSON.stringify({ v: 1, layout: P.layout, cards: P.cards, edges: P.edges, groups: P.groups.map((g) => ({ id: g.id, t: g.t, c: g.c, ids: g.ids })) })}`);
     return lines.join('\n');
   }
   block() { return '```mermaid\n' + this.mermaid() + '\n```\n'; }
@@ -349,3 +351,66 @@ class DraftPlotCanvas {
   }
 }
 function projectFolderOrRoot() { const p = activeProject(); return (p && p.folder) || 'Plot drafts'; }
+
+/* =====================================================================
+   Encyclopedia diagram editor: draw a flowchart, get Mermaid
+   The drawing is kept in a %% comment inside the Mermaid block, so it can be reopened as a
+   drawing. Flowcharts written by hand are read back too (nodes, shapes, arrows, words, groups, colours).
+   ===================================================================== */
+function mermaidBlocks(text) { return [...String(text).matchAll(/```mermaid[^\n]*\n([\s\S]*?)```/g)].map((m) => ({ code: m[1], start: m.index, end: m.index + m[0].length })); }
+function diagramFromMermaid(code) {
+  const saved = code.match(/%%\s*storyguild-diagram\s+(\{.*\})\s*$/m);
+  if (saved) { try { const d = JSON.parse(saved[1]); return { id: 'dg', name: 'Diagram', layout: d.layout || 'TD', view: null, cards: d.cards || [], edges: d.edges || [], groups: (d.groups || []).map((g) => Object.assign({ x: 0, y: 0, w: 0, h: 0 }, g)) }; } catch (e) { /* fall through */ } }
+  const lines = code.split('\n').map((l) => l.replace(/%%.*$/, '').trim()).filter(Boolean);
+  const head = (lines[0] || '').match(/^(flowchart|graph)\s*(TD|TB|BT|LR|RL)?/i); if (!head) return null;
+  const dir = /LR|RL/i.test(head[2] || '') ? 'LR' : 'TD';
+  const cards = new Map(); const edges = []; const groups = []; let grp = null; const classes = {};
+  const SH = [[/^\(\((.*)\)\)$/, 'idea'], [/^\(\[(.*)\]\)$/, 'event'], [/^\[\[(.*)\]\]$/, 'scene'], [/^\[\((.*)\)\]$/, 'scene'], [/^\[(.*)\]$/, 'scene'], [/^\((.*)\)$/, 'event'], [/^\{\{(.*)\}\}$/, 'choice'], [/^\{(.*)\}$/, 'choice'], [/^>(.*)\]$/, 'note']];
+  const clean = (t) => t.trim().replace(/^"(.*)"$/, '$1').replace(/#quot;/g, '"').replace(/<br\s*\/?>/gi, ' ');
+  const node = (s) => {
+    const m = s.match(/^([A-Za-z0-9_\-]+)\s*(.*)$/); if (!m) return null; const id = m[1]; let shape = m[2].trim().replace(/:::\w+$/, ''); let kind = null, text = null;
+    if (shape) for (const [re, k] of SH) { const x = shape.match(re); if (x) { kind = k; text = clean(x[1]); break; } }
+    const c = cards.get(id) || { id: 'm_' + id, key: id, t: id, k: 'scene', c: 'grey', x: 0, y: 0 };
+    if (kind) { c.k = kind; c.t = text || id; } cards.set(id, c); if (grp && !grp.ids.includes(c.id)) grp.ids.push(c.id);
+    const cls = m[2].match(/:::(\w+)$/); if (cls) (classes[cls[1]] ??= []).push(id);
+    return c;
+  };
+  const NODE = /([A-Za-z0-9_\-]+\s*(?:\(\(.*?\)\)|\(\[.*?\]\)|\[\[.*?\]\]|\[\(.*?\)\]|\[.*?\]|\(.*?\)|\{\{.*?\}\}|\{.*?\}|>.*?\])?(?::::\w+)?)/y;
+  const EDGE = /\s*(?:(-{2,3}|-\.|={2,3})\s+([^|>]*?)\s+(-{2,3}>|\.->|={2,3}>)|(-{2,3}>|-\.->|-\.-|={2,3}>|-{3}))\s*(?:\|([^|]*)\|)?\s*/y;
+  for (const raw of lines.slice(1)) {
+    const sg = raw.match(/^subgraph\s+([A-Za-z0-9_\-]+)?\s*(?:\[(.*)\])?\s*(.*)$/); if (sg) { grp = { id: 'g_' + groups.length, t: clean(sg[2] || sg[3] || sg[1] || 'Group'), c: 'teal', ids: [], x: 0, y: 0, w: 0, h: 0 }; groups.push(grp); continue; }
+    if (/^end$/.test(raw)) { grp = null; continue; }
+    const cl = raw.match(/^class\s+([\w,\-]+)\s+(\w+)/); if (cl) { (classes[cl[2]] ??= []).push(...cl[1].split(',')); continue; }
+    if (/^(classDef|style|linkStyle|click|direction)\b/.test(raw)) continue;
+    let i = 0; NODE.lastIndex = 0; let m = NODE.exec(raw); if (!m) continue; let prev = node(m[1].trim()); i = NODE.lastIndex;
+    while (i < raw.length) {
+      EDGE.lastIndex = i; const e = EDGE.exec(raw); if (!e) break; i = EDGE.lastIndex;
+      NODE.lastIndex = i; const n = NODE.exec(raw); if (!n) break; i = NODE.lastIndex; const next = node(n[1].trim());
+      const op = e[3] || e[4] || ''; edges.push({ id: 'e' + edges.length, a: prev.id, b: next.id, l: clean(e[5] || e[2] || ''), dash: op.includes('.') }); prev = next;
+    }
+  }
+  for (const [k, ids] of Object.entries(classes)) if (DP_COLORS[k]) ids.forEach((i) => { const c = cards.get(i); if (c) c.c = k; });
+  if (!cards.size) return null;
+  return { id: 'dg', name: 'Diagram', layout: dir, view: null, cards: [...cards.values()].map(({ key, ...c }) => c), edges, groups, needsLayout: true };
+}
+class DiagramEditor extends Modal {
+  constructor(plot, onSave, title) { super(SG.app); this.plot = plot; this.onSave = onSave; this.ttl = title; }
+  onOpen() {
+    this.modalEl.addClass('sg-diagram-editor'); this.titleEl.setText(this.ttl || 'Draw a diagram');
+    const store = { active: this.plot.id, plots: [this.plot], code: false, helpSeen: true };
+    this.canvas = new DraftPlotCanvas(null, store, null, { single: true, save: () => {} });
+    put(this.contentEl, el('div', { class: 'ds-hint' }, isPhone() ? 'Long-press for a card · drag a card’s dot to connect · double-tap to write.' : 'Double-click for a card · drag a card’s dot onto another to connect · double-click a card or arrow to write on it · click a card for shape and colour.'),
+      this.canvas.root,
+      el('div', { class: 'sg-sbtns' }, el('button', { onclick: () => this.close() }, 'Cancel'), el('button', { class: 'mod-cta', onclick: () => { this.onSave('```mermaid\n' + this.canvas.mermaid() + '\n```'); this.close(); } }, 'Save diagram')));
+    this.canvas.mount();
+    if (this.plot.needsLayout) { delete this.plot.needsLayout; setTimeout(() => { this.canvas.arrange(this.plot.layout === 'LR' ? 'LR' : 'TD'); this.canvas.draw(); this.canvas.fit(); }, 30); }
+    else setTimeout(() => this.canvas.fit(), 30);
+  }
+  onClose() { if (this.canvas) this.canvas.destroy(); this.contentEl.empty(); }
+}
+/** Open the editor on a Mermaid block; onSave gets the new ```mermaid block. Returns false if it isn't a flowchart. */
+function editDiagram(code, onSave) {
+  const plot = code == null ? { id: 'dg', name: 'Diagram', layout: 'TD', view: null, cards: [{ id: dpId(), t: 'Start here', k: 'event', c: 'purple', x: 300, y: 120 }], edges: [], groups: [] } : diagramFromMermaid(code);
+  if (!plot) { notice('Only flowcharts can be edited as a drawing. This diagram can still be edited as text.'); return false; }
+  new DiagramEditor(plot, onSave, code == null ? 'Draw a diagram' : 'Edit diagram').open(); return true;
+}

@@ -297,11 +297,31 @@ async def main():
           const tools = [...document.querySelectorAll('.enc-editor .cs-section-actions button')].map(b => b.textContent);
           const ta = document.querySelector('.enc-editor textarea');
           [...document.querySelectorAll('.enc-editor button')].find(b => b.textContent.includes('Diagram')).click();
-          const diagrams = __lastMenu.items.map(i => i.title); await __lastMenu.items.find(i => i.title === 'Family tree').cb(); await W(900);
+          const diagrams = __lastMenu.items.map(i => i.title); await __lastMenu.items.find(i => i.title === 'Text: Family tree').cb(); await W(900);
           const hasMermaid = /```mermaid\\nflowchart TD/.test(ta.value); const preview = document.querySelector('.sg-enc-dpreview'); const pv = preview && preview.style.display !== 'none' && preview.textContent.includes('Aldo Vell');
           [...document.querySelectorAll('.enc-editor button')].find(b => b.textContent.includes('Canvas')).click(); const canvasMenu = __lastMenu.items.map(i => i.title);
           const canvases = SGP.sections.world && HOST_canvas();
           return { tools, diagrams: diagrams.length, hasMermaid, pv, canvasMenu, canvases }; }""".replace('HOST_canvas()', "app.vault.getFiles().filter(f => f.extension === 'canvas').map(f => f.path)"))
+        r2 = await ev("""async () => { const W = (ms) => new Promise(r => setTimeout(r, ms)); const A = SGP.api;
+          const parsed = {};
+          const samples = {
+            cause: 'flowchart TD\\n  A[The ninth lantern goes dark] --> B[The Guild calls in the debt]\\n  B --> C{Does Mara pay?}\\n  C -- yes --> D[She loses the house]\\n  C -- no --> E[The Tide Court takes the town]\\n',
+            rel: 'flowchart LR\\n  Mara((Mara)) -- sister --> Ilse((Ilse))\\n  Mara -- owes a debt to --> Teodor((Teodor))\\n  Ilse -. secretly serves .-> Court[The Tide Court]\\n',
+            chain: 'graph TD\\n  subgraph act2["Act II"]\\n  a("Start") -->|then| b[Middle] --> c>Note]\\n  end\\n  class a,b purple\\n',
+            timeline: 'timeline\\n  title x\\n  A : b\\n' };
+          for (const [k, v] of Object.entries(samples)) { const d = A.diagramFromMermaid(v); parsed[k] = d ? { cards: d.cards.map(c => c.k + ':' + c.t + ':' + c.c), edges: d.edges.map(e => (e.l || '') + (e.dash ? '~' : '')), groups: d.groups.map(g => g.t + ':' + g.ids.length), layout: d.layout } : null; }
+          // draw → save → read back the same drawing
+          let saved = null; A.editDiagram(null, (b) => { saved = b; }); await W(200);
+          const m = __modals[__modals.length - 1]; const cv = m.canvas; cv.addCard(); document.activeElement.textContent = 'Then this'; document.activeElement.blur(); cv.P.edges.push({ id: 'q', a: cv.P.cards[0].id, b: cv.P.cards[1].id, l: 'so' });
+          [...m.contentEl.querySelectorAll('button')].find(b => b.textContent === 'Save diagram').click(); await W(50);
+          const back = A.diagramFromMermaid(saved.replace(/^```mermaid\\n|```$/g, ''));
+          return { parsed, saved: saved.split('\\n').slice(0, 5), back: back && back.cards.map(c => c.t), backEdges: back && back.edges.map(e => e.l) }; }""")
+        print('10b. diagrams:', json.dumps(r2, ensure_ascii=False))
+        pz = r2['parsed']
+        assert pz['cause']['cards'][2].startswith('choice:Does Mara pay?') and pz['cause']['edges'] == ['', '', 'yes', 'no']
+        assert pz['rel']['cards'][0] == 'idea:Mara:grey' and 'secretly serves~' in pz['rel']['edges'] and pz['rel']['layout'] == 'LR'
+        assert pz['chain']['groups'] == ['Act II:3'] and pz['chain']['cards'][0] == 'event:Start:purple' and pz['chain']['cards'][2].startswith('note:Note') and pz['timeline'] is None
+        assert r2['back'] == ['Start here', 'Then this'] and r2['backEdges'] == ['so']
         print('10. encyclopedia extras:', json.dumps(r, ensure_ascii=False))
         assert 'Diagram' in ' '.join(r['tools']) and 'Canvas' in ' '.join(r['tools']) and r['diagrams'] >= 8 and r['hasMermaid'] and r['pv']
         assert any('Show a canvas' in x for x in r['canvasMenu']) and 'Maps/Harbour.canvas' in r['canvases']

@@ -112,6 +112,19 @@ WorldkeeperPlugin.storyguild = { readTodos, writeTodos, pwLoad, mergeSettings, D
 /* ------------------------------ Plot Weaver ------------------------------ */
 let pw = read('vendor', 'plot-weaver', 'main.js');
 // The host wraps commit() on the instance; these patches only add the phone layout.
+// Speed: each board cell used to re-sort the whole manuscript to find its cards (chapters × plotlines sorts per redraw).
+// Sort once per redraw and group the cards by cell.
+pw = patch(pw, 'pw:cell-cache', `    let beats = NV.chapterCell(n, col.id, p.id);`,
+  `    let beats = this._cellCache ? (this._cellCache.get(\`\${col.id && NV.hasChapter(n, { chapterId: col.id }) ? col.id : ''}|\${p.id}\`) || []) : NV.chapterCell(n, col.id, p.id);`);
+pw = patch(pw, 'pw:cell-cache-build', `    const grid = scroller.createDiv('pw-grid');
+    this.gridEl = grid;`, `    this._cellCache = new Map();
+    for (const b of NV.manuscript(n)) { const k = \`\${NV.hasChapter(n, b) ? b.chapterId : ''}|\${b.plotlineId}\`; if (!this._cellCache.has(k)) this._cellCache.set(k, []); this._cellCache.get(k).push(b); }
+    const grid = scroller.createDiv('pw-grid');
+    this.gridEl = grid;`);
+pw = patch(pw, 'pw:cell-cache-clear', `    this.svgEl = svg('svg', { class: 'pw-svg' });
+    grid.appendChild(this.svgEl);`, `    this._cellCache = null;
+    this.svgEl = svg('svg', { class: 'pw-svg' });
+    grid.appendChild(this.svgEl);`);
 pw = patch(pw, 'pw:phone-board', `    else this.renderBoard(main, n);`, `    else if (HOST.isPhone()) HOST.phoneBoard(this, main, n, NV);
     else this.renderBoard(main, n);`);
 pw = patch(pw, 'pw:phone-shelf', `    if (this.ui.shelfCollapsed) this.renderShelfRail(body.createDiv('pw-shelf-rail'), n);`,

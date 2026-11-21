@@ -266,6 +266,11 @@
 /* =====================================================================
    Phone layout (body.sg-phone) — all three sections
    ===================================================================== */
+/* Obsidian gives buttons and fields a fixed height and no wrapping; on a narrow screen that makes long
+   labels spill out of their boxes. Here controls grow with their text and never get wider than their box. */
+.sg-phone :where(.ds-root, .wk, .sg-pw-phone, .ds-modal, .pw-toolbar) button { height: auto; min-height: 38px; white-space: normal; line-height: 1.25; padding-top: 6px; padding-bottom: 6px; max-width: 100%; }
+.sg-phone :where(.ds-root, .wk, .sg-pw-phone, .ds-modal) :is(input, select, textarea) { max-width: 100%; min-width: 0; box-sizing: border-box; }
+.sg-phone :where(.ds-root, .wk, .ds-modal) select { text-overflow: ellipsis; }
 .sg-phone .ds-root { padding: 10px 12px 90px !important; }
 .sg-phone .ds-root button, .sg-phone .ds-root select.dropdown, .sg-phone .ds-root input:not([type=checkbox]):not([type=range]) { min-height: 40px; }
 .sg-phone .ds-root input[type=checkbox] { width: 22px; height: 22px; }
@@ -273,20 +278,23 @@
 .sg-phone .ds-row > .ds-hint.ds-grow, .sg-phone .ds-row > p.ds-grow { flex-basis: 100%; }
 /* section switcher */
 .sg-sections { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 10px; background: var(--background-secondary); margin-bottom: 10px; }
-.sg-sections button { flex: 1; min-height: 38px; background: none; box-shadow: none; border: 0; border-radius: 7px; color: var(--text-muted); font-weight: 600; font-size: 12.5px; white-space: nowrap; padding: 0 4px; }
+.sg-sections button { flex: 1 1 0; min-width: 0; min-height: 38px; background: none; box-shadow: none; border: 0; border-radius: 7px; color: var(--text-muted); font-weight: 600; font-size: 12px; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; padding: 0 4px !important; display: block; }
 .sg-sections button.is-on { background: var(--background-primary); color: var(--text-normal); box-shadow: inset 0 -2px 0 var(--interactive-accent); }
-/* header */
-.sg-phead { gap: 10px; padding: 10px; }
+/* header: cover, book and title on top; draft, words and stage underneath */
+.sg-phead { display: block; padding: 10px 12px; }
+.sg-phead-top { display: flex; gap: 10px; align-items: center; min-width: 0; }
 .sg-phead .ds-cover-sm { width: 42px; height: 63px; flex: none; }
-.sg-phead h1 { font-size: 1.3em !important; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sg-bookchip { min-height: 26px !important; height: auto; padding: 2px 9px; border-radius: 20px; font-size: 11.5px; background: var(--background-modifier-hover); box-shadow: none; color: var(--text-muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
-.sg-phead .ds-draftbox { text-align: right; flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.sg-phead .ds-draftbox b { font-size: 1.6em; color: var(--ds-acc); line-height: 1; }
-.sg-phead .ds-draftbox select { min-height: 30px !important; height: 30px; font-size: 12px; max-width: 120px; }
+.sg-phead .ds-head-main { min-width: 0; flex: 1; }
+.sg-phead h1 { font-size: 1.3em !important; line-height: 1.2; margin: 4px 0 0 !important; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sg-phone .sg-bookchip { display: block; max-width: 100%; min-height: 28px !important; height: auto; padding: 3px 10px; border-radius: 14px; font-size: 12px; line-height: 1.3; background: var(--background-modifier-hover); box-shadow: none; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.sg-pmeta { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--background-modifier-border); font-size: 13px; color: var(--text-muted); }
+.sg-pmeta b { color: var(--ds-acc); font-size: 15px; }
+.sg-pmeta > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sg-pmeta select { flex: none; max-width: 48%; min-height: 34px !important; height: 34px; font-size: 13px; }
 /* tabs: one row that scrolls sideways and stays put */
 .sg-phone .ds-tabs { position: sticky; top: 0; z-index: 4; background: var(--background-primary); margin: 10px -12px 10px; padding: 6px 12px; gap: 6px; border-bottom: 1px solid var(--background-modifier-border); scrollbar-width: none; }
 .sg-phone .ds-tabs::-webkit-scrollbar { display: none; }
-.sg-phone .ds-tabs button { flex: none; min-height: 38px; padding: 0 14px; border-radius: 19px; border: 1px solid var(--background-modifier-border); background: var(--background-secondary); font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.sg-phone .ds-tabs button { flex: none; white-space: nowrap; min-height: 38px; padding: 0 14px; border-radius: 19px; border: 1px solid var(--background-modifier-border); background: var(--background-secondary); font-size: 13.5px; font-weight: 600; white-space: nowrap; }
 .sg-phone .ds-tabs button.is-on { background: var(--interactive-accent); border-color: var(--interactive-accent); color: var(--text-on-accent, #fff); }
 /* summary numbers: 2 × 2 */
 .sg-phone .ds-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -357,14 +365,18 @@
 /* stats */
 .sg-phone .ds-sgrid { grid-template-columns: minmax(0, 1fr); }
 .sg-phone .ds-facts, .sg-phone .ds-facts.is-3 { grid-template-columns: minmax(0, 1fr); }
-.sg-phone .ds-seg { overflow-x: auto; flex-wrap: nowrap; }
+.sg-phone .ds-seg { flex-wrap: wrap; height: auto; }
 /* publish: preview first as a row of pages you swipe; Publish button stays on screen */
 .sg-phone .ds-pubgrid > :last-child { order: -1; }
 .sg-phone .ds-pp-strip { display: flex; flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x mandatory; gap: 12px; padding-bottom: 6px; }
 .sg-phone .ds-pp-wrap { flex: none; scroll-snap-align: center; }
 .sg-phone .ds-pubbar { position: sticky; bottom: 8px; z-index: 3; background: var(--background-primary); padding: 8px 0; }
 .sg-phone .ds-pubbar > button:first-child { flex: 1; min-height: 48px; font-size: 15px; }
-.sg-phone .ds-fmt button { min-height: 48px; }
+.sg-phone .ds-fmt { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sg-phone .ds-fmt button { min-height: 52px; flex-direction: column; overflow: hidden; }
+.sg-phone .ds-opt { gap: 10px; }
+.sg-phone .ds-opt > div:first-child { min-width: 0; }
+.sg-phone .ds-opt select, .sg-phone .ds-opt input[type=text] { max-width: 55%; }
 .sg-phone .ds-opt { min-height: 48px; }
 
 /* ---------- Worldkeeper on a phone ---------- */
@@ -446,6 +458,28 @@
 .sg-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--background-modifier-border); }
 .sg-dots i.is-on { background: var(--interactive-accent); }
 .sg-center { text-align: center; }
+
+/* ---------- fixes for the real app's fixed-height controls ---------- */
+.sg-phone .wk .hd-hero .cs-banner-tools { position: relative; top: auto; left: auto; right: auto; order: -1; flex-wrap: wrap; align-self: flex-start; max-width: calc(100% - 80px); }
+.sg-phone .wk .hd-hero { padding-top: 14px; }
+.sg-phone .wk .hd-hero .wk-ring { top: 12px; }
+.sg-phone .wk .hd-hero .hd-sec, .sg-phone .wk .hd-hero .hd-enc { height: auto; min-height: 42px; white-space: nowrap; overflow: hidden; padding: 6px 8px; font-size: 13px; }
+.sg-phone .wk .hd-hero .hd-sec b, .sg-phone .wk .hd-hero .hd-enc b { flex: none; }
+.sg-phone .wk .cs-hero { padding: 50px 14px 16px; gap: 12px; }
+.sg-phone .wk .cs-hero .cs-type-pill { top: 12px; left: 12px; }
+.sg-phone .wk .cs-hero .cs-banner-tools { top: 10px; right: 10px; }
+.sg-phone .wk .cs-hero .cs-name-row { flex-wrap: wrap; }
+.sg-phone .wk .cs-hero .cs-name { font-size: 1.7em; overflow-wrap: anywhere; }
+.sg-phone .wk .cs-tile { overflow: hidden; }
+.sg-phone .wk .cs-tile select, .sg-phone .wk .cs-tile .dropdown { width: 100%; }
+.sg-phone .wk .cs-gal-drop { grid-column: 1 / -1; aspect-ratio: auto; min-height: 64px; flex-direction: row; gap: 8px; }
+.sg-phone .wk .cs-gal-drop small { white-space: normal; }
+.sg-phone .wk .apill, .sg-phone .wk .cs-chip { max-width: 100%; }
+.sg-phone .wk .cs-tabs { width: 100%; box-sizing: border-box; border-radius: 12px; }
+.sg-phone .wk .cs-tab { white-space: nowrap; }
+.sg-phone .ds-pubbar { flex-wrap: nowrap; }
+.sg-phone .ds-pubbar > * { flex: none; }
+.sg-phone .ds-recent { flex-wrap: wrap; overflow-wrap: anywhere; }
 
 /* ---- Worldkeeper ---- */
 /* ==========================================================================

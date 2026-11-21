@@ -63,6 +63,8 @@ async def main():
         # Worldkeeper
         await ev(f"async () => {{ app.commands.executeCommandById('worldkeeper:open-home'); await {WAIT % 900}; }}")
         await shot('wk-home')
+        await ev(f"async () => {{ const b = document.querySelector('.hd-hero .wk-pencil'); b && b.click(); await {WAIT % 300}; }}")
+        await shot('wk-home-tools')
         await ev(f"""async () => {{ await app.vault.create('Story/Places/Brineholt.md', '---\\ntype: place\\nplaceType: Port\\nsize: Large\\n---\\n```worldkeeper\\n```\\n\\n## Notes\\n\\nClings to the cliffs.\\n');
           app.commands.executeCommandById('worldkeeper:open-dashboards'); await {WAIT % 800}; }}""")
         await shot('wk-dashboards')
@@ -71,6 +73,8 @@ async def main():
               document.getElementById('workspace').append(wrap); const ctx = {{ sourcePath: path, addChild(c) {{ c.load(); }}, getSectionInfo() {{ return null; }} }};
               await app.codeblocks['worldkeeper']('', inner, ctx); await {WAIT % 600}; wrap.scrollIntoView(); }}""", path)
             await shot(name)
+            await ev(f"async () => {{ const b = document.querySelector('.sg-sheet-test .cs-hero .wk-pencil'); b && b.click(); await {WAIT % 300}; }}")
+            await shot(name + '-tools')
         await ev("() => document.querySelectorAll('.sg-sheet-test').forEach(e => e.remove())")
         await ev(f"""async () => {{ await app.vault.create('Worldkeeper/Encyclopedia/Lantern Law.md', '---\\ntype: entry\\ncategory: Law & custom\\ntags: [guild]\\nlinks: []\\nseeAlso: []\\n---\\n```worldkeeper-entry\\n```\\n\\n## Origins\\n\\nEvery lantern on the harbour wall was lit by a keeper.\\n\\n## The Nine Lanterns\\n\\nEight still burn.\\n');
           await app.vault.create('Worldkeeper/Encyclopedia/Saltglass.md', '---\\ntype: entry\\ncategory: Materials\\n---\\n```worldkeeper-entry\\n```\\n\\nGlass that remembers the sea.\\n');

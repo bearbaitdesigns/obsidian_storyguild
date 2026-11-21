@@ -58,11 +58,12 @@ function phoneHeader(view, p) {
   const stage = el('select', { class: 'dropdown' }, STAGES.map((s) => el('option', { selected: s === p.stage }, s)));
   stage.addEventListener('change', () => setProjectField(p, 'stage', stage.value));
   return el('div', { class: 'ds-head sg-phead' },
-    el('div', { class: 'ds-cover-sm', onclick: () => view.setTab('details') }, cov ? el('img', { src: cov }) : el('span', {}, p.title.slice(0, 1))),
-    el('div', { class: 'ds-head-main' },
-      el('button', { class: 'sg-bookchip', onclick: () => openLibrary() }, '📚 ', seriesLine(p) || 'Books & series', ' ▾'),
-      el('h1', {}, p.title), el('div', { class: 'ds-sub' }, `${fmtN(totalWords(p))} words`)),
-    el('div', { class: 'ds-draftbox' }, el('small', {}, 'Draft'), el('b', {}, '#' + p.draft), stage));
+    el('div', { class: 'sg-phead-top' },
+      el('div', { class: 'ds-cover-sm', onclick: () => view.setTab('details') }, cov ? el('img', { src: cov }) : el('span', {}, p.title.slice(0, 1))),
+      el('div', { class: 'ds-head-main' },
+        el('button', { class: 'sg-bookchip', onclick: () => openLibrary() }, `📚 ${seriesLine(p) || 'Books & series'} ▾`),
+        el('h1', {}, p.title))),
+    el('div', { class: 'sg-pmeta' }, el('span', {}, el('b', {}, `Draft #${p.draft}`), ` · ${fmtN(totalWords(p))} words`), stage));
 }
 
 /* ---------------- Draftsmith: chapter cards ---------------- */

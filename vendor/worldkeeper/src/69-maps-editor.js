@@ -385,10 +385,18 @@ function iconPalette(current, onPick, emoji, compact = false) {
     ap(wrap, row);
   }
   ap(wrap, h('div', { class: 'wkm-pal-g' }, compact ? null : h('span', { class: 'wkm-pal-l' }, 'Other'), h('button', { class: 'wkm-ib' + (current === 'emoji' ? ' is-on' : ''), title: 'Any emoji as a symbol', onclick: () => onPick('emoji') }, emoji || '✱'),
-    h('button', { class: 'wkm-ib wkm-pal-add', title: 'Make your own pins in Settings → Wayfinder', onclick: () => { app().setting.open(); app().setting.openTabById && app().setting.openTabById(P.manifest.id); } }, '＋')));
+    h('button', { class: 'wkm-ib wkm-pal-add', title: 'Make your own pins, or change these, in Settings → Wayfinder → Pins', onclick: () => openPinSettings() }, '✎')));
   return wrap;
 }
+/** open Settings at Wayfinder → Pins */
+function openPinSettings() {
+  if (P.settingTab) P.settingTab.tab = 'maps';
+  const st = app().setting; if (!st) return; try { st.open(); st.openTabById && st.openTabById(P.settingTab && P.settingTab.id ? P.settingTab.id : P.manifest.id); } catch (e) { console.error(e); }
+  setTimeout(() => { const el = document.querySelector('.wkm-custom'); el && el.scrollIntoView({ block: 'start' }); }, 250);
+}
+/** redraw open maps after pins change in settings */
+function refreshOpenMaps() { for (const l of app().workspace.getLeavesOfType(VIEW_MAP)) { const v = l.view; if (v && v.d && v.stage) { v.drawOpts(); v.draw(); v.drawPanel(); } } }
 function iconSvg(key, size, it = {}) {
   const sv = s('svg', { width: size, height: size, viewBox: `0 0 ${size} ${size}`, class: 'wkm-icsvg' });
-  ap(sv, pinGlyph({ x: size / 2, y: size / 2, icon: key, color: it.color, emoji: it.emoji, _glyph: it._glyph }, size)); return sv;
+  ap(sv, pinGlyph({ x: size / 2, y: size / 2, icon: key, color: it.color, emoji: it.emoji, _glyph: it._glyph, _def: it._def }, size)); return sv;
 }

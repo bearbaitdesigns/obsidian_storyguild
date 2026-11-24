@@ -2030,6 +2030,24 @@ body.wk-white-links a.internal-link:not(.is-unresolved), body.wk-white-links .cm
 .wkm-palette.is-compact .wkm-pal-g {gap: 0; padding-right: 6px; border-right: 1px solid var(--background-modifier-border);}
 .wkm-palette.is-compact .wkm-pal-g:last-child {border-right: none;}
 .wkm-palette.is-compact .wkm-ib {width: 28px; height: 28px;}
+/* Wayfinder: bigger pop-up; pins in settings */
+.wkm-popover {width: 400px; box-sizing: border-box; font-size: .95em; padding: 0 16px 16px;}
+.wkm-popover .wkm-ib {width: 32px; height: 32px;}
+.wkm-popover textarea {min-height: 90px;}
+.wkm-popover.is-sheet {max-height: 70%;}
+.wkm-custom .wkm-cp {display: block; padding: 0; border: 1px solid var(--background-modifier-border); border-radius: 10px; overflow: hidden;}
+.wkm-cp-group {display: flex; flex-direction: column; gap: 6px; margin-top: 6px;}
+.wkm-cp-gh {font-size: .7em; text-transform: uppercase; letter-spacing: .09em; font-weight: 700; color: var(--text-muted); margin-top: 6px;}
+.wkm-cp-row {display: flex; align-items: center; gap: 10px; padding: 6px 12px; cursor: pointer;}
+.wkm-cp-row:hover {background: var(--background-modifier-hover);}
+.wkm-cp-row .wkm-cp-prev {width: 40px; height: 40px;}
+.wkm-cp-edit {font-size: .85em; color: var(--text-accent);}
+.wkm-pill.is-off {background: rgba(200,80,80,.18); color: #e27a7a;}
+.wkm-cp.is-open {border-color: var(--interactive-accent);}
+.wkm-cp.is-open .wkm-cp-main {padding: 4px 12px 12px; border-top: 1px solid var(--background-modifier-border);}
+.wkm-cp-main .wkm-f {margin: 4px 0;}
+.wkm-cp-main .wkm-f > span {font-size: .68em;}
+.wkm-cp-addbtn {margin-top: 6px;}
 
 /* ---- Plot Weaver ---- */
 /* ===================== Plot Weaver ===================== */

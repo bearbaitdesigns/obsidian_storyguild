@@ -65,7 +65,7 @@ class WorldkeeperPlugin extends Plugin {
     this.registerEvent(app().vault.on('create', dirty));
 
     Object.assign(this, WAYFINDER_METHODS); installWayfinder(this);
-    this.addSettingTab(new WorldkeeperSettingTab(this));
+    this.settingTab = new WorldkeeperSettingTab(this); this.addSettingTab(this.settingTab);
   }
   updateHomeTitle() { for (const l of app().workspace.getLeavesOfType(VIEW_HOME)) { if (typeof l.updateHeader === 'function') l.updateHeader(); else if (l.tabHeaderInnerTitleEl) l.tabHeaderInnerTitleEl.setText(l.view.getDisplayText()); } }
   applyLinkStyle() { document.body.classList.toggle('wk-white-links', !!(this.settings && this.settings.whiteLinks)); }

@@ -21,7 +21,7 @@ function smoothPath(pts, closed) {
 const straightPath = (pts, closed) => 'M' + pts.map((p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' L') + (closed ? ' Z' : '');
 
 function pinGlyph(it, size) {
-  const ic = it.icon === '__g' ? { color: it.color, glyph: it._glyph } : iconDef(it.icon) || ICONS.poi; const col = it.color || ic.color; const k = size / 24;
+  const ic = it.icon === '__g' ? { color: it.color, glyph: it._glyph } : it.icon === '__def' ? it._def : iconDef(it.icon) || ICONS.poi; const col = it.color || ic.color; const k = size / 24;
   const g = s('g', { transform: `translate(${(it.x - size / 2).toFixed(1)} ${(it.y - size / 2).toFixed(1)}) scale(${k.toFixed(3)})` });
   const r = ic.small ? 7.5 : 10;
   ap(g, s('circle', { cx: 12.6, cy: 13, r, fill: '#000', opacity: 0.25 }));

@@ -37,6 +37,7 @@ const MAP_DEFAULTS = {
   pdfWidth: 3000,
   exportScale: 2,
   customPins: [],
+  pinOverrides: {},
   view: { lib: 'grid' },
 };
 function mergeMapSettings(saved) { const s = Object.assign(clone(MAP_DEFAULTS), saved || {}); s.view = Object.assign(clone(MAP_DEFAULTS.view), (saved || {}).view || {}); return s; }
@@ -98,17 +99,31 @@ const ICON_GROUPS = [['Settlements', ['capital', 'city', 'town', 'village', 'por
 /* ---------- custom pins (Settings → Wayfinder → Custom pins) ----------
    { id, label, group, kind: 'glyph' | 'emoji' | 'image', glyph, emoji, img (small PNG as a data URL), color, ring } */
 const customPins = () => arr(MS().customPins);
-/** a pin icon: built-in or custom; null if it no longer exists */
-function iconDef(key) {
-  if (ICONS[key]) return ICONS[key];
-  const c = customPins().find((x) => x.id === key); if (!c) return null;
-  return { label: c.label || 'Custom pin', color: c.color || '#5a6b7b', glyph: c.kind === 'glyph' ? c.glyph || 'poi' : null, emoji: c.kind === 'emoji' ? c.emoji || '★' : null, img: c.kind === 'image' ? c.img || null : null, ring: !!c.ring, custom: true, group: (c.group || '').trim() || 'Custom' };
-}
-/** groups of pin icons for palettes, legends and the PDF key: built-in groups with custom pins added to theirs */
-function iconGroups() {
-  const out = ICON_GROUPS.map(([g, keys]) => [g, keys.slice()]);
-  for (const c of customPins()) { const g = (c.group || '').trim() || 'Custom'; const row = out.find((x) => x[0].toLowerCase() === g.toLowerCase()); if (row) row[1].push(c.id); else out.push([g, [c.id]]); }
+/** changes to built-in pins (Settings → Wayfinder → Pins): { key: { label, group, color, ring, kind, glyph, emoji, img, hidden } } */
+const pinOverrides = () => MS().pinOverrides || {};
+function applyPin(base, o, custom) {
+  const out = Object.assign({}, base, { custom: !!custom });
+  if (o.label) out.label = o.label; if (o.color) out.color = o.color; if (o.ring != null) out.ring = !!o.ring;
+  if ((o.group || '').trim()) out.group = o.group.trim(); out.hidden = !!o.hidden;
+  const kind = o.kind || (custom ? 'glyph' : null);
+  if (kind === 'glyph') Object.assign(out, { glyph: o.glyph || base.glyph || 'poi', emoji: null, img: null, small: o.glyph ? false : !!base.small });
+  if (kind === 'emoji') Object.assign(out, { emoji: o.emoji || '★', img: null, small: false });
+  if (kind === 'image') Object.assign(out, { img: o.img || null, emoji: null, small: false });
   return out;
+}
+/** a pin icon: built-in (with your changes) or custom; null if it no longer exists */
+function iconDef(key) {
+  if (ICONS[key]) { const o = pinOverrides()[key]; return o ? applyPin(ICONS[key], o, false) : ICONS[key]; }
+  const c = customPins().find((x) => x.id === key); if (!c) return null;
+  return applyPin({ label: 'Custom pin', color: '#5a6b7b', glyph: 'poi' }, Object.assign({}, c, { label: c.label || 'Custom pin', group: (c.group || '').trim() || 'Custom' }), true);
+}
+/** groups of pin icons for palettes, legends and the PDF key; withHidden includes pins hidden from the pickers */
+function iconGroups(withHidden = false) {
+  const out = ICON_GROUPS.map(([g]) => [g, []]);
+  const put = (g, k) => { const row = out.find((x) => x[0].toLowerCase() === g.toLowerCase()); if (row) row[1].push(k); else out.push([g, [k]]); };
+  for (const [g, keys] of ICON_GROUPS) for (const k of keys) { const d = iconDef(k); if (withHidden || !d.hidden) put(d.group || g, k); }
+  for (const c of customPins()) { const d = iconDef(c.id); if (withHidden || !d.hidden) put(d.group || 'Custom', c.id); }
+  return out.filter((x) => x[1].length);
 }
 /** a Worldkeeper note type suggests a pin icon */
 const ICON_FOR_TYPE = { kingdom: 'capital', place: 'town', hub: 'poi', character: 'person', organization: 'flag', item: 'poi', magic: 'poi', culture: 'flag', species: 'flag', demon: 'lair', pantheon: 'temple', continent: 'flag', planet: 'flag' };

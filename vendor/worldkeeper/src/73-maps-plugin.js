@@ -69,36 +69,54 @@ function renderMapSettings(root, { row, head }) {
     row('Travel speeds', 'Routes show how long they take. One per line: name, miles per day', speeds));
   ap(root, renderCustomPins());
 }
-let CP_REDRAW = false;
-/** Settings → Wayfinder → Custom pins: your own pin types with a symbol, emoji or picture */
+let CP_REDRAW = false; const CP_OPEN = new Set();
+/** Settings → Wayfinder → Pins: change any built-in pin, and make your own */
 function renderCustomPins() {
-  const st = MS(); st.customPins = arr(st.customPins); const box = h('div', { class: 'wkm wkm-custom' });
-  const save = () => P.saveSettingsQuiet(); const redraw = () => { if (CP_REDRAW) return; CP_REDRAW = true; setTimeout(() => { CP_REDRAW = false; const cur = document.querySelector('.wkm-custom'); if (cur && cur.isConnected) cur.replaceWith(renderCustomPins()); }, 0); };
-  const groups = [...new Set([...ICON_GROUPS.map((g) => g[0]), ...st.customPins.map((c) => (c.group || '').trim()).filter(Boolean)])];
-  const dl = h('datalist', { id: 'wkm-groups' }, ...groups.map((g) => h('option', { value: g })));
-  ap(box, h('div', { class: 'wk-set-h' }, h('h3', {}, '📍 Custom pins'), h('p', { class: 'setting-item-description' }, 'Make your own pin types, such as Tavern, Shipwreck or Ley line node. Give each a name, a group it’s listed under, and a symbol, emoji or picture. They appear with the built-in pins in Wayfinder, in legends and in the PDF key.')), dl);
-  st.customPins.forEach((c, i) => {
-    const prev = h('div', { class: 'wkm-cp-prev' }); const paint = () => prev.replaceChildren(iconSvg(c.id, 40));
-    const upd = (k, v, re = false) => { c[k] = v; save(); paint(); if (re) redraw(); };
-    const name = h('input', { type: 'text', value: c.label || '', placeholder: 'Name, e.g. Tavern' }); name.addEventListener('input', () => upd('label', name.value)); name.addEventListener('change', () => redraw());
-    const grp = h('input', { type: 'text', value: c.group || '', placeholder: 'Group, e.g. Places', list: 'wkm-groups' }); grp.addEventListener('change', () => upd('group', grp.value.trim(), true));
-    const col = h('input', { type: 'color', value: c.color || '#5a6b7b' }); col.addEventListener('input', () => upd('color', col.value));
-    const ring = h('label', { class: 'wkm-check' }, ((x) => { x.addEventListener('change', () => upd('ring', x.checked)); return x; })(h('input', { type: 'checkbox', checked: !!c.ring })), 'Outer ring');
-    const kind = h('div', { class: 'wkm-seg' }, ...[['glyph', 'Symbol'], ['emoji', 'Emoji'], ['image', 'Picture']].map(([k, l]) => h('button', { class: (c.kind || 'glyph') === k ? 'is-on' : '', onclick: () => upd('kind', k, true) }, l)));
-    let pick;
-    if ((c.kind || 'glyph') === 'glyph') pick = h('div', { class: 'wkm-cp-glyphs' }, ...Object.keys(G).map((g) => { const b = h('button', { class: 'wkm-ib' + ((c.glyph || 'poi') === g ? ' is-on' : ''), title: g, onclick: () => upd('glyph', g, true) }); ap(b, iconSvg('__g', 22, { color: c.color || '#5a6b7b', _glyph: g })); return b; }));
-    else if (c.kind === 'emoji') { const e = h('input', { type: 'text', value: c.emoji || '', placeholder: 'e.g. 🍺', class: 'wkm-cp-emoji' }); e.addEventListener('input', () => { const v = [...e.value.trim()]; if (v.length) upd('emoji', v.slice(0, 2).join('')); }); pick = e; }
-    else {
+  const st = MS(); st.customPins = arr(st.customPins); st.pinOverrides = st.pinOverrides || {}; const box = h('div', { class: 'wkm wkm-custom' });
+  const save = () => { P.saveSettingsQuiet(); refreshOpenMaps(); };
+  const redraw = () => { if (CP_REDRAW) return; CP_REDRAW = true; setTimeout(() => { CP_REDRAW = false; const cur = document.querySelector('.wkm-custom'); if (cur && cur.isConnected) cur.replaceWith(renderCustomPins()); }, 0); };
+  const groups = [...new Set(iconGroups(true).map((g) => g[0]))];
+  ap(box, h('div', { class: 'wk-set-h' }, h('h3', {}, '📍 Pins'), h('p', { class: 'setting-item-description' }, 'Change any pin’s name, group, colour or icon, hide pins you never use, or make your own (Tavern, Shipwreck, Ley line node…). Icons can be a built-in symbol, an emoji or a picture. Changes show everywhere: maps, legends and the PDF key.')),
+    h('datalist', { id: 'wkm-groups' }, ...groups.map((g) => h('option', { value: g }))));
+  /** one pin row; o is what gets edited: the custom pin itself, or the built-in's override */
+  const pinRow = (key, isCustom) => {
+    const getO = () => (isCustom ? st.customPins.find((c) => c.id === key) : st.pinOverrides[key] || {});
+    const setO = (k, v, re) => { if (isCustom) getO()[k] = v; else st.pinOverrides[key] = Object.assign({}, st.pinOverrides[key], { [k]: v }); save(); paint(); if (re) redraw(); };
+    const o = getO(); const d = iconDef(key); const base = ICONS[key];
+    const changed = !isCustom && Object.keys(o).some((k) => k !== 'hidden' && o[k] !== '' && o[k] != null);
+    const prev = h('span', { class: 'wkm-cp-prev' }); const paint = () => prev.replaceChildren(iconSvg(key, 34));
+    paint();
+    const open = CP_OPEN.has(key);
+    const head = h('div', { class: 'wkm-cp-row', onclick: () => { open ? CP_OPEN.delete(key) : CP_OPEN.add(key); redraw(); } }, prev,
+      h('b', {}, d.label), isCustom ? h('span', { class: 'wkm-pill' }, 'Yours') : changed ? h('span', { class: 'wkm-pill' }, 'Changed') : null, d.hidden ? h('span', { class: 'wkm-pill is-off' }, 'Hidden') : null,
+      h('span', { class: 'wkm-sp' }), h('span', { class: 'wkm-cp-edit' }, open ? 'Close' : 'Edit'));
+    const row = h('div', { class: 'wkm-cp' + (open ? ' is-open' : '') }, head);
+    if (!open) return row;
+    const name = h('input', { type: 'text', value: isCustom ? o.label || '' : o.label || '', placeholder: isCustom ? 'Name, e.g. Tavern' : base.label }); name.addEventListener('input', () => setO('label', name.value)); name.addEventListener('change', () => redraw());
+    const grp = h('input', { type: 'text', value: o.group || '', placeholder: isCustom ? 'Custom' : (ICON_GROUPS.find((g) => g[1].includes(key)) || ['Places'])[0], list: 'wkm-groups' }); grp.addEventListener('change', () => setO('group', grp.value.trim(), true));
+    const col = h('input', { type: 'color', value: d.color || '#5a6b7b' }); col.addEventListener('input', () => setO('color', col.value));
+    const ring = h('label', { class: 'wkm-check' }, ((x) => { x.addEventListener('change', () => setO('ring', x.checked)); return x; })(h('input', { type: 'checkbox', checked: !!d.ring })), 'Outer ring');
+    const hide = h('label', { class: 'wkm-check', title: 'Leave it out of the pin pickers. Pins already on maps keep it.' }, ((x) => { x.addEventListener('change', () => setO('hidden', x.checked, true)); return x; })(h('input', { type: 'checkbox', checked: !!o.hidden })), 'Hide from pickers');
+    const kindNow = o.kind || (isCustom ? 'glyph' : 'base');
+    const kinds = isCustom ? [['glyph', 'Symbol'], ['emoji', 'Emoji'], ['image', 'Picture']] : [['base', 'Original'], ['glyph', 'Symbol'], ['emoji', 'Emoji'], ['image', 'Picture']];
+    const kind = h('div', { class: 'wkm-seg' }, ...kinds.map(([k, l]) => h('button', { class: kindNow === k ? 'is-on' : '', onclick: () => setO('kind', k === 'base' ? null : k, true) }, l)));
+    let pick = null;
+    if (kindNow === 'glyph') pick = h('div', { class: 'wkm-cp-glyphs' }, ...Object.keys(G).map((g) => { const b = h('button', { class: 'wkm-ib' + ((o.glyph || d.glyph) === g ? ' is-on' : ''), title: g, onclick: () => setO('glyph', g, true) }); ap(b, iconSvg('__g', 24, { color: d.color, _glyph: g })); return b; }));
+    else if (kindNow === 'emoji') { const e = h('input', { type: 'text', value: o.emoji || '', placeholder: 'e.g. 🍺', class: 'wkm-cp-emoji' }); e.addEventListener('input', () => { const v = [...e.value.trim()]; if (v.length) setO('emoji', v.slice(0, 2).join('')); }); pick = e; }
+    else if (kindNow === 'image') {
       const up = h('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
-      const setImg = async (blob) => { try { upd('img', await iconDataUrl(blob), true); } catch (e) { toast('Could not read that picture'); } };
+      const setImg = async (blob) => { try { setO('img', await iconDataUrl(blob), true); } catch (e) { toast('Could not read that picture'); } };
       up.addEventListener('change', () => up.files[0] && setImg(up.files[0]));
       pick = h('div', { class: 'wkm-row' }, h('button', { onclick: () => up.click() }, '⤒ Upload a picture'), h('button', { onclick: () => chooseMapImage(async (f) => { if (f.extension.toLowerCase() === 'pdf') { toast('Pick an image, not a PDF'); return; } setImg(new Blob([await app().vault.readBinary(f)])); }) }, 'From your vault'), up, h('span', { class: 'setting-item-description' }, 'Square pictures work best; it’s shown in a circle.'));
     }
-    paint();
-    ap(box, h('div', { class: 'wkm-cp' }, prev, h('div', { class: 'wkm-cp-main' }, h('div', { class: 'wkm-row' }, name, grp, col, ring, h('span', { class: 'wkm-sp' }),
-      h('button', { class: 'mod-warning', title: 'Delete this pin type. Pins already on maps change to Point of interest.', onclick: () => { st.customPins.splice(i, 1); save(); redraw(); } }, 'Delete')), kind, pick)));
-  });
-  ap(box, h('button', { class: 'mod-cta', onclick: () => { st.customPins.push({ id: 'c-' + uid(), label: '', group: 'Custom', kind: 'glyph', glyph: 'poi', color: '#c0392b' }); save(); redraw(); setTimeout(() => { const ins = document.querySelectorAll('.wkm-cp input[type=text]'); const last = [...ins].filter((x) => x.placeholder.startsWith('Name')).pop(); last && last.focus(); }, 30); } }, '＋ Add a custom pin'));
+    const end = isCustom ? h('button', { class: 'mod-warning', title: 'Pins already on maps change to Point of interest', onclick: () => { st.customPins = st.customPins.filter((c) => c.id !== key); CP_OPEN.delete(key); save(); redraw(); } }, 'Delete')
+      : h('button', { disabled: !changed && !o.hidden, onclick: () => { delete st.pinOverrides[key]; save(); redraw(); } }, 'Reset to original');
+    ap(row, h('div', { class: 'wkm-cp-main' }, h('div', { class: 'wkm-row' }, h('label', { class: 'wkm-f' }, h('span', {}, 'Name'), name), h('label', { class: 'wkm-f' }, h('span', {}, 'Group'), grp), h('label', { class: 'wkm-f' }, h('span', {}, 'Colour'), col)),
+      h('div', { class: 'wkm-row' }, ring, hide), h('div', { class: 'wkm-f' }, h('span', {}, 'Icon'), kind), pick, h('div', { class: 'wkm-row' }, h('span', { class: 'wkm-sp' }), end)));
+    return row;
+  };
+  for (const [g, keys] of iconGroups(true)) ap(box, h('div', { class: 'wkm-cp-group' }, h('div', { class: 'wkm-cp-gh' }, g), ...keys.map((k) => pinRow(k, !ICONS[k]))));
+  ap(box, h('button', { class: 'mod-cta wkm-cp-addbtn', onclick: () => { const id = 'c-' + uid(); st.customPins.push({ id, label: '', group: 'Custom', kind: 'glyph', glyph: 'poi', color: '#c0392b' }); CP_OPEN.add(id); save(); redraw(); setTimeout(() => { const ins = [...document.querySelectorAll('.wkm-cp.is-open input[type=text]')].filter((x) => x.placeholder.startsWith('Name')); ins.length && ins[ins.length - 1].focus(); }, 60); } }, '＋ Add a custom pin'));
   return box;
 }
 /** shrink a picture to a small square PNG kept in settings, so pins look the same everywhere, exports included */

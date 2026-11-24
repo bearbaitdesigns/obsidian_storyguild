@@ -49,13 +49,13 @@ wk = patch(wk, 'wk:ms-readers', `    if (MS_READERS.has(m.kind)) {
       readers = h('div', { class: 'ms-f' }, h('label', {}, 'Readers'), h('span', { class: 'cs-hint' }, \`Synced from Draftsmith → Readers (\${(m.readers || []).length} readers). Edit them there.\`));
     } else if (MS_READERS.has(m.kind)) {
       m.readers = m.readers || [];`);
-// Home banner: Plot Weaver and Draftsmith pills under the book info; on the right the
-// goal ring sits above the Encyclopedia and World Atlas pills (same bottom line); a
+// Home banner: Plot Weaver and Draftsmith pills under the book title; on the right the
+// goal ring beside a column of World Atlas, Encyclopedia and Wayfinder pills; a
 // Books & series button.
 wk = patch(wk, 'wk:hero-sections', `daysLeft != null ? h('span', {}, \`\${daysLeft} days left\`) : null)),`,
   `daysLeft != null ? h('span', {}, \`\${daysLeft} days left\`) : null), HOST.sectionPills()),`);
 wk = patch(wk, 'wk:hero-corner', `h('small', {}, 'of goal'))), h('div', { class: 'hd-pills' }, enc, atlas, wayfinder)));`,
-  `h('small', {}, 'of goal'))), h('div', { class: 'hd-side-pills' }, enc, atlas, wayfinder)));`);
+  `h('small', {}, 'of goal'))), HOST.sidePills(enc, atlas, wayfinder)));`);
 wk = patch(wk, 'wk:hero-books', `pencilToggle(), changeBanner, renameTab);`, `pencilToggle(), changeBanner, renameTab, HOST.booksButton());`);
 // Gods and demons (individuals) get their own sheet templates, grouped with Characters
 // under Story. Existing characters with role Deity / Demon keep working everywhere.
@@ -180,7 +180,7 @@ const header = `/*
 const HOST = {
   plugin: null, world: null, plot: null, plotVersion: '${JSON.parse(read('vendor', 'plot-weaver', 'manifest.json')).version}',
   worldVersion: '${JSON.parse(read('vendor', 'worldkeeper', 'manifest.json')).version}',
-  sharedWords: (w) => w, coverPath: () => '', sectionPills: () => null, booksButton: () => null, isPhone: () => false, phoneBoard: null, canvasFiles: () => [], encTools: () => null, encPreview: () => null, encEnhance: () => {}, draftPlot: null,
+  sharedWords: (w) => w, coverPath: () => '', sectionPills: () => null, sidePills: (...a) => { const d = document.createElement('div'); d.className = 'hd-pills'; d.append(...a.filter(Boolean)); return d; }, booksButton: () => null, isPhone: () => false, phoneBoard: null, canvasFiles: () => [], encTools: () => null, encPreview: () => null, encEnhance: () => {}, draftPlot: null,
 };
 `;
 const main = header + wrap('WorldkeeperModule', wk) + wrap('PlotWeaverModule', pw)

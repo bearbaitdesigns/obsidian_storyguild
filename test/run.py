@@ -287,16 +287,16 @@ async def main():
         _opf = epub.read('OEBPS/content.opf').decode(); assert _opf.index('idref="ch1"') < _opf.index('idref="map1"'), 'back maps follow the chapters'
         # Wayfinder is part of Storyguild: commands, views, Draftsmith header button, Home pill, Maps tab
         r = await ev("""async () => { const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view; v.setTab('compile'); await new Promise(r => setTimeout(r, 200));
-          const hb = [...document.querySelectorAll('.ds-head button')].find(b => b.textContent.startsWith('🧭 Wayfinder')); const headBtn = hb ? hb.textContent : null; hb && hb.click(); await new Promise(r => setTimeout(r, 900));
+          const hb = [...document.querySelectorAll('.ds-head button')].find(b => b.textContent.startsWith('🧭 Wayfinder')); const headBtn = hb ? hb.textContent : null; app.commands.executeCommandById('worldkeeper:open-wayfinder'); await new Promise(r => setTimeout(r, 900));
           const lib = app.workspace.getLeavesOfType('worldkeeper-maps-library').length; const cards = [...document.querySelectorAll('.wkm-mcard-name')].map(x => x.textContent);
           await HOST_WORLD().openMap(app.vault.getAbstractFileByPath('World/Maps/Brineholt.md')); await new Promise(r => setTimeout(r, 1200));
           const ed = app.workspace.getLeavesOfType('worldkeeper-map-editor').map(l => l.view.d && l.view.d.items.length);
           const cmds = Object.keys(app.commands.commands).filter(k => /map|wayfinder/i.test(k));
           app.commands.executeCommandById('worldkeeper:open-home'); await new Promise(r => setTimeout(r, 900));
-          const pill = [...document.querySelectorAll('.hd-side-pills button')].map(b => b.textContent);
-          return { headBtn, lib, cards, ed, cmds, pill }; }""".replace('HOST_WORLD()', 'SGP.sections.world'))
+          const pill = [...document.querySelectorAll('.hd-side-pills button')].map(b => b.textContent); const under = [...document.querySelectorAll('.hd-sections button')].map(b => b.textContent);
+          return { headBtn, lib, cards, ed, cmds, pill, under }; }""".replace('HOST_WORLD()', 'SGP.sections.world'))
         print('7d. wayfinder in storyguild:', json.dumps(r, ensure_ascii=False))
-        assert r['headBtn'] and r['lib'] and 'Brineholt' in r['cards'] and r['ed'] == [2] and 'worldkeeper:open-wayfinder' in r['cmds'] and any('Wayfinder' in x for x in r['pill'])
+        assert r['headBtn'] is None and r['lib'] and 'Brineholt' in r['cards'] and r['ed'] == [2] and 'worldkeeper:open-wayfinder' in r['cmds'] and all(n in x for n, x in zip(['World Atlas', 'Encyclopedia', 'Wayfinder'], r['pill'])) and len(r['pill']) == 3 and 'Plot Weaver' in r['under'][0] and 'Draftsmith' in r['under'][1]
         # Settings → Worldkeeper → Wayfinder → Pins: add a custom pin and change a built-in one
         r = await ev("""async () => { const tab = app.setting.tabs.find(t => t.constructor.name === 'WorldkeeperSettingTab'); tab.tab = 'maps'; tab.display();
           // Obsidian 1.15 can show Settings in its own window: put it in a separate document

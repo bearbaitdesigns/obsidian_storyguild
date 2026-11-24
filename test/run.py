@@ -298,14 +298,16 @@ async def main():
         print('7d. wayfinder in storyguild:', json.dumps(r, ensure_ascii=False))
         assert r['headBtn'] and r['lib'] and 'Brineholt' in r['cards'] and r['ed'] == [2] and 'worldkeeper:open-wayfinder' in r['cmds'] and any('Wayfinder' in x for x in r['pill'])
         # Settings → Worldkeeper → Wayfinder → Pins: add a custom pin and change a built-in one
-        r = await ev("""async () => { const tab = app.setting.tabs.find(t => t.constructor.name === 'WorldkeeperSettingTab'); document.body.append(tab.containerEl); tab.tab = 'maps'; tab.display(); await new Promise(r => setTimeout(r, 200));
+        r = await ev("""async () => { const tab = app.setting.tabs.find(t => t.constructor.name === 'WorldkeeperSettingTab'); tab.tab = 'maps'; tab.display();
+          // Obsidian 1.15 can show Settings in its own window: put it in a separate document
+          const fr = document.createElement('iframe'); document.body.append(fr); await new Promise(r => setTimeout(r, 100)); fr.contentDocument.body.append(tab.containerEl); window.activeDocument = fr.contentDocument; await new Promise(r => setTimeout(r, 200));
           const W = SGP.sections.world.settings.maps; const add = [...tab.containerEl.querySelectorAll('button')].find(b => b.textContent.includes('Add a custom pin')); add.click(); await new Promise(r => setTimeout(r, 300));
           const name = [...tab.containerEl.querySelectorAll('.wkm-cp.is-open input')].find(i => i.placeholder.startsWith('Name')); name.value = 'Tavern'; name.dispatchEvent(new Event('input')); name.dispatchEvent(new Event('change')); await new Promise(r => setTimeout(r, 200));
           [...tab.containerEl.querySelectorAll('.wkm-cp-row')].find(x => x.textContent.startsWith('Town')).click(); await new Promise(r => setTimeout(r, 200));
           const tn = [...tab.containerEl.querySelectorAll('.wkm-cp.is-open input')].find(i => i.placeholder === 'Town'); tn.value = 'Market town'; tn.dispatchEvent(new Event('input')); await new Promise(r => setTimeout(r, 200));
-          const saved = SGP.data.world.maps; tab.containerEl.remove();
-          return { custom: W.customPins.map(c => c.label), town: (W.pinOverrides.town || {}).label, saved: !!(saved && saved.customPins && saved.customPins.length) }; }""")
-        print('7e. pins settings:', r); assert r['custom'] == ['Tavern'] and r['town'] == 'Market town' and r['saved']
+          const saved = SGP.data.world.maps; const reopened = !!tab.containerEl.querySelector('.wkm-cp.is-open'); tab.containerEl.remove(); fr.remove(); window.activeDocument = document;
+          return { custom: W.customPins.map(c => c.label), town: (W.pinOverrides.town || {}).label, saved: !!(saved && saved.customPins && saved.customPins.length), reopened }; }""")
+        print('7e. pins settings (own window):', r); assert r['custom'] == ['Tavern'] and r['town'] == 'Market town' and r['saved'] and r['reopened']
         for name, extra in [('10-preview-book', {'format': 'pdf', 'manuscriptFormat': False, 'pageSize': '6x9'}), ('11-preview-msf', {'format': 'docx', 'manuscriptFormat': True}), ('12-preview-epub', {'format': 'epub'})]:
             await ev("""async (extra) => { const p = SGP.data.manuscript.projects[0]; Object.assign(p.compile, { includeQuestions: true, toc: true, titlePage: true, frontMatter: true, draftStamp: true }, extra);
               const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view; v.setTab('compile'); await new Promise(r => setTimeout(r, 400)); }""", extra)

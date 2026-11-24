@@ -69,12 +69,12 @@ function renderMapSettings(root, { row, head }) {
     row('Travel speeds', 'Routes show how long they take. One per line: name, miles per day', speeds));
   ap(root, renderCustomPins());
 }
-let CP_REDRAW = false; const CP_OPEN = new Set();
+let CP_REDRAW = false; const CP_OPEN = new Set(); let CP_BOX = null;
 /** Settings → Wayfinder → Pins: change any built-in pin, and make your own */
 function renderCustomPins() {
-  const st = MS(); st.customPins = arr(st.customPins); st.pinOverrides = st.pinOverrides || {}; const box = h('div', { class: 'wkm wkm-custom' });
+  const st = MS(); st.customPins = arr(st.customPins); st.pinOverrides = st.pinOverrides || {}; const box = h('div', { class: 'wkm wkm-custom' }); CP_BOX = box;
   const save = () => { P.saveSettingsQuiet(); refreshOpenMaps(); };
-  const redraw = () => { if (CP_REDRAW) return; CP_REDRAW = true; setTimeout(() => { CP_REDRAW = false; const cur = document.querySelector('.wkm-custom'); if (cur && cur.isConnected) cur.replaceWith(renderCustomPins()); }, 0); };
+  const redraw = () => { if (CP_REDRAW) return; CP_REDRAW = true; setTimeout(() => { CP_REDRAW = false; const cur = CP_BOX; if (cur && cur.isConnected) cur.replaceWith(renderCustomPins()); }, 0); };
   const groups = [...new Set(iconGroups(true).map((g) => g[0]))];
   ap(box, h('div', { class: 'wk-set-h' }, h('h3', {}, '📍 Pins'), h('p', { class: 'setting-item-description' }, 'Change any pin’s name, group, colour or icon, hide pins you never use, or make your own (Tavern, Shipwreck, Ley line node…). Icons can be a built-in symbol, an emoji or a picture. Changes show everywhere: maps, legends and the PDF key.')),
     h('datalist', { id: 'wkm-groups' }, ...groups.map((g) => h('option', { value: g }))));
@@ -116,7 +116,7 @@ function renderCustomPins() {
     return row;
   };
   for (const [g, keys] of iconGroups(true)) ap(box, h('div', { class: 'wkm-cp-group' }, h('div', { class: 'wkm-cp-gh' }, g), ...keys.map((k) => pinRow(k, !ICONS[k]))));
-  ap(box, h('button', { class: 'mod-cta wkm-cp-addbtn', onclick: () => { const id = 'c-' + uid(); st.customPins.push({ id, label: '', group: 'Custom', kind: 'glyph', glyph: 'poi', color: '#c0392b' }); CP_OPEN.add(id); save(); redraw(); setTimeout(() => { const ins = [...document.querySelectorAll('.wkm-cp.is-open input[type=text]')].filter((x) => x.placeholder.startsWith('Name')); ins.length && ins[ins.length - 1].focus(); }, 60); } }, '＋ Add a custom pin'));
+  ap(box, h('button', { class: 'mod-cta wkm-cp-addbtn', onclick: () => { const id = 'c-' + uid(); st.customPins.push({ id, label: '', group: 'Custom', kind: 'glyph', glyph: 'poi', color: '#c0392b' }); CP_OPEN.add(id); save(); redraw(); setTimeout(() => { const ins = [...(CP_BOX ? CP_BOX.querySelectorAll('.wkm-cp.is-open input[type=text]') : [])].filter((x) => x.placeholder.startsWith('Name')); ins.length && ins[ins.length - 1].focus(); }, 60); } }, '＋ Add a custom pin'));
   return box;
 }
 /** shrink a picture to a small square PNG kept in settings, so pins look the same everywhere, exports included */

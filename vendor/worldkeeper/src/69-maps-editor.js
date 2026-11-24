@@ -367,7 +367,7 @@ class MapEditorView extends ItemView {
     }
     return wrap;
   }
-  typingInPanel() { const a = document.activeElement; return !!a && a.tagName !== 'BUTTON' && ((this.panel && this.panel.contains(a)) || (this.pop && this.pop.contains(a))); }
+  typingInPanel() { const a = this.containerEl.ownerDocument.activeElement; return !!a && a.tagName !== 'BUTTON' && ((this.panel && this.panel.contains(a)) || (this.pop && this.pop.contains(a))); }
   drawPanelSoon() { clearTimeout(this._pt); this._pt = setTimeout(() => { if (!this.typingInPanel()) this.drawPanel(); }, 50); }
 }
 function nearestSeg(pts, p, closed) {
@@ -392,7 +392,7 @@ function iconPalette(current, onPick, emoji, compact = false) {
 function openPinSettings() {
   if (P.settingTab) P.settingTab.tab = 'maps';
   const st = app().setting; if (!st) return; try { st.open(); st.openTabById && st.openTabById(P.settingTab && P.settingTab.id ? P.settingTab.id : P.manifest.id); } catch (e) { console.error(e); }
-  setTimeout(() => { const el = document.querySelector('.wkm-custom'); el && el.scrollIntoView({ block: 'start' }); }, 250);
+  setTimeout(() => { const el = (CP_BOX && CP_BOX.isConnected) ? CP_BOX : P.settingTab && P.settingTab.containerEl.querySelector('.wkm-custom'); el && el.scrollIntoView({ block: 'start' }); }, 300);
 }
 /** redraw open maps after pins change in settings */
 function refreshOpenMaps() { for (const l of app().workspace.getLeavesOfType(VIEW_MAP)) { const v = l.view; if (v && v.d && v.stage) { v.drawOpts(); v.draw(); v.drawPanel(); } } }

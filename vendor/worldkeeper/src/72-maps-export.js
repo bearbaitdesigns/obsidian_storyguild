@@ -152,7 +152,7 @@ function openExport(map, d, img) {
     try {
       const { blob, ext } = await makeExport(map, d, img, o);
       MS().lastExport = { fmt: o.fmt, width: o.width, names: o.names, legend: o.legend, title: o.title, openNotes: o.openNotes, key: o.key, paper: o.paper }; P.saveSettingsQuiet();
-      if (download) { const a = h('a', { href: URL.createObjectURL(blob), download: `${map.basename}.${ext}` }); document.body.append(a); a.click(); a.remove(); toast('Download started'); close(); return; }
+      if (download) { const a = h('a', { href: URL.createObjectURL(blob), download: `${map.basename}.${ext}` }); activeDoc().body.append(a); a.click(); a.remove(); toast('Download started'); close(); return; }
       const folder = mapFolder('exportsFolder'); await mEnsureFolder(folder);
       const f = await app().vault.createBinary(await mFreePath(folder, map.basename, ext), await blob.arrayBuffer());
       toast(`Saved ${f.path}`); close(); if (ext !== 'json' && ext !== 'svg') openFile(f);

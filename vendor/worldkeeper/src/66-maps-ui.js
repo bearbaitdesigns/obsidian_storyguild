@@ -2,14 +2,16 @@
    Small UI pieces: modal, picker, prompt, confirm, file chooser
    ===================================================================== */
 let CLOSE_MODAL = null;
+/** the window you're working in: Obsidian can show Settings and notes in separate windows */
+const activeDoc = () => (typeof activeDocument !== 'undefined' && activeDocument) || document;
 function mModal(inner, { wide = false, onClose } = {}) {
   if (CLOSE_MODAL) CLOSE_MODAL();
   const bg = h('div', { class: 'wkm wkm-modal-bg' + (wide ? ' is-wide' : '') });
-  const close = () => { bg.remove(); document.removeEventListener('keydown', escK, true); if (CLOSE_MODAL === close) CLOSE_MODAL = null; onClose && onClose(); };
+  const doc = activeDoc(); const close = () => { bg.remove(); doc.removeEventListener('keydown', escK, true); if (CLOSE_MODAL === close) CLOSE_MODAL = null; onClose && onClose(); };
   const escK = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } };
   bg.addEventListener('mousedown', (e) => { if (e.target === bg) close(); });
-  document.addEventListener('keydown', escK, true);
-  ap(bg, inner); ap(document.body, bg); CLOSE_MODAL = close;
+  doc.addEventListener('keydown', escK, true);
+  ap(bg, inner); ap(doc.body, bg); CLOSE_MODAL = close;
   return close;
 }
 /** items: [{label, sub, icon, value}] */

@@ -1,15 +1,16 @@
 # Storyguild
 
-Write, plan and build your novel in one Obsidian plugin. Storyguild has three sections:
+Write, plan and build your novel in one Obsidian plugin. Storyguild has four parts:
 
 - **Draftsmith** — your manuscript: chapter notes, draft numbers, book details, alpha/beta reader rounds with questions and answers, publishing checklists, and publishing to PDF, Word, EPUB or Markdown.
 - **Worldkeeper** — worldbuilding sheets, dashboards, encyclopedia, Home, milestones and to-do list.
   - **Gods** and **Demons** have their own sheet templates, listed with Characters under **Story** on the dashboard.
   - Pantheons, magic patrons, faiths and demon species accept them.
   - The command **Give Deity and Demon characters their own God and Demon sheets** converts existing characters with role Deity or Demon. Only their `type` property changes. The Home banner has Plot Weaver and Draftsmith pills under the book's details. On the right, the goal ring sits above the Encyclopedia and World Atlas pills.
+- **Wayfinder** — your world's maps: JPEG, PNG or PDF maps with scale, pins, routes, borders, areas, labels and notes, linked to your characters, places and encyclopedia entries, exported with all their markup, and added to published books by Draftsmith. It runs with the Worldkeeper section (see [Wayfinder](#wayfinder-maps)).
 - **Plot Weaver** — plotlines × chapters board, POVs, off-screen events, cause and effect.
 
-All three sections share **books and series**. The current book is the same everywhere. You can start a new book, create a series, or add an existing book to a series from **📚 Books & series**. It's on the ribbon, in the Draftsmith header, on the Worldkeeper Home banner and in the command palette (**New book…**, **New series…**, **Add a book to a series…**, **Switch book…**). A novel created in Plot Weaver becomes a book automatically, and switching novels in Plot Weaver switches the book everywhere.
+All parts share **books and series**. The current book is the same everywhere. You can start a new book, create a series, or add an existing book to a series from **📚 Books & series**. It's on the ribbon, in the Draftsmith header, on the Worldkeeper Home banner and in the command palette (**New book…**, **New series…**, **Add a book to a series…**, **Switch book…**). A novel created in Plot Weaver becomes a book automatically, and switching novels in Plot Weaver switches the book everywhere.
 
 Worldkeeper and Plot Weaver work exactly as they did as separate plugins. Their views, code blocks (`worldkeeper`, `worldkeeper-home`, `worldkeeper-dashboard`, `worldkeeper-entry`, `plot-weaver`), commands and hotkeys keep the same names.
 

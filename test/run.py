@@ -285,6 +285,18 @@ async def main():
         print('7c. maps:', r['cardText'], r['picked'], 'preview', r['previewMap'], '| pdf /M1:', b'/M1 ' in pdfb, mres['pdf-front'][1], '| docx:', [n for n in docx.namelist() if 'map' in n], '| epub:', [n for n in epub.namelist() if 'map' in n], '| md:', '![[World/Maps/Brineholt]]' in md)
         assert r['picked'] == ['World/Maps/Brineholt.md'] and b'/M1 ' in pdfb and 'word/media/map1.jpeg' in docx.namelist() and 'OEBPS/map1.xhtml' in epub.namelist() and '![[World/Maps/Brineholt]]' in md
         _opf = epub.read('OEBPS/content.opf').decode(); assert _opf.index('idref="ch1"') < _opf.index('idref="map1"'), 'back maps follow the chapters'
+        # Wayfinder is part of Storyguild: commands, views, Draftsmith header button, Home pill, Maps tab
+        r = await ev("""async () => { const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view; v.setTab('compile'); await new Promise(r => setTimeout(r, 200));
+          const hb = [...document.querySelectorAll('.ds-head button')].find(b => b.textContent.startsWith('🧭 Wayfinder')); const headBtn = hb ? hb.textContent : null; hb && hb.click(); await new Promise(r => setTimeout(r, 900));
+          const lib = app.workspace.getLeavesOfType('worldkeeper-maps-library').length; const cards = [...document.querySelectorAll('.wkm-card-t')].map(x => x.textContent);
+          await HOST_WORLD().openMap(app.vault.getAbstractFileByPath('World/Maps/Brineholt.md')); await new Promise(r => setTimeout(r, 1200));
+          const ed = app.workspace.getLeavesOfType('worldkeeper-map-editor').map(l => l.view.d && l.view.d.items.length);
+          const cmds = Object.keys(app.commands.commands).filter(k => /map|wayfinder/i.test(k));
+          app.commands.executeCommandById('worldkeeper:open-home'); await new Promise(r => setTimeout(r, 900));
+          const pill = [...document.querySelectorAll('.hd-side-pills button')].map(b => b.textContent);
+          return { headBtn, lib, cards, ed, cmds, pill }; }""".replace('HOST_WORLD()', 'SGP.sections.world'))
+        print('7d. wayfinder in storyguild:', json.dumps(r, ensure_ascii=False))
+        assert r['headBtn'] and r['lib'] and 'Brineholt' in r['cards'] and r['ed'] == [2] and 'worldkeeper:open-wayfinder' in r['cmds'] and any('Wayfinder' in x for x in r['pill'])
         for name, extra in [('10-preview-book', {'format': 'pdf', 'manuscriptFormat': False, 'pageSize': '6x9'}), ('11-preview-msf', {'format': 'docx', 'manuscriptFormat': True}), ('12-preview-epub', {'format': 'epub'})]:
             await ev("""async (extra) => { const p = SGP.data.manuscript.projects[0]; Object.assign(p.compile, { includeQuestions: true, toc: true, titlePage: true, frontMatter: true, draftStamp: true }, extra);
               const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view; v.setTab('compile'); await new Promise(r => setTimeout(r, 400)); }""", extra)

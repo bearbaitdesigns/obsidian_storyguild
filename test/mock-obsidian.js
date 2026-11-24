@@ -146,7 +146,7 @@
   class ItemView extends View { addAction() { return document.createElement('div'); } }
   class MarkdownRenderChild extends Component { constructor(el) { super(); this.containerEl = el; } }
   class WorkspaceLeaf { constructor() { this.app = APP; this.view = null; this.tabHeaderInnerTitleEl = document.createElement('div'); }
-    async setViewState(s) { if (this.view) { await this.view.onClose(); this.view.unload(); this.view.containerEl.remove(); } const fn = APP.viewRegistry[s.type]; if (!fn) throw new Error('no view ' + s.type); this.view = fn(this); document.getElementById('workspace').append(this.view.containerEl); this.view.load(); await this.view.onOpen(); }
+    async setViewState(s) { if (this.view) { await this.view.onClose(); this.view.unload(); this.view.containerEl.remove(); } const fn = APP.viewRegistry[s.type]; if (!fn) throw new Error('no view ' + s.type); this.view = fn(this); document.getElementById('workspace').append(this.view.containerEl); this.view.load(); await this.view.onOpen(); if (s.state && this.view.setState) await this.view.setState(s.state, {}); }
     async openFile(f) { this.file = f; APP.workspace.activeFile = f; }
     getViewState() { return { type: this.view && this.view.getViewType() }; } detach() { if (this.view) { this.view.onClose(); this.view.unload(); this.view.containerEl.remove(); } APP.workspace.leaves = APP.workspace.leaves.filter((l) => l !== this); } updateHeader() {} setPinned() {} }
   class Workspace extends Events {

@@ -21,13 +21,15 @@ function smoothPath(pts, closed) {
 const straightPath = (pts, closed) => 'M' + pts.map((p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' L') + (closed ? ' Z' : '');
 
 function pinGlyph(it, size) {
-  const ic = ICONS[it.icon] || ICONS.poi; const col = it.color || ic.color; const k = size / 24;
+  const ic = it.icon === '__g' ? { color: it.color, glyph: it._glyph } : iconDef(it.icon) || ICONS.poi; const col = it.color || ic.color; const k = size / 24;
   const g = s('g', { transform: `translate(${(it.x - size / 2).toFixed(1)} ${(it.y - size / 2).toFixed(1)}) scale(${k.toFixed(3)})` });
   const r = ic.small ? 7.5 : 10;
   ap(g, s('circle', { cx: 12.6, cy: 13, r, fill: '#000', opacity: 0.25 }));
   if (ic.ring) ap(g, s('circle', { cx: 12, cy: 12, r: 11.6, fill: 'none', stroke: col, 'stroke-width': 1.4 }));
   ap(g, s('circle', { cx: 12, cy: 12, r, fill: col, stroke: '#fff', 'stroke-width': 1.6 }));
   if (it.icon === 'emoji' && it.emoji) ap(g, s('text', { x: 12, y: 12.5, 'font-size': 12, 'text-anchor': 'middle', 'dominant-baseline': 'central' }, it.emoji));
+  else if (ic.img) { const cid = 'wkm-c' + uid(); ap(g, s('clipPath', { id: cid }, s('circle', { cx: 12, cy: 12, r: r - 1.4 })), s('image', { href: ic.img, x: 12 - r, y: 12 - r, width: r * 2, height: r * 2, 'clip-path': `url(#${cid})`, preserveAspectRatio: 'xMidYMid slice' })); }
+  else if (ic.emoji) ap(g, s('text', { x: 12, y: 12.5, 'font-size': 12, 'text-anchor': 'middle', 'dominant-baseline': 'central' }, ic.emoji));
   else if (ic.small) ap(g, s('circle', { cx: 12, cy: 12, r: 2.6, fill: '#fff' }));
   else ap(g, s('path', { d: G[ic.glyph], fill: '#fff' }));
   return g;
@@ -89,7 +91,7 @@ function drawMarkup(d, opts) {
   // pins
   if (layer('pins')) for (const it of by('pin')) {
     const sz = (it.size || 1) * pinSize; const g = s('g', {}, pinGlyph(it, sz));
-    if (showNames && it.name && !it.hideName) ap(g, textEl(it.x, it.y + sz * 0.5 + sz * 0.32, it.name, { size: Math.max(8, sz * 0.46), color: '#241a12', weight: (ICONS[it.icon] || {}).ring ? 700 : 600 }));
+    if (showNames && it.name && !it.hideName) ap(g, textEl(it.x, it.y + sz * 0.5 + sz * 0.32, it.name, { size: Math.max(8, sz * 0.46), color: '#241a12', weight: (iconDef(it.icon) || {}).ring ? 700 : 600 }));
     if (it.map && opts.interactive) ap(g, s('text', { x: it.x + sz * 0.42, y: it.y - sz * 0.42, 'font-size': sz * 0.42, class: 'wkm-sub-ic' }, '⤵'));
     ap(root, tag(g, it));
   }
@@ -129,7 +131,7 @@ function drawMarkup(d, opts) {
       ap(g, s('rect', { x, y, width: w, height: 28 + used.length * rowH, rx: 5, fill: HALO, opacity: 0.92, stroke: '#2b211833' }), textEl(x + 10, y + 13, 'Legend', { size: 11, halo: false, anchor: 'start', font: 'sans', weight: 700 }));
       used.forEach((it, i) => {
         const yy = y + 30 + i * rowH; let sw; let lab;
-        if (it.k === 'pin') { sw = pinGlyph({ x: x + 18, y: yy, icon: it.icon, color: it.color, emoji: it.emoji }, 15); lab = it.icon === 'emoji' ? 'Marker' : (ICONS[it.icon] || ICONS.poi).label; }
+        if (it.k === 'pin') { sw = pinGlyph({ x: x + 18, y: yy, icon: it.icon, color: it.color, emoji: it.emoji }, 15); lab = it.icon === 'emoji' ? 'Marker' : (iconDef(it.icon) || ICONS.poi).label; }
         else if (it.k === 'line') { const pre = LINES[it.style] || LINES.custom; sw = s('path', { d: `M${x + 9} ${yy}h18`, stroke: it.color || pre.color, 'stroke-width': 2.5, 'stroke-dasharray': (it.dash ?? pre.dash) || null }); lab = pre.label; }
         else { const pre = AREAS[it.style] || AREAS.custom; const c = it.color || pre.color; sw = s('rect', { x: x + 10, y: yy - 6, width: 16, height: 12, fill: c, 'fill-opacity': 0.25, stroke: c, 'stroke-width': 1.5 }); lab = pre.label; }
         ap(g, sw, textEl(x + 34, yy, lab, { size: 10.5, halo: false, anchor: 'start', font: 'sans', weight: 500 }));
@@ -144,7 +146,7 @@ function drawMarkup(d, opts) {
 function noteNumbers(d) { const m = new Map(); let i = 1; for (const it of d.items) if (it.k === 'note' && !it.hide) m.set(it.id, i++); return m; }
 function itemCenter(it) { if (it.pts && it.pts.length) { const xs = it.pts.map((p) => p[0]), ys = it.pts.map((p) => p[1]); return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]; } return [it.x || 0, it.y || 0]; }
 function itemTitle(it) {
-  if (it.k === 'pin') return it.name || (ICONS[it.icon] || {}).label || 'Pin';
+  if (it.k === 'pin') return it.name || (iconDef(it.icon) || {}).label || 'Pin';
   if (it.k === 'line') return it.name || (LINES[it.style] || LINES.custom).label;
   if (it.k === 'area') return it.name || (AREAS[it.style] || AREAS.custom).label;
   if (it.k === 'label') return (it.text || 'Label').replace(/\n/g, ' ');

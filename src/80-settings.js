@@ -10,7 +10,7 @@ class StoryguildSettingTab extends PluginSettingTab {
     c.createEl('p', { cls: 'setting-item-description', text: 'Draftsmith, Worldkeeper and Plot Weaver in one plugin. Worldkeeper and Plot Weaver have their own settings tabs in the list on the left.' });
 
     c.createEl('h3', { text: 'Sections' });
-    for (const [key, name, desc] of [['world', 'Worldkeeper', 'Worldbuilding sheets, dashboards, encyclopedia, Home, milestones and to-do list.'], ['plot', 'Plot Weaver', 'Plotlines × chapters board, POVs, off-screen events, cause and effect.']]) {
+    for (const [key, name, desc] of [['world', 'Worldkeeper', 'Worldbuilding sheets, dashboards, encyclopedia, Home, milestones, to-do list, and Wayfinder maps (settings and custom pins: Worldkeeper → 🧭 Wayfinder).'], ['plot', 'Plot Weaver', 'Plotlines × chapters board, POVs, off-screen events, cause and effect.']]) {
       const old = this.plugin.oldEnabled(key);
       const status = old ? `Paused: the separate ${name} plugin is still turned on.` : HOST[key] ? 'Running.' : 'Off.';
       new Setting(c).setName(name).setDesc(`${desc} ${status}`).addToggle((t) => t.setValue(!!d.modules[key]).setDisabled(old).onChange(async (v) => { d.modules[key] = v; await SG.saveNow(); if (v) await SG.loadSections(); else SG.unloadSection(key); this.display(); }));

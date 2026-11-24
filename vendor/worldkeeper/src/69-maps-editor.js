@@ -17,7 +17,7 @@ class MapEditorView extends ItemView {
   async onOpen() {
     this.root = this.contentEl.appendChild(h('div', { class: 'wkm wkm-editor' }));
     this.registerEvent(app().vault.on('modify', (f) => { if (this.file && f.path === this.file.path) this.externalChange(); }));
-    this.registerEvent(app().metadataCache.on('changed', (f) => { if (this.file && f.path === this.file.path && !this.saving) { if (!this.panel || !this.panel.contains(document.activeElement) || document.activeElement.tagName === 'BUTTON') this.drawPanel(); this.drawCrumbs(); } }));
+    this.registerEvent(app().metadataCache.on('changed', (f) => { if (this.file && f.path === this.file.path && !this.saving) { if (!this.typingInPanel()) this.drawPanel(); this.drawCrumbs(); } }));
     this.registerEvent(app().vault.on('rename', (f, old) => { if (this.file && f === this.file) { this.leaf.updateHeader && this.leaf.updateHeader(); this.drawCrumbs(); } }));
     this.saveSoon = debounce(() => this.doSave(), 500);
     if (!this.file) this.root.replaceChildren(h('div', { class: 'wkm-empty' }, 'Open a map from the Maps library.'));
@@ -60,11 +60,14 @@ class MapEditorView extends ItemView {
     this.crumbs = h('div', { class: 'wkm-crumbs' });
     this.bar = h('div', { class: 'wkm-bar' }); this.optBar = h('div', { class: 'wkm-optbar' });
     this.stageWrap = h('div', { class: 'wkm-stage-wrap' }); this.panel = h('div', { class: 'wkm-panel' });
+    this.pop = h('div', { class: 'wkm-popover', style: { display: 'none' } });
+    this.pop.addEventListener('pointerdown', (e) => e.stopPropagation()); this.pop.addEventListener('wheel', (e) => e.stopPropagation());
     this.readout = h('div', { class: 'wkm-readout', style: { display: 'none' } });
     this.zoomEl = h('span', { class: 'wkm-zoom' });
-    ap(this.root, this.crumbs, this.bar, this.optBar, h('div', { class: 'wkm-body' }, this.stageWrap, this.panel));
-    this.stage = new Stage(this.stageWrap, { interactive: true }); ap(this.stageWrap, this.readout);
-    this.stage.onZoom = (z) => { this.zoomEl.textContent = Math.round(z * 100) + '%'; };
+    this.body = h('div', { class: 'wkm-body' + (this.panelOpen() ? '' : ' is-closed') }, this.stageWrap, this.panel);
+    ap(this.root, this.crumbs, this.bar, this.optBar, this.body);
+    this.stage = new Stage(this.stageWrap, { interactive: true }); ap(this.stageWrap, this.readout, this.pop);
+    this.stage.onZoom = (z) => { this.zoomEl.textContent = Math.round(z * 100) + '%'; this.placePop(); };
     this.bindStage(); this.bindKeys();
     this.drawCrumbs(); this.drawBar(); this.drawOpts(); this.drawPanel();
   }
@@ -82,15 +85,15 @@ class MapEditorView extends ItemView {
       h('div', { class: 'wkm-tools' }, h('button', { class: 'wkm-tool', title: 'Pin a note: pick a character, place or entry, then click the map', onclick: () => this.pinANote() }, '＋📄'), h('button', { class: 'wkm-tool', title: 'Undo (Ctrl+Z)', onclick: () => this.doUndo() }, '↶'), h('button', { class: 'wkm-tool', title: 'Redo (Ctrl+Shift+Z)', onclick: () => this.doRedo() }, '↷')),
       h('span', { class: 'wkm-sp' }),
       h('div', { class: 'wkm-tools' }, h('button', { class: 'wkm-tool', title: 'Zoom out', onclick: () => this.stage.zoomBy(1 / 1.3) }, '−'), this.zoomEl, h('button', { class: 'wkm-tool', title: 'Zoom in', onclick: () => this.stage.zoomBy(1.3) }, '+'), h('button', { class: 'wkm-tool', title: 'Fit the whole map', onclick: () => this.stage.fit() }, '⤢')),
-      h('button', { class: 'mod-cta wkm-export', onclick: () => openExport(this.file, this.d, this.img) }, '⤓ Export'));
+      h('button', { class: 'mod-cta wkm-export', onclick: () => openExport(this.file, this.d, this.img) }, '⤓ Export'),
+      h('button', { class: 'wkm-tool wkm-gear' + (this.panelOpen() ? ' is-on' : ''), title: this.panelOpen() ? 'Hide map settings' : 'Map settings: image, scale, layers, linked notes, everything on the map', onclick: () => this.togglePanel() }, '⚙'));
   }
   drawOpts() {
     const o = this.optBar; o.replaceChildren(); const t = this.tool;
     const tip = (x) => h('span', { class: 'wkm-hint' }, x);
     if (t === 'select') ap(o, tip('Click to select · Shift-click to add · drag to move · drag a line’s dots to reshape, double-click a line to add a dot · Delete removes · drag the background to pan, scroll to zoom'));
     if (t === 'pin') {
-      ap(o, h('div', { class: 'wkm-iconrow' }, ...Object.entries(ICONS).map(([k, ic]) => { const b = h('button', { class: 'wkm-ib' + (this.opt.icon === k ? ' is-on' : ''), title: ic.label, onclick: () => { this.opt.icon = k; this.drawOpts(); } }); ap(b, iconSvg(k, 22)); return b; }),
-        h('button', { class: 'wkm-ib' + (this.opt.icon === 'emoji' ? ' is-on' : ''), title: 'Your own symbol (emoji)', onclick: () => mPrompt('Symbol for these pins', 'An emoji, e.g. 🐉', (v) => { this.opt.icon = 'emoji'; this.opt.emoji = [...v][0]; this.drawOpts(); }, this.opt.emoji || '') }, this.opt.emoji || '✱')), tip('Click the map to place a ' + (this.opt.icon === 'emoji' ? 'marker' : (ICONS[this.opt.icon] || {}).label.toLowerCase())));
+      ap(o, iconPalette(this.opt.icon, (k) => { if (k === 'emoji') mPrompt('Symbol for these pins', 'An emoji, e.g. 🐉', (v) => { this.opt.icon = 'emoji'; this.opt.emoji = [...v][0]; this.drawOpts(); }, this.opt.emoji || ''); else { this.opt.icon = k; this.drawOpts(); } }, this.opt.emoji), tip('Click the map to place a ' + (this.opt.icon === 'emoji' ? 'marker' : ((iconDef(this.opt.icon) || ICONS.poi).label).toLowerCase())));
     }
     if (t === 'line' || t === 'area') {
       const set = t === 'line' ? LINES : AREAS; const key = t === 'line' ? 'line' : 'area';
@@ -154,12 +157,13 @@ class MapEditorView extends ItemView {
       },
       move: (e) => {
         const p = this.stage.toMap(e.clientX, e.clientY);
+        if (drag) this.pop.classList.add('is-dragging');
         if (drag && drag.kind === 'vertex') { drag.it.pts[drag.vi] = [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]; drag.moved = true; this.draw(); return; }
         if (drag && drag.kind === 'move') { const dx = p[0] - drag.start[0], dy = p[1] - drag.start[1]; for (const o of drag.orig) { if (o.pts) o.it.pts = o.pts.map((q) => [Math.round((q[0] + dx) * 10) / 10, Math.round((q[1] + dy) * 10) / 10]); else { o.it.x = Math.round((o.x + dx) * 10) / 10; o.it.y = Math.round((o.y + dy) * 10) / 10; } } drag.moved = true; this.draw(); return; }
         if (this.draft && !this.draft.done) { this.draft.hover = p; this.drawDraft(); }
       },
       up: (e, moved, wasPan) => {
-        if (drag) { if (drag.moved) { this.undo.push(drag.snap); this.redo = []; this.saveSoon(); this.drawPanel(); } drag = null; return; }
+        if (drag) { this.pop.classList.remove('is-dragging'); if (drag.moved) { this.undo.push(drag.snap); this.redo = []; this.saveSoon(); this.drawPanel(); } drag = null; return; }
         if (wasPan) { if (!moved && this.tool === 'select' && this.sel.size) { this.sel = new Set(); this.draw(); this.drawPanel(); } return; }
         if (moved || e.button !== 0) return;
         // our own double-click: the dot drawn under the pointer after the first click stops the browser's from firing
@@ -209,7 +213,7 @@ class MapEditorView extends ItemView {
     const [x, y] = [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10];
     if (x < -50 || y < -50 || x > MAP_W + 50 || y > this.stage.H + 50) return;
     const t = this.tool;
-    if (t === 'pin') { const it = { id: uid(), k: 'pin', x, y, icon: this.opt.icon, name: '' }; if (this.opt.icon === 'emoji') it.emoji = this.opt.emoji || '★'; if (this.pending) { Object.assign(it, this.pending); this.pending = null; } this.change((d) => d.items.push(it)); this.sel = new Set([it.id]); this.draw(); this.drawPanel(); if (!it.name) setTimeout(() => this.panel.querySelector('.wkm-name')?.focus(), 30); if (it.link) this.setTool('select'); return; }
+    if (t === 'pin') { const it = { id: uid(), k: 'pin', x, y, icon: this.opt.icon, name: '' }; if (this.opt.icon === 'emoji') it.emoji = this.opt.emoji || '★'; if (this.pending) { Object.assign(it, this.pending); this.pending = null; } this.change((d) => d.items.push(it)); this.sel = new Set([it.id]); this.draw(); this.drawPanel(); if (!it.name) setTimeout(() => this.pop.querySelector('.wkm-name')?.focus(), 30); if (it.link) this.setTool('select'); return; }
     if (t === 'label') { mPrompt('Label text', 'e.g. The Northmarch', (v) => { const it = { id: uid(), k: 'label', x, y, text: v, style: this.opt.label }; this.change((d) => d.items.push(it)); this.sel = new Set([it.id]); this.draw(); this.drawPanel(); }, '', { multiline: false }); return; }
     if (t === 'note') { mPrompt('Note', 'What should this note say?', (v) => { const it = { id: uid(), k: 'note', x, y, text: v, color: this.opt.note, open: false }; this.change((d) => d.items.push(it)); this.sel = new Set([it.id]); this.draw(); this.drawPanel(); }, '', { multiline: true, ok: 'Add note' }); return; }
     if (t === 'line' || t === 'area' || t === 'measure' || t === 'scale') {
@@ -257,9 +261,26 @@ class MapEditorView extends ItemView {
   }
 
   /* ---------- side panel ---------- */
+  /** the ⚙ map settings side bar (closed unless you open it) and the pop-up for the selected item */
+  panelOpen() { return !!(MS().view && MS().view.panel); }
+  togglePanel() { MS().view = Object.assign({}, MS().view, { panel: !this.panelOpen() }); P.saveSettingsQuiet(); this.body.classList.toggle('is-closed', !this.panelOpen()); this.drawBar(); this.drawPanel(); requestAnimationFrame(() => this.placePop()); }
   drawPanel() {
     if (!this.panel || !this.d) return; const items = this.selItems();
-    this.panel.replaceChildren(items.length === 1 ? this.inspector(items[0]) : items.length > 1 ? this.multiPanel(items) : this.mapPanel());
+    if (this.panelOpen()) this.panel.replaceChildren(this.mapPanel()); else this.panel.replaceChildren();
+    if (!items.length) { this.pop.style.display = 'none'; this.pop.replaceChildren(); return; }
+    this.pop.replaceChildren(items.length === 1 ? this.inspector(items[0]) : this.multiPanel(items));
+    this.pop.style.display = ''; this.placePop();
+  }
+  /** keep the pop-up beside the selected item, inside the map area */
+  placePop() {
+    if (!this.pop || this.pop.style.display === 'none') return; const items = this.selItems(); if (!items.length) return;
+    const pts = items.flatMap((x) => x.pts || [[x.x, x.y]]); const st = this.stage;
+    const xs = pts.map((p) => p[0] * st.z + st.tx), ys = pts.map((p) => p[1] * st.z + st.ty);
+    const W = this.stageWrap.clientWidth, Hh = this.stageWrap.clientHeight; const pw = this.pop.offsetWidth || 300, ph = this.pop.offsetHeight || 300;
+    if (W < 560) { this.pop.style.left = ''; this.pop.style.top = ''; this.pop.classList.add('is-sheet'); return; } this.pop.classList.remove('is-sheet');
+    let x = Math.max(...xs) + 24; if (x + pw > W - 8) x = Math.min(...xs) - pw - 24; x = clamp(x, 8, Math.max(8, W - pw - 8));
+    const y = clamp((Math.min(...ys) + Math.max(...ys)) / 2 - ph / 2, 8, Math.max(8, Hh - ph - 8));
+    this.pop.style.left = x + 'px'; this.pop.style.top = y + 'px';
   }
   section(title, ...kids) { return h('div', { class: 'wkm-sec' }, title ? h('div', { class: 'wkm-sec-h' }, title) : null, ...kids); }
   field(label, ...kids) { return h('label', { class: 'wkm-f' }, h('span', {}, label), ...kids); }
@@ -311,10 +332,9 @@ class MapEditorView extends ItemView {
       h('button', { class: 'wkm-sm', title: 'Duplicate (Ctrl+D)', onclick: () => this.duplicate() }, '⧉'), h('button', { class: 'wkm-sm mod-warning', title: 'Delete', onclick: () => this.deleteSel() }, '🗑'), h('button', { class: 'wkm-sm', title: 'Done', onclick: () => { this.sel = new Set(); this.draw(); this.drawPanel(); } }, '✓'));
     ap(wrap, head);
     if (it.k === 'pin') {
-      const grid = h('div', { class: 'wkm-iconrow is-grid' }, ...Object.entries(ICONS).map(([k, ic]) => { const b = h('button', { class: 'wkm-ib' + (it.icon === k ? ' is-on' : ''), title: ic.label, onclick: () => this.change(() => { it.icon = k; it._iconSet = true; delete it.emoji; }) }); ap(b, iconSvg(k, 20)); return b; }),
-        h('button', { class: 'wkm-ib' + (it.icon === 'emoji' ? ' is-on' : ''), title: 'Your own symbol', onclick: () => mPrompt('Symbol', 'An emoji, e.g. 🐉', (v) => this.change(() => { it.icon = 'emoji'; it.emoji = [...v][0]; })) }, it.emoji || '✱'));
+      const grid = iconPalette(it.icon, (k) => { if (k === 'emoji') mPrompt('Symbol', 'An emoji, e.g. 🐉', (v) => this.change(() => { it.icon = 'emoji'; it.emoji = [...v][0]; })); else this.change(() => { it.icon = k; it._iconSet = true; delete it.emoji; }); }, it.emoji, true);
       const sub = it.map ? M.resolve(it.map, src) : null;
-      ap(wrap, this.field('Name', txt('name', 'e.g. Saltgate', { cls: 'wkm-name' })), linkRow(), this.field('Icon', grid), this.field('Colour', color((ICONS[it.icon] || ICONS.poi).color)), this.field('Size', num('size', 0.5, 2.5, 0.1, 1)), toggle('hideName', 'Hide the name on the map', false),
+      ap(wrap, this.field('Name', txt('name', 'e.g. Saltgate', { cls: 'wkm-name' })), linkRow(), this.field('Icon', grid), this.field('Colour', color((iconDef(it.icon) || ICONS.poi).color)), this.field('Size', num('size', 0.5, 2.5, 0.1, 1)), toggle('hideName', 'Hide the name on the map', false),
         this.field('Description', txt('desc', 'Shown when someone clicks the pin', { multi: true })),
         this.field('Opens a map', h('div', { class: 'wkm-chips' }, it.map ? this.noteChip(it.map, () => this.change(() => { delete it.map; })) : null,
           h('button', { class: 'wkm-add', title: 'A more detailed map of this spot', onclick: () => pickNote('Open which map from this pin?', (f) => this.change(() => { it.map = M.link(f, src); }), { onlyMaps: true, exclude: [this.file] }) }, it.map ? '⇄' : '+'),
@@ -347,7 +367,8 @@ class MapEditorView extends ItemView {
     }
     return wrap;
   }
-  drawPanelSoon() { clearTimeout(this._pt); this._pt = setTimeout(() => { if (!this.panel.contains(document.activeElement) || document.activeElement.tagName === 'BUTTON') this.drawPanel(); }, 50); }
+  typingInPanel() { const a = document.activeElement; return !!a && a.tagName !== 'BUTTON' && ((this.panel && this.panel.contains(a)) || (this.pop && this.pop.contains(a))); }
+  drawPanelSoon() { clearTimeout(this._pt); this._pt = setTimeout(() => { if (!this.typingInPanel()) this.drawPanel(); }, 50); }
 }
 function nearestSeg(pts, p, closed) {
   let best = 0, bd = Infinity; const n = closed ? pts.length : pts.length - 1;
@@ -355,7 +376,19 @@ function nearestSeg(pts, p, closed) {
   return best;
 }
 /** a pin icon as a small standalone SVG (toolbar, lists) */
+/** every pin icon, grouped (built-in and custom), plus "your own emoji" */
+function iconPalette(current, onPick, emoji, compact = false) {
+  const wrap = h('div', { class: 'wkm-palette' + (compact ? ' is-compact' : '') });
+  for (const [g, keys] of iconGroups()) {
+    const row = h('div', { class: 'wkm-pal-g', title: g }, compact ? null : h('span', { class: 'wkm-pal-l' }, g));
+    for (const k of keys) { const ic = iconDef(k); if (!ic) continue; const b = h('button', { class: 'wkm-ib' + (current === k ? ' is-on' : ''), title: ic.label, onclick: () => onPick(k) }); ap(b, iconSvg(k, 22)); ap(row, b); }
+    ap(wrap, row);
+  }
+  ap(wrap, h('div', { class: 'wkm-pal-g' }, compact ? null : h('span', { class: 'wkm-pal-l' }, 'Other'), h('button', { class: 'wkm-ib' + (current === 'emoji' ? ' is-on' : ''), title: 'Any emoji as a symbol', onclick: () => onPick('emoji') }, emoji || '✱'),
+    h('button', { class: 'wkm-ib wkm-pal-add', title: 'Make your own pins in Settings → Wayfinder', onclick: () => { app().setting.open(); app().setting.openTabById && app().setting.openTabById(P.manifest.id); } }, '＋')));
+  return wrap;
+}
 function iconSvg(key, size, it = {}) {
   const sv = s('svg', { width: size, height: size, viewBox: `0 0 ${size} ${size}`, class: 'wkm-icsvg' });
-  ap(sv, pinGlyph({ x: size / 2, y: size / 2, icon: key, color: it.color, emoji: it.emoji }, size)); return sv;
+  ap(sv, pinGlyph({ x: size / 2, y: size / 2, icon: key, color: it.color, emoji: it.emoji, _glyph: it._glyph }, size)); return sv;
 }

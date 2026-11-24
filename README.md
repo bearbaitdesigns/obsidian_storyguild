@@ -116,7 +116,10 @@ Edit a shared field anywhere and it changes everywhere.
 
 ## Wayfinder (maps)
 
-Worldkeeper includes **Wayfinder**, a map room for your world: JPEG, PNG or PDF maps with a scale, pins (23 icons or any emoji), routes, borders, roads, rivers, areas, labels and sticky notes. Maps link to characters, places and encyclopedia entries, which show them in a 🧭 Maps tab, and export as PNG, JPEG, SVG, PDF (with a key page) or markup. Open it from the 🧭 ribbon icon, the World Atlas or the Wayfinder pill on Home. Draftsmith can add maps to a published book (see Publish above).
+Worldkeeper includes **Wayfinder**, a map room for your world: JPEG, PNG or PDF maps with a scale, pins (23 icons or any emoji), routes, borders, roads, rivers, areas, labels and sticky notes. Maps link to characters, places and encyclopedia entries, which show them in a 🧭 Maps tab, and export as PNG, JPEG, SVG, PDF (with a key page) or markup. Open it from the 🧭 ribbon icon, the World Atlas or the Wayfinder pill on Home.
+
+- **Editing:** when you add or select a pin, line, area, label or note, its settings open in a pop-up beside it (a sheet at the bottom on a phone). The map's own settings (image, what it shows, scale, layers, linked notes and a list of everything on it) are behind the **⚙** button.
+- **Custom pins:** in **Settings → Worldkeeper → 🧭 Wayfinder → Custom pins**, make your own pin types: a name (such as Tavern), the group it's listed under, a colour, and a built-in symbol, an emoji or a picture. They appear with the built-in pins, in legends and in the PDF key. Deleting one turns its pins into Point of interest. Draftsmith can add maps to a published book (see Publish above).
 
 ## Encyclopedia: diagrams and canvases
 

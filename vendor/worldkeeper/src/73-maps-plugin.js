@@ -67,4 +67,41 @@ function renderMapSettings(root, { row, head }) {
     row('Show pin names', 'Default for maps that haven’t chosen', tog('showNames')),
     row('PDF detail', 'Width in pixels that PDF maps are drawn at. Higher is sharper but slower.', num('pdfWidth', 1000, 8000)),
     row('Travel speeds', 'Routes show how long they take. One per line: name, miles per day', speeds));
+  ap(root, renderCustomPins());
+}
+let CP_REDRAW = false;
+/** Settings → Wayfinder → Custom pins: your own pin types with a symbol, emoji or picture */
+function renderCustomPins() {
+  const st = MS(); st.customPins = arr(st.customPins); const box = h('div', { class: 'wkm wkm-custom' });
+  const save = () => P.saveSettingsQuiet(); const redraw = () => { if (CP_REDRAW) return; CP_REDRAW = true; setTimeout(() => { CP_REDRAW = false; const cur = document.querySelector('.wkm-custom'); if (cur && cur.isConnected) cur.replaceWith(renderCustomPins()); }, 0); };
+  const groups = [...new Set([...ICON_GROUPS.map((g) => g[0]), ...st.customPins.map((c) => (c.group || '').trim()).filter(Boolean)])];
+  const dl = h('datalist', { id: 'wkm-groups' }, ...groups.map((g) => h('option', { value: g })));
+  ap(box, h('div', { class: 'wk-set-h' }, h('h3', {}, '📍 Custom pins'), h('p', { class: 'setting-item-description' }, 'Make your own pin types, such as Tavern, Shipwreck or Ley line node. Give each a name, a group it’s listed under, and a symbol, emoji or picture. They appear with the built-in pins in Wayfinder, in legends and in the PDF key.')), dl);
+  st.customPins.forEach((c, i) => {
+    const prev = h('div', { class: 'wkm-cp-prev' }); const paint = () => prev.replaceChildren(iconSvg(c.id, 40));
+    const upd = (k, v, re = false) => { c[k] = v; save(); paint(); if (re) redraw(); };
+    const name = h('input', { type: 'text', value: c.label || '', placeholder: 'Name, e.g. Tavern' }); name.addEventListener('input', () => upd('label', name.value)); name.addEventListener('change', () => redraw());
+    const grp = h('input', { type: 'text', value: c.group || '', placeholder: 'Group, e.g. Places', list: 'wkm-groups' }); grp.addEventListener('change', () => upd('group', grp.value.trim(), true));
+    const col = h('input', { type: 'color', value: c.color || '#5a6b7b' }); col.addEventListener('input', () => upd('color', col.value));
+    const ring = h('label', { class: 'wkm-check' }, ((x) => { x.addEventListener('change', () => upd('ring', x.checked)); return x; })(h('input', { type: 'checkbox', checked: !!c.ring })), 'Outer ring');
+    const kind = h('div', { class: 'wkm-seg' }, ...[['glyph', 'Symbol'], ['emoji', 'Emoji'], ['image', 'Picture']].map(([k, l]) => h('button', { class: (c.kind || 'glyph') === k ? 'is-on' : '', onclick: () => upd('kind', k, true) }, l)));
+    let pick;
+    if ((c.kind || 'glyph') === 'glyph') pick = h('div', { class: 'wkm-cp-glyphs' }, ...Object.keys(G).map((g) => { const b = h('button', { class: 'wkm-ib' + ((c.glyph || 'poi') === g ? ' is-on' : ''), title: g, onclick: () => upd('glyph', g, true) }); ap(b, iconSvg('__g', 22, { color: c.color || '#5a6b7b', _glyph: g })); return b; }));
+    else if (c.kind === 'emoji') { const e = h('input', { type: 'text', value: c.emoji || '', placeholder: 'e.g. 🍺', class: 'wkm-cp-emoji' }); e.addEventListener('input', () => { const v = [...e.value.trim()]; if (v.length) upd('emoji', v.slice(0, 2).join('')); }); pick = e; }
+    else {
+      const up = h('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
+      const setImg = async (blob) => { try { upd('img', await iconDataUrl(blob), true); } catch (e) { toast('Could not read that picture'); } };
+      up.addEventListener('change', () => up.files[0] && setImg(up.files[0]));
+      pick = h('div', { class: 'wkm-row' }, h('button', { onclick: () => up.click() }, '⤒ Upload a picture'), h('button', { onclick: () => chooseMapImage(async (f) => { if (f.extension.toLowerCase() === 'pdf') { toast('Pick an image, not a PDF'); return; } setImg(new Blob([await app().vault.readBinary(f)])); }) }, 'From your vault'), up, h('span', { class: 'setting-item-description' }, 'Square pictures work best; it’s shown in a circle.'));
+    }
+    paint();
+    ap(box, h('div', { class: 'wkm-cp' }, prev, h('div', { class: 'wkm-cp-main' }, h('div', { class: 'wkm-row' }, name, grp, col, ring, h('span', { class: 'wkm-sp' }),
+      h('button', { class: 'mod-warning', title: 'Delete this pin type. Pins already on maps change to Point of interest.', onclick: () => { st.customPins.splice(i, 1); save(); redraw(); } }, 'Delete')), kind, pick)));
+  });
+  ap(box, h('button', { class: 'mod-cta', onclick: () => { st.customPins.push({ id: 'c-' + uid(), label: '', group: 'Custom', kind: 'glyph', glyph: 'poi', color: '#c0392b' }); save(); redraw(); setTimeout(() => { const ins = document.querySelectorAll('.wkm-cp input[type=text]'); const last = [...ins].filter((x) => x.placeholder.startsWith('Name')).pop(); last && last.focus(); }, 30); } }, '＋ Add a custom pin'));
+  return box;
+}
+/** shrink a picture to a small square PNG kept in settings, so pins look the same everywhere, exports included */
+async function iconDataUrl(blob) {
+  const url = URL.createObjectURL(blob); try { const im = await loadImg(url); const n = 96; const c = document.createElement('canvas'); c.width = c.height = n; const ctx = c.getContext('2d'); const k = Math.max(n / im.naturalWidth, n / im.naturalHeight); const w = im.naturalWidth * k, hh = im.naturalHeight * k; ctx.drawImage(im, (n - w) / 2, (n - hh) / 2, w, hh); return c.toDataURL('image/png'); } finally { URL.revokeObjectURL(url); }
 }

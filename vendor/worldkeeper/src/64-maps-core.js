@@ -36,6 +36,7 @@ const MAP_DEFAULTS = {
   showNames: true,
   pdfWidth: 3000,
   exportScale: 2,
+  customPins: [],
   view: { lib: 'grid' },
 };
 function mergeMapSettings(saved) { const s = Object.assign(clone(MAP_DEFAULTS), saved || {}); s.view = Object.assign(clone(MAP_DEFAULTS.view), (saved || {}).view || {}); return s; }
@@ -94,6 +95,21 @@ const ICONS = {
   poi: { label: 'Point of interest', glyph: 'poi', color: '#d08a1e' },
 };
 const ICON_GROUPS = [['Settlements', ['capital', 'city', 'town', 'village', 'port']], ['Strongholds', ['castle', 'fort', 'tower']], ['Places', ['temple', 'ruin', 'cave', 'mine', 'bridge', 'camp']], ['Land & sea', ['mountain', 'forest', 'ship']], ['Story', ['person', 'battle', 'flag', 'danger', 'lair', 'poi']]];
+/* ---------- custom pins (Settings → Wayfinder → Custom pins) ----------
+   { id, label, group, kind: 'glyph' | 'emoji' | 'image', glyph, emoji, img (small PNG as a data URL), color, ring } */
+const customPins = () => arr(MS().customPins);
+/** a pin icon: built-in or custom; null if it no longer exists */
+function iconDef(key) {
+  if (ICONS[key]) return ICONS[key];
+  const c = customPins().find((x) => x.id === key); if (!c) return null;
+  return { label: c.label || 'Custom pin', color: c.color || '#5a6b7b', glyph: c.kind === 'glyph' ? c.glyph || 'poi' : null, emoji: c.kind === 'emoji' ? c.emoji || '★' : null, img: c.kind === 'image' ? c.img || null : null, ring: !!c.ring, custom: true, group: (c.group || '').trim() || 'Custom' };
+}
+/** groups of pin icons for palettes, legends and the PDF key: built-in groups with custom pins added to theirs */
+function iconGroups() {
+  const out = ICON_GROUPS.map(([g, keys]) => [g, keys.slice()]);
+  for (const c of customPins()) { const g = (c.group || '').trim() || 'Custom'; const row = out.find((x) => x[0].toLowerCase() === g.toLowerCase()); if (row) row[1].push(c.id); else out.push([g, [c.id]]); }
+  return out;
+}
 /** a Worldkeeper note type suggests a pin icon */
 const ICON_FOR_TYPE = { kingdom: 'capital', place: 'town', hub: 'poi', character: 'person', organization: 'flag', item: 'poi', magic: 'poi', culture: 'flag', species: 'flag', demon: 'lair', pantheon: 'temple', continent: 'flag', planet: 'flag' };
 

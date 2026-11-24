@@ -61,14 +61,14 @@ async function buildPdf(map, d, img, o) {
     const pins = dd.items.filter((it) => it.k === 'pin' && vis(it));
     if (pins.length) {
       heading(`Places · ${pins.length}`);
-      for (const [g, keys] of ICON_GROUPS.concat([['Other', ['emoji']]])) {
-        const ps = pins.filter((p) => keys.includes(p.icon) || (g === 'Other' && !ICONS[p.icon])); if (!ps.length) continue;
+      for (const [g, keys] of iconGroups().concat([['Other', ['emoji']]])) {
+        const ps = pins.filter((p) => keys.includes(p.icon) || (g === 'Other' && !iconDef(p.icon))); if (!ps.length) continue;
         need(18); text(L, y, g.toUpperCase(), 8, true, '0.45 0.4 0.35'); y -= 13;
         for (const p of ps.sort((a, b) => (a.name || '').localeCompare(b.name || ''))) {
-          need(14); dot(L + 5, y + 3, hexRgb(p.color || (ICONS[p.icon] || ICONS.poi).color), 4.2);
+          need(14); dot(L + 5, y + 3, hexRgb(p.color || (iconDef(p.icon) || ICONS.poi).color), 4.2);
           const ln = p.link ? M.resolve(p.link, map.path) : null;
-          text(L + 16, y, p.name || (ICONS[p.icon] || { label: 'Marker' }).label, 10, true);
-          const extra = [(ICONS[p.icon] || { label: 'Marker' }).label, ln && ln.basename !== p.name ? '→ ' + ln.basename : null].filter(Boolean).join('  ·  ');
+          text(L + 16, y, p.name || (iconDef(p.icon) || { label: 'Marker' }).label, 10, true);
+          const extra = [(iconDef(p.icon) || { label: 'Marker' }).label, ln && ln.basename !== p.name ? '→ ' + ln.basename : null].filter(Boolean).join('  ·  ');
           text(L + 22 + textW(p.name || '', 10, true), y, extra, 8.5, false, '0.45 0.4 0.35'); y -= 13;
           if (p.desc) { y += 2; para(L + 16, p.desc, 8.5); y -= 2; }
         }

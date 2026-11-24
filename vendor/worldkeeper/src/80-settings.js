@@ -15,9 +15,10 @@ class WorldkeeperSettingTab extends PluginSettingTab {
     const btn = (label, fn, cta) => h('button', { class: cta ? 'mod-cta' : '', onclick: fn }, label);
 
     ap(root, h('div', { class: 'st-title' }, '🌍 Worldkeeper'), h('div', { class: 'cs-hint' }, 'by bearbaitdesigns · Changes apply to sheets and dashboards straight away.'));
-    const tabs = [['folders', '📁 Folders'], ['types', '🧩 Templates & fields'], ['novel', '🧵 Novel & Plot Weaver'], ['general', '⚙ General']];
+    const tabs = [['folders', '📁 Folders'], ['types', '🧩 Templates & fields'], ['novel', '🧵 Novel & Plot Weaver'], ['maps', '🧭 Wayfinder'], ['general', '⚙ General']];
     ap(root, h('div', { class: 'st-nav' }, ...tabs.map(([k, l]) => h('button', { class: this.tab === k ? 'is-on' : '', onclick: () => { this.tab = k; this.display(); } }, l))));
 
+    if (this.tab === 'maps') renderMapSettings(root, { row, head });
     if (this.tab === 'folders') {
       const tree = h('div', { class: 'ftree' });
       const refresh = () => {
@@ -57,7 +58,7 @@ class WorldkeeperSettingTab extends PluginSettingTab {
         const other = h('input', { type: 'text', placeholder: 'other type values, comma-separated', value: lf.targets.filter((x) => !T()[x]).join(', ') });
         other.addEventListener('change', () => { lf.targets = [...lf.targets.filter((x) => T()[x]), ...other.value.split(',').map((x) => x.trim()).filter(Boolean)]; save(); });
         ap(root, h('div', { class: 'st-card' }, row(lf.label, t.parentKey === lf.key ? 'Hierarchy parent' : '', txt(lf, 'label', 'Label'), txt(lf, 'key', 'property'), pl, h('button', { class: 'st-ico', title: 'Remove', onclick: () => { t.links.splice(i, 1); redraw(); } }, '🗑')),
-          row('Links to', 'Templates the picker offers', targets), row('Other note types', 'e.g. occupation', other), lf.where ? row('Only notes where', Object.entries(lf.where).map(([k, v]) => `${k} = ${v}`).join(', ')) : null));
+          row('Links to', 'Templates the picker offers', targets), row('Other note types', 'Type values without a template of their own, e.g. event', other), lf.where ? row('Only notes where', Object.entries(lf.where).map(([k, v]) => `${k} = ${v}`).join(', ')) : null));
       });
       ap(root, btn('+ Add link field', () => { t.links.push(L('newLink', 'New link', 'tile', ['character'])); redraw(); }));
       ap(root, head('Layout'),

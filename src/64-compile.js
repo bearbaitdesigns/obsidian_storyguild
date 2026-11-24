@@ -31,6 +31,7 @@ async function gatherBook(p) {
     const f = app().vault.getAbstractFileByPath(normalizePath(p.cover));
     if (f instanceof TFile) { const ext = f.extension.toLowerCase() === 'jpeg' ? 'jpg' : f.extension.toLowerCase(); const mime = { jpg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' }[ext]; if (mime) cover = { ext, mime, bytes: new Uint8Array(await app().vault.readBinary(f)) }; }
   }
+  p._mapWarnings = []; const maps = await renderBookMaps(p);
   const back = [];
   if (o.frontMatter && !o.manuscriptFormat) {
     if (String(p.acknowledgments || '').trim()) back.push({ title: 'Acknowledgments', blocks: plainBlocks(p.acknowledgments) });
@@ -54,7 +55,7 @@ async function gatherBook(p) {
   // Printed at the foot of every page (PDF, Word) or the end of every section (EPUB).
   const footer = [o.footerCopyright !== false ? fill(p.shortCopyright || DEFAULT_LEGAL.shortCopyright) : '', o.footerAi !== false ? fill(p.aiNotice || DEFAULT_LEGAL.aiNotice) : ''].map((x) => x.trim()).filter(Boolean);
   return {
-    opts: o, words, cover, chapters, back, questions, dedication: o.frontMatter && !o.manuscriptFormat ? String(p.dedication || '').trim() : '',
+    opts: o, words, cover, chapters, back, questions, maps, mapsPlace: o.mapsPlace === 'back' ? 'back' : 'front', warnings: p._mapWarnings.length ? p._mapWarnings.slice() : undefined, dedication: o.frontMatter && !o.manuscriptFormat ? String(p.dedication || '').trim() : '',
     meta: {
       title: p.title, subtitle: p.subtitle, author, legalName: p.author || author, contact: o.contact || '', shortTitle: o.shortTitle || '',
       seriesLine: p.series ? `${p.series}${p.seriesNo ? `, Book ${p.seriesNo}` : ''}` : '', language: p.language || 'en', publisher: p.publisher, isbn: o.format === 'epub' ? p.isbnEbook : p.isbnPrint || p.isbnEbook,
@@ -69,7 +70,10 @@ function bookMarkdown(book) {
   const md = (bl) => bl.map((b) => b.t === 'break' ? `\n${book.opts.sceneBreak}\n` : b.t === 'h' ? `\n### ${b.text}\n` : b.runs.map((r) => (r.b && r.i ? `***${r.text}***` : r.b ? `**${r.text}**` : r.i ? `*${r.text}*` : r.text)).join('') + '\n').join('\n');
   if (book.dedication) L.push(`*${book.dedication}*`, '');
   if (book.questions) { L.push(`## ${book.questions.title}`, '', book.questions.intro, ''); book.questions.items.forEach((q, i) => L.push(`${i + 1}. ${q.text}`)); L.push(''); }
+  const mapsMd = () => { for (const mp of book.maps || []) L.push(`## ${mp.title}`, '', `![[${mp.path.replace(/\.md$/, '')}]]`, ''); };
+  if (book.mapsPlace === 'front') mapsMd();
   for (const c of book.chapters) L.push(`## ${c.heading}`, '', md(c.blocks), '');
+  if (book.mapsPlace === 'back') mapsMd();
   for (const s of book.back) L.push(`## ${s.title}`, '', md(s.blocks), '');
   return L.join('\n');
 }

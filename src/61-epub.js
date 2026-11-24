@@ -30,6 +30,7 @@ p.brk{text-indent:0;text-align:center;margin:1em 0;letter-spacing:.3em}
 .ded{margin-top:30%;font-style:italic}
 .cover{margin:0;padding:0;text-align:center}
 .cover img{max-width:100%;max-height:100%}
+.map{text-align:center;margin:1em 0}.map img{max-width:100%;height:auto}
 nav ol{list-style:none;padding:0}
 nav li{margin:.4em 0}
 .q li{margin:0 0 1.2em}
@@ -61,7 +62,13 @@ function buildEpub(book) {
   }
   const tocPos = spine.length; // nav goes here when shown
   const firstChapter = book.chapters.length ? 'ch001.xhtml' : null;
+  const mapPages = () => (book.maps || []).forEach((mp, i) => {
+    add(`map${i + 1}-img`, `images/map${i + 1}.jpg`, 'image/jpeg', mp.bytes, null, false);
+    add(`map${i + 1}`, `map${i + 1}.xhtml`, 'application/xhtml+xml', xhtml(mp.title, lang, `<h2>${xe(mp.title)}</h2><div class="map"><img src="images/map${i + 1}.jpg" alt="${xe(mp.title)}"/></div>${legal}`), null, true, mp.title);
+  });
+  if (book.mapsPlace === 'front') mapPages();
   book.chapters.forEach((c, i) => { const href = `ch${String(i + 1).padStart(3, '0')}.xhtml`; add('ch' + (i + 1), href, 'application/xhtml+xml', xhtml(c.heading, lang, `<h2 class="ch">${xe(c.heading)}</h2>\n${blocksHtml(c.blocks, book.opts.sceneBreak)}${legal}`), null, true, c.heading); });
+  if (book.mapsPlace === 'back') mapPages();
   book.back.forEach((s, i) => add('back' + (i + 1), `back${i + 1}.xhtml`, 'application/xhtml+xml', xhtml(s.title, lang, `<h2>${xe(s.title)}</h2>\n${blocksHtml(s.blocks, book.opts.sceneBreak)}${legal}`), null, true, s.title));
   const navBody = `<nav epub:type="toc" id="toc"><h1>Contents</h1><ol>${toc.map((t) => `<li><a href="${t.href}">${xe(t.title)}</a></li>`).join('')}</ol></nav>
 <nav epub:type="landmarks" hidden=""><ol>${book.cover ? '<li><a epub:type="cover" href="cover.xhtml">Cover</a></li>' : ''}${firstChapter ? `<li><a epub:type="bodymatter" href="${firstChapter}">Start</a></li>` : ''}</ol></nav>`;

@@ -49,8 +49,12 @@ function renderEntryFoot(f, open) {
       suggest({ items: S.entries().filter((o) => o.path !== f.path).map((o) => ({ label: o.basename, sub: S.fm(o).category || '', value: o.path })), selected: sel, toggle: true, placeholder: 'Pick entries… (esc when done)', onPick: (v) => { next = v; } });
       const obs = new MutationObserver(() => { if (!document.querySelector('.wk-modal-bg')) { obs.disconnect(); if (next.join('|') !== sel.join('|')) W((x) => { x.seeAlso = next.map((p) => S.link(app().vault.getAbstractFileByPath(p), f.path)); }); } });
       obs.observe(document.body, { childList: true }); } }, '+'));
+  const maps = M.mapsFor(f);
+  const mapRow = h('div', { class: 'cs-tile-body' }, ...maps.map(({ map }) => h('span', { class: 'cs-chip', title: 'Open the map at this entry', onclick: (e) => P.openMap(map, f, e) }, '🧭 ' + map.basename)),
+    h('button', { class: 'cs-add', title: 'Put this entry on a map', onclick: () => mSuggest({ title: 'Put this entry on which map?', items: [...M.all().map((m) => ({ label: m.basename, icon: '🧭', value: m })), { label: 'New map…', icon: '＋', value: null }], onPick: (m) => (m ? P.openMap(m).then((leaf) => { setTimeout(() => { const v = leaf.view; if (!v || !v.d) return; v.pending = { name: f.basename, link: M.link(f, m.path), icon: 'poi' }; v.opt.icon = 'poi'; v.setTool('pin'); toast(`Click the map to place ${f.basename}`); }, 500); }) : P.newMap({ of: M.link(f) })) }) }, '+'));
   return foot = h('div', { class: 'enc-foot' },
     h('div', {}, groupTitle('See also'), see),
+    h('div', {}, h('div', { class: 'cs-group-title' }, 'Maps', h('span', { class: 'enc-note' }, maps.length ? 'click to open it here' : 'none yet')), mapRow),
     h('div', {}, h('div', { class: 'cs-group-title' }, 'Related entries', h('span', { class: 'enc-note' }, 'share a linked element')),
       rel.length ? h('div', { class: 'wk-bars' }, ...rel.map(([o, sh]) => { const a = h('a', { class: 'wk-link' }, o.basename); a.addEventListener('click', (e) => open(o, e)); return h('div', { class: 'enc-rel' }, a, h('span', { class: 'cs-hint' }, sh.map((x) => x.basename).join(', '))); })) : h('div', { class: 'cs-hint' }, 'None yet.')));
 }

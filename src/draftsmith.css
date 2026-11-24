@@ -575,3 +575,9 @@
 .sg-diagram-editor .modal-content { display: flex; flex-direction: column; gap: 8px; height: calc(100% - 40px); }
 .sg-dp.is-single { height: auto; flex: 1; min-height: 300px; }
 .sg-phone .sg-diagram-editor { width: 100vw; height: 100vh; }
+/* maps in Publish */
+.ds-pp-map { display: block; max-width: 100%; max-height: 82%; margin: 6% auto 0; object-fit: contain; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+.ds-maps-pick { display: flex; flex-direction: column; gap: 4px; }
+.ds-map-opt { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 3px 0; }
+.ds-map-thumb { width: 56px; height: 38px; border-radius: 4px; background: var(--background-secondary) center / cover no-repeat; flex: none; box-shadow: inset 0 0 0 1px var(--background-modifier-border); }
+.ds-maps-order { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }

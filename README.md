@@ -95,6 +95,7 @@ Edit a shared field anywhere and it changes everywhere.
 - **Publishing checklist** — three tabs: **Drafting & Revision**, **Traditional** and **Self-publishing**. Steps marked ⚡ tick themselves from your data. You can add, remove or date any step. 🎯 turns a dated step into a milestone on the Worldkeeper Home Milestones & deadlines card. The to-do list keeps only to-dos from your notes and the to-do file.
 - **Publish** — PDF (book layout or standard manuscript format), Word (.docx), EPUB 3 or one Markdown note.
   - Options: title page, contents, front and back matter, chapter heading template (`{n}`, `{N}`, `{title}`), scene-break mark, page size and curly quotes.
+  - **Maps** from Worldkeeper's Wayfinder: tick the maps to include and choose *before chapter one* or *after the story*. Each map gets its own page (listed in the contents) drawn with its pins, routes, borders, labels and notes, with optional place names, legend and scale bar. In PDF and Word, wide maps can be turned sideways to fill the page. Markdown embeds the map note instead. Standard manuscript format leaves maps out.
   - A round's questions can be added to a reader (alpha, beta or ARC) copy as a plain list, **before the table of contents**, with no space for answers.
   - **Cover page** (optional): the cover image from Book details.
     - In PDF and Word it's fitted inside a 1-inch margin, centred, and never stretched or cropped. EPUB uses it as the e-book cover.
@@ -111,6 +112,10 @@ Edit a shared field anywhere and it changes everywhere.
 - **PDF text:** uses the built-in PDF fonts (Times and Courier), so it supports Western European characters only. Anything else prints as `?`. For other scripts, publish to Word or EPUB.
 - **PDF cover:** JPEG, or PNG without transparency. EPUB takes JPEG, PNG, GIF or WebP.
 - **Word contents page:** Word fills in the page numbers when the file is opened.
+
+## Wayfinder (maps)
+
+Worldkeeper includes **Wayfinder**, a map room for your world: JPEG, PNG or PDF maps with a scale, pins (23 icons or any emoji), routes, borders, roads, rivers, areas, labels and sticky notes. Maps link to characters, places and encyclopedia entries, which show them in a 🧭 Maps tab, and export as PNG, JPEG, SVG, PDF (with a key page) or markup. Open it from the 🧭 ribbon icon, the World Atlas or the Wayfinder pill on Home. Draftsmith can add maps to a published book (see Publish above).
 
 ## Encyclopedia: diagrams and canvases
 

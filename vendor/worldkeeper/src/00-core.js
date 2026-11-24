@@ -160,6 +160,7 @@ function mergeSettings(saved) {
   const s = Object.assign(clone(DEFAULT_SETTINGS), saved || {});
   s.novel = Object.assign(clone(DEFAULT_SETTINGS.novel), (saved && saved.novel) || {});
   s.plotweaver = Object.assign(clone(DEFAULT_SETTINGS.plotweaver), (saved && saved.plotweaver) || {});
+  s.maps = mergeMapSettings(saved && saved.maps);
   const types = clone(DEFAULT_TYPES);
   for (const [id, t] of Object.entries((saved && saved.types) || {})) types[id] = Object.assign(types[id] || {}, t);
   // occupation is plain text on the character sheet (not a link): move it out of saved link fields

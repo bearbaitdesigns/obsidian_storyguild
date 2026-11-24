@@ -43,6 +43,7 @@ function renderCompile(view, p, body) {
     qRounds.length ? [toggle('includeQuestions', 'Add reader questions', 'For alpha, beta and ARC reader copies. They’re printed before the table of contents.'),
       o.includeQuestions ? select('questionsRound', 'Questions from', qRounds.map((r) => [r.id, `${r.name} (${r.questions.length})`]).reverse()) : null]
       : hint(p.rounds.some((r) => r.questions.length) ? 'Your rounds have questions, but none are set to “Include in Publish”. Turn that on in Readers.' : 'Add questions to a reader round (Readers tab) to offer them here.')));
+  put(left, renderMapsCard(p, set));
   put(left, el('div', { class: 'ds-row ds-pubbar' }, btn(`Publish ${({ pdf: 'PDF', docx: 'Word', epub: 'EPUB', md: 'Markdown' })[o.format]}`, async (e) => { e.target.disabled = true; try { await compileProject(p); } catch (err) { console.error(err); notice('Publishing failed: ' + err.message); } view.render(); }, 'mod-cta ds-big')));
 
   // right: preview + recent
@@ -105,6 +106,9 @@ function previewPage(p, sel) {
   back.forEach(() => { starts.push(pageNo + 1); pageNo += 1; });
   const entries = [...headings, ...back];
   if (showToc) add('toc', (b) => { put(b, el('div', { class: 'ds-pp-h', style: { 'margin-top': '8%' } }, 'Contents'), ...entries.slice(0, 16).map((h, i) => el('div', { class: 'ds-pp-toc' }, el('span', {}, h), epub ? null : el('i'), epub ? null : el('span', {}, String(starts[i])))), ...(entries.length > 16 ? [el('div', { class: 'ds-pp-center' }, '…')] : [])); });
+  const pmaps = mapsAllowed(o) ? pickedMaps(p) : [];
+  const addMaps = () => pmaps.slice(0, 2).forEach((m) => add('map', (b) => { put(b, el('div', { class: 'ds-pp-h', style: { 'margin-top': '0', 'font-size': px(fs * 1.3) } }, m.basename)); const im = el('img', { class: 'ds-pp-map' }); put(b, im); const w = WF(); if (w) w.loadMapImage(m).then((x) => { if (x) im.src = x.url; }); }));
+  if ((o.mapsPlace || 'front') === 'front') addMaps();
   const first = sel[0];
   add('chapter', (b) => {
     put(b, el('div', { class: 'ds-pp-h', style: { 'margin-top': msf ? '28%' : '16%' } }, headings[0]));
@@ -114,6 +118,7 @@ function previewPage(p, sel) {
       if (epub) put(holder, ...footer.map((l) => el('p', { class: 'ds-pp-legal-in' }, l)));
     });
   });
+  if (o.mapsPlace === 'back') addMaps();
   // draw
   const strip = el('div', { class: 'ds-pp-strip' });
   pages.forEach((pg, i) => {
@@ -125,7 +130,7 @@ function previewPage(p, sel) {
       put(box, el('div', { class: 'ds-pp-foot', style: { 'font-size': px(msf ? 8 : Math.max(6, fs * 0.62)) } },
         !msf && pg.kind !== 'title' ? el('div', { class: 'ds-pp-num', style: { 'font-size': px(fs * 0.85) } }, String(num)) : null, footer.map((l) => el('div', {}, l))));
     }
-    put(strip, el('div', { class: 'ds-pp-wrap' }, box, el('small', { class: 'ds-hint' }, { cover: 'Cover', title: 'Title page', front: 'Front matter', questions: 'Reader questions', toc: 'Contents', chapter: 'First chapter' }[pg.kind])));
+    put(strip, el('div', { class: 'ds-pp-wrap' }, box, el('small', { class: 'ds-hint' }, { cover: 'Cover', title: 'Title page', front: 'Front matter', questions: 'Reader questions', toc: 'Contents', chapter: 'First chapter', map: o.mapsPlace === 'back' ? 'Map (after the story)' : 'Map' }[pg.kind])));
   });
   put(wrap, strip); return wrap;
 }

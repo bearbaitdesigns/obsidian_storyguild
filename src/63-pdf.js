@@ -164,14 +164,25 @@ function buildPdf(book) {
   }
   // contents (page numbers filled in once the body is laid out)
   const tocStart = pages.length; const perToc = Math.floor((top - bottom - fs * 6) / (fs * 1.7));
-  const tocEntries = [...book.chapters.map((c) => c.heading), ...book.back.map((s) => s.title)];
+  const mapTitles = (book.maps || []).map((mp) => mp.title);
+  const tocEntries = [...(book.mapsPlace === 'front' ? mapTitles : []), ...book.chapters.map((c) => c.heading), ...(book.mapsPlace === 'back' ? mapTitles : []), ...book.back.map((s) => s.title)];
   const tocPages = o.toc && !msf ? Math.max(1, Math.ceil(tocEntries.length / perToc)) : 0;
   for (let i = 0; i < tocPages; i++) newPage('toc');
 
   /* ---- body ---- */
   const firstBody = pages.length;
+  // Maps from Wayfinder: one page each, the name at the top and the map fitted below it
+  const mapImgs = (book.maps || []).map((mp) => ({ mp, img: pdfImage(mp) })).filter((x) => x.img);
+  const mapPages = () => mapImgs.forEach(({ mp }, i) => {
+    newPage('map'); outline.push({ title: mp.title, page: pages.length - 1 });
+    y = top; centerWrap(mp.title, 'F1', fs * 1.3, fs * 1.8); y -= fs * 0.6;
+    const box = fitInside(mp.w, mp.h, W, y - bottom); const x0 = left + (W - box.w) / 2, y0 = bottom + (y - bottom - box.h) / 2;
+    cur.ops.push(`q ${box.w.toFixed(2)} 0 0 ${box.h.toFixed(2)} ${x0.toFixed(2)} ${y0.toFixed(2)} cm /M${i + 1} Do Q`);
+  });
+  if (book.mapsPlace === 'front') mapPages();
   for (const c of book.chapters) { chapterStart(c.heading); blocks(c.blocks); }
   if (msf && book.chapters.length) { ensure(lead * 3); y -= lead; center('THE END', 'F5', 12, y - fs); }
+  if (book.mapsPlace === 'back') mapPages();
   for (const s of book.back) { chapterStart(s.title, 'back'); blocks(s.blocks); }
 
   /* ---- page numbers, footers, headers, contents ----
@@ -207,7 +218,9 @@ function buildPdf(book) {
   const fontIds = {}; const FONTS = { F1: 'Times-Roman', F2: 'Times-Italic', F3: 'Times-Bold', F4: 'Times-BoldItalic', F5: 'Courier', F6: 'Courier-Oblique', F7: 'Courier-Bold', F8: 'Courier-BoldOblique' };
   for (const [k, n] of Object.entries(FONTS)) fontIds[k] = add(`<< /Type /Font /Subtype /Type1 /BaseFont /${n} /Encoding /WinAnsiEncoding >>`);
   const imgId = coverImg ? add({ dict: `<< /Type /XObject /Subtype /Image ${coverImg.dict} /Length ${coverImg.bytes.length} >>`, bytes: coverImg.bytes }) : null;
-  const res = `<< /Font << ${Object.entries(fontIds).map(([k, id]) => `/${k} ${id} 0 R`).join(' ')} >>${imgId ? ` /XObject << /Im1 ${imgId} 0 R >>` : ''} >>`;
+  const mapIds = mapImgs.map(({ img }) => add({ dict: `<< /Type /XObject /Subtype /Image ${img.dict} /Length ${img.bytes.length} >>`, bytes: img.bytes }));
+  const xo = [imgId ? `/Im1 ${imgId} 0 R` : '', ...mapIds.map((id, i) => `/M${i + 1} ${id} 0 R`)].filter(Boolean).join(' ');
+  const res = `<< /Font << ${Object.entries(fontIds).map(([k, id]) => `/${k} ${id} 0 R`).join(' ')} >>${xo ? ` /XObject << ${xo} >>` : ''} >>`;
   const resId = add(res);
   const pageIds = [];
   for (const pg of pages) { const s = pg.ops.join('\n'); const cId = add({ dict: `<< /Length ${s.length} >>`, bin: s }); pageIds.push(add(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources ${resId} 0 R /Contents ${cId} 0 R >>`)); }

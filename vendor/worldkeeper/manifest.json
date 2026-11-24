@@ -1,9 +1,9 @@
 {
   "id": "worldkeeper",
   "name": "Worldkeeper",
-  "version": "1.0.6",
+  "version": "1.1.0",
   "minAppVersion": "1.4.0",
-  "description": "Worldbuilding sheets, dashboards, an encyclopedia and novel progress tracking: characters, places, cultures, conlangs, magic systems, pantheons and more.",
+  "description": "Worldbuilding sheets, dashboards, an encyclopedia and novel progress tracking: characters, places, cultures, conlangs, magic systems, pantheons and more. Includes Wayfinder: maps with scale, pins, routes, borders, labels, notes and export.",
   "author": "bearbaitdesigns",
   "authorUrl": "https://github.com/bearbaitdesigns",
   "isDesktopOnly": false

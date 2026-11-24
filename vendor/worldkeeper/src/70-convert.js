@@ -27,7 +27,7 @@ function convertCandidates(all) {
   const tf = normalizePath(ST().todoFile); const tpl = normalizePath(ST().templatesFolder || 'Templates') + '/';
   const pwInst = app().plugins?.plugins?.[PW_ID]; const sceneNotes = new Set(); for (const n of (pwInst && pwInst.data && pwInst.data.novels) || []) for (const b of n.beats || []) if (b.notePath) sceneNotes.add(b.notePath);
   return S.files().filter((f) => {
-    if (S.managed(f) || S.isEntry(f) || f.path === tf || f.path.startsWith(tpl) || f.path.startsWith(app().vault.configDir)) return false;
+    if (S.managed(f) || S.isEntry(f) || M.isMap(f) || f.path === tf || f.path.startsWith(tpl) || f.path.startsWith(app().vault.configDir)) return false;
     if (all) return true;
     const fm = S.fm(f); if (fm.type != null && fm.type !== '') return false;
     if (sceneNotes.has(f.path) || fm['plot-weaver-id'] != null) return false;

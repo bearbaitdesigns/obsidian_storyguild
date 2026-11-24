@@ -262,6 +262,29 @@ async def main():
         print('7b. covers:', r['withCover'], '|', r['noCover'])
         assert '13 pages' in r['withCover'][-1] and '12 pages' in r['noCover'] and not any('left out' in n for n in r['withCover'])
         print('7. published:', outs)
+        # Maps from Wayfinder (Worldkeeper) in every format
+        _m = io.BytesIO(); _im = _I.new('RGB', (900, 560), (182, 200, 204)); from PIL import ImageDraw as _D; _D.Draw(_im).ellipse([200, 120, 700, 460], fill=(233, 220, 190)); _im.save(_m, 'JPEG')
+        r = await ev("""async (jpg) => { const bin = Uint8Array.from(atob(jpg), (c) => c.charCodeAt(0)); await app.vault.createBinary('World/Maps/Images/brineholt.jpg', bin.buffer);
+          const data = '{"v":1,"scale":{"per":5,"unit":"mi"},"items":[\\n{"id":"p1","k":"pin","icon":"capital","name":"Brineholt","x":500,"y":300},\\n{"id":"l1","k":"line","style":"route","name":"Mara\u2019s walk","pts":[[300,250],[450,320],[600,280]]}\\n]}';
+          await app.vault.create('World/Maps/Brineholt.md', '---\\ntype: map\\nmap-image: "[[brineholt.jpg]]"\\n---\\n```worldkeeper-map\\n' + data + '\\n```\\n'); await new Promise(r => setTimeout(r, 300));
+          const p = SGP.data.manuscript.projects[0]; const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view;
+          Object.assign(p.compile, { format: 'pdf', manuscriptFormat: false, includeQuestions: false, maps: [], mapsPlace: 'front' }); v.setTab('compile'); await new Promise(r => setTimeout(r, 300));
+          const card = [...document.querySelectorAll('.ds-card')].find(c => c.textContent.startsWith('Maps')); const cardText = card ? card.textContent.slice(0, 60) : null;
+          card.querySelector('.ds-map-opt input').click(); await new Promise(r => setTimeout(r, 300));
+          const picked = p.compile.maps.slice(); const previewMap = !!document.querySelector('.ds-pp-map');
+          const out = {}; const pub = async (fmt, place) => { Object.assign(p.compile, { format: fmt, mapsPlace: place }); v.render(); await new Promise(r => setTimeout(r, 200));
+            [...document.querySelectorAll('.ds-root button')].find(b => b.textContent.startsWith('Publish ')).click(); await new Promise(r => setTimeout(r, 1500));
+            const path = p.lastCompiled[0].path; const bytes = app.vault.bin.get(path) || new TextEncoder().encode(app.vault.text.get(path)); let s = ''; for (const x of bytes) s += String.fromCharCode(x); out[fmt + '-' + place] = { path, b64: btoa(s), notice: __notices[__notices.length - 1] }; };
+          await pub('pdf', 'front'); await pub('docx', 'front'); await pub('epub', 'back'); await pub('md', 'back');
+          p.compile.maps = []; return { cardText, picked, previewMap, out, views: !!app.workspace.getLeavesOfType }; }""", base64.b64encode(_m.getvalue()).decode())
+        import zipfile
+        mres = {}
+        for k, x in r['out'].items():
+            fn = os.path.join(OUT, 'maps-' + os.path.basename(x['path']).replace(' ', '_')); open(fn, 'wb').write(base64.b64decode(x['b64'])); mres[k] = (fn, x['notice'])
+        pdfb = open(mres['pdf-front'][0], 'rb').read(); docx = zipfile.ZipFile(mres['docx-front'][0]); epub = zipfile.ZipFile(mres['epub-back'][0]); md = open(mres['md-back'][0]).read()
+        print('7c. maps:', r['cardText'], r['picked'], 'preview', r['previewMap'], '| pdf /M1:', b'/M1 ' in pdfb, mres['pdf-front'][1], '| docx:', [n for n in docx.namelist() if 'map' in n], '| epub:', [n for n in epub.namelist() if 'map' in n], '| md:', '![[World/Maps/Brineholt]]' in md)
+        assert r['picked'] == ['World/Maps/Brineholt.md'] and b'/M1 ' in pdfb and 'word/media/map1.jpeg' in docx.namelist() and 'OEBPS/map1.xhtml' in epub.namelist() and '![[World/Maps/Brineholt]]' in md
+        _opf = epub.read('OEBPS/content.opf').decode(); assert _opf.index('idref="ch1"') < _opf.index('idref="map1"'), 'back maps follow the chapters'
         for name, extra in [('10-preview-book', {'format': 'pdf', 'manuscriptFormat': False, 'pageSize': '6x9'}), ('11-preview-msf', {'format': 'docx', 'manuscriptFormat': True}), ('12-preview-epub', {'format': 'epub'})]:
             await ev("""async (extra) => { const p = SGP.data.manuscript.projects[0]; Object.assign(p.compile, { includeQuestions: true, toc: true, titlePage: true, frontMatter: true, draftStamp: true }, extra);
               const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view; v.setTab('compile'); await new Promise(r => setTimeout(r, 400)); }""", extra)

@@ -64,11 +64,12 @@ class WorldkeeperPlugin extends Plugin {
     this.registerEvent(app().vault.on('rename', dirty));
     this.registerEvent(app().vault.on('create', dirty));
 
+    Object.assign(this, WAYFINDER_METHODS); installWayfinder(this);
     this.addSettingTab(new WorldkeeperSettingTab(this));
   }
   updateHomeTitle() { for (const l of app().workspace.getLeavesOfType(VIEW_HOME)) { if (typeof l.updateHeader === 'function') l.updateHeader(); else if (l.tabHeaderInnerTitleEl) l.tabHeaderInnerTitleEl.setText(l.view.getDisplayText()); } }
   applyLinkStyle() { document.body.classList.toggle('wk-white-links', !!(this.settings && this.settings.whiteLinks)); }
-  onunload() { document.body.classList.remove('wk-white-links'); clearTimeout(this._t); closeModal(); document.getElementById('wk-file')?.remove(); }
+  onunload() { document.body.classList.remove('wk-white-links'); clearTimeout(this._t); closeModal(); if (CLOSE_MODAL) CLOSE_MODAL(); document.getElementById('wk-file')?.remove(); }
 
   mem(path, key, init) { const k = path + '::' + key; if (!this._mem.has(k)) this._mem.set(k, init); return this._mem.get(k); }
   refreshSoon(ms = 250) { clearTimeout(this._t); this._t = setTimeout(() => { if (P === this) app().workspace.trigger(REFRESH); }, ms); }

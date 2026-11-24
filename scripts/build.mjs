@@ -54,8 +54,8 @@ wk = patch(wk, 'wk:ms-readers', `    if (MS_READERS.has(m.kind)) {
 // Books & series button.
 wk = patch(wk, 'wk:hero-sections', `daysLeft != null ? h('span', {}, \`\${daysLeft} days left\`) : null)),`,
   `daysLeft != null ? h('span', {}, \`\${daysLeft} days left\`) : null), HOST.sectionPills()),`);
-wk = patch(wk, 'wk:hero-corner', `h('small', {}, 'of goal'))), h('div', { class: 'hd-pills' }, enc, atlas)));`,
-  `h('small', {}, 'of goal'))), h('div', { class: 'hd-side-pills' }, enc, atlas)));`);
+wk = patch(wk, 'wk:hero-corner', `h('small', {}, 'of goal'))), h('div', { class: 'hd-pills' }, enc, atlas, wayfinder)));`,
+  `h('small', {}, 'of goal'))), h('div', { class: 'hd-side-pills' }, enc, atlas, wayfinder)));`);
 wk = patch(wk, 'wk:hero-books', `pencilToggle(), changeBanner, renameTab);`, `pencilToggle(), changeBanner, renameTab, HOST.booksButton());`);
 // Gods and demons (individuals) get their own sheet templates, grouped with Characters
 // under Story. Existing characters with role Deity / Demon keep working everywhere.
@@ -117,7 +117,7 @@ wk = patch(wk, 'wk:enc-toc-fold', `h('div', { class: 'enc-toc-title' }, 'Content
 
 // Expose a few helpers to the host.
 wk += `
-WorldkeeperPlugin.storyguild = { readTodos, writeTodos, pwLoad, mergeSettings, DEFAULT_SETTINGS, MS_STANDARD, S };
+WorldkeeperPlugin.storyguild = { readTodos, writeTodos, pwLoad, mergeSettings, DEFAULT_SETTINGS, MS_STANDARD, S, wayfinder: { M, loadMapImage, exportCanvas, mapFolder } };
 `;
 
 /* ------------------------------ Plot Weaver ------------------------------ */

@@ -95,10 +95,13 @@ async function renderSheet(f, id, comp) {
   /* ---------- tabs ---------- */
   const pwx = ST().plotweaver.enabled ? await pwLoad() : { data: null }; const pwCards = pwx.data ? pwCardsFor(pwx, f) : [];
   const TB = tabsOf(id, f); if (pwCards.length) { const li = TB.findIndex((x) => x.mod === 'linked'); TB.splice(li < 0 ? TB.length : li, 0, { id: 'mod:Scenes', label: 'Scenes', icon: '🧵', mod: 'scenes' }); }
+  // Wayfinder: places always get a Maps tab; anything else once a map shows or mentions it
+  const mapsHere = M.mapsFor(f);
+  if (mapsHere.length || GEO.includes(id)) { const li = TB.findIndex((x) => x.mod === 'linked'); TB.splice(li < 0 ? TB.length : li, 0, { id: 'mod:Maps', label: 'Maps', icon: '🧭', mod: 'maps' }); }
   let act = P.tabState.get(f.path); if (!TB.find((x) => x.id === act)) act = TB[0].id;
   const count = (x) => x.lf ? names(fm[x.lf.key]).length : x.id === 'details' ? Object.keys(fm[s.detailsKey] || {}).length : x.mod === 'relationships' ? arr(fm[s.relationshipKey]).length
     : x.mod === 'linked' ? S.backlinks(f).length : x.mod === 'contains' ? S.descendants(f).length : x.mod === 'rules' ? arr(fm.rules).length : x.mod === 'spellbook' ? arr(fm.spells).length
-      : x.mod === 'conlang' ? arr(fm.lexicon).length : x.mod === 'gods' ? arr(fm.gods).length : x.mod === 'worship' ? worshipOf(f).length : x.mod === 'scenes' ? pwCards.length : typeof x.mod === 'object' ? S.refsOf(f, x.mod).length : 0;
+      : x.mod === 'conlang' ? arr(fm.lexicon).length : x.mod === 'gods' ? arr(fm.gods).length : x.mod === 'worship' ? worshipOf(f).length : x.mod === 'scenes' ? pwCards.length : x.mod === 'maps' ? mapsHere.length : typeof x.mod === 'object' ? S.refsOf(f, x.mod).length : 0;
   ap(root, h('div', { class: 'cs-tabs' }, ...TB.map((x) => { const c = count(x); return h('button', { class: 'cs-tab' + (x.id === act ? ' is-active' : ''), onclick: (e) => { P.tabState.set(f.path, x.id); wkRerender(e.currentTarget); } }, h('span', { class: 'cs-tab-icon' }, x.icon), h('span', {}, x.label), c ? h('span', { class: 'cs-tab-count' }, String(c)) : null); })));
   const panel = h('div', { class: 'cs-panel' }); const x = TB.find((y) => y.id === act);
   if (x.body) await renderTextTab(panel, f, x.body, comp);
@@ -117,6 +120,7 @@ async function renderSheet(f, id, comp) {
   else if (x.mod === 'gods') ap(panel, renderGods(f, fm));
   else if (x.mod === 'worship') ap(panel, renderWorship(f));
   else if (x.mod === 'scenes') ap(panel, renderScenes(f, pwx));
+  else if (x.mod === 'maps') renderMapsFor(panel, f, {});
   else if (typeof x.mod === 'object') ap(panel, renderRefs(f, x.mod));
   ap(root, panel, renderGallery(f, fm));
   return root;

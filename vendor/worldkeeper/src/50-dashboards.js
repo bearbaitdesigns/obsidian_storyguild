@@ -83,9 +83,11 @@ class DashboardsView extends ItemView {
     const nav = h('div', { class: 'anav' }, h('button', { onclick: () => P.openHome() }, '🏠 Home'));
     const btn = (t) => h('button', { class: this.type === t ? 'is-on' : '', onclick: () => this.setType(t) }, h('span', {}, T()[t].icon), T()[t].plural, h('span', { class: 'c' }, String(S.notesOf(t).length)));
     ap(nav, h('div', { class: 'sep' }, 'Story'), btn('character'), h('div', { class: 'sep' }, 'Geography'), ...GEO.map(btn), h('div', { class: 'sep' }, 'Shared'), ...CROSS.map(btn), h('div', { class: 'sep' }, 'Divine & infernal'), ...DIVINE.map(btn), h('div', { class: 'sep' }, 'Things'), btn('item'),
-      ...Object.keys(T()).filter((k) => !TYPE_ORDER.includes(k)).map(btn), h('div', { class: 'sep' }, 'Reference'), h('button', { onclick: () => P.openEncyclopedia() }, h('span', {}, '📚'), 'Encyclopedia', h('span', { class: 'c' }, String(S.entries().length))));
-    const st = (this.states[this.type] ??= newDashState());
+      ...Object.keys(T()).filter((k) => !TYPE_ORDER.includes(k)).map(btn), h('div', { class: 'sep' }, 'Reference'), h('button', { onclick: () => P.openEncyclopedia() }, h('span', {}, '📚'), 'Encyclopedia', h('span', { class: 'c' }, String(S.entries().length))),
+      h('button', { class: this.type === '__maps' ? 'is-on' : '', onclick: () => { this.type = '__maps'; this.run(); } }, h('span', {}, '🧭'), 'Wayfinder', h('span', { class: 'c' }, String(M.all().length))));
     const main = h('div', { class: 'atlas-main' });
+    if (this.type === '__maps') { const lib = h('div', { class: 'wkm' }); renderLibrary(lib, this.mapState || (this.mapState = {})); ap(main, lib); this.body.replaceChildren(h('div', { class: 'atlas' }, nav, main)); return; }
+    const st = (this.states[this.type] ??= newDashState());
     st._rerender = () => this.run(); st._root = main;
     ap(main, renderTypeDash(this.type, st));
     this.body.replaceChildren(h('div', { class: 'atlas' }, nav, main));
@@ -181,10 +183,11 @@ async function renderHome(state) {
   }
   const enc = h('button', { class: 'apill is-enc hd-enc', onclick: () => P.openEncyclopedia() }, h('span', {}, '📚'), 'Encyclopedia', h('b', {}, String(S.entries().length)));
   const atlas = h('button', { class: 'apill is-enc hd-enc', title: 'Open the Worldkeeper dashboards', onclick: () => P.openDashboards() }, h('span', {}, '🗺️'), 'World Atlas', h('b', {}, String(S.ix().type.size)));
+  const wayfinder = h('button', { class: 'apill is-enc hd-enc', title: 'Open Wayfinder: your maps', onclick: () => P.openMaps() }, h('span', {}, '🧭'), 'Wayfinder', h('b', {}, String(M.all().length)));
   const hero = h('div', { class: 'hd-hero' + (bnSrc ? ' is-' + bStyle : ' is-empty'), style: bnSrc ? { '--img': `url("${bnSrc}")`, '--y': bY + '%' } : { '--cd-hue': String(hashHue(nv.title || 'x')) } }, h('div', { class: 'bg' }), tools,
     h('div', {}, nv.series ? h('div', { class: 'hd-series' }, nv.series) : null, h('h1', {}, nv.title || 'Untitled novel'),
       h('div', { class: 'sub' }, h('span', { class: 'cs-badge' }, nv.stage || 'Drafting'), dl ? h('span', {}, `Due ${dl.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`) : h('span', {}, 'No deadline set'), daysLeft != null ? h('span', {}, '·') : null, daysLeft != null ? h('span', {}, `${daysLeft} days left`) : null)),
-    h('div', { class: 'hd-side' }, h('div', { class: 'wk-ring', style: { '--p': String(pct) } }, h('div', {}, h('b', {}, pct + '%'), h('small', {}, 'of goal'))), h('div', { class: 'hd-pills' }, enc, atlas)));
+    h('div', { class: 'hd-side' }, h('div', { class: 'wk-ring', style: { '--p': String(pct) } }, h('div', {}, h('b', {}, pct + '%'), h('small', {}, 'of goal'))), h('div', { class: 'hd-pills' }, enc, atlas, wayfinder)));
   dropImages(hero, null, ([img]) => setBanner(img));
   ap(root, hero);
 

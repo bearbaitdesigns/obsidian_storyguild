@@ -50,7 +50,16 @@ function buildDocx(book) {
   }
   const tocAt = body.length;
   const blocks = (bl) => bl.map((b) => b.t === 'break' ? wp('SceneBreak', wrun(o.sceneBreak || '#')) : b.t === 'h' ? wp('Sub', wrun(b.text)) : wp(b.first ? 'NoInd' : '', wruns(b.runs))).join('');
+  // Maps from Wayfinder: a heading (listed in the contents) and the map fitted to the page
+  const mapParts = [];
+  const mapPages = () => (book.maps || []).forEach((mp, i) => {
+    const bw = pw - 2 * mar, bh = ph - 2 * mar - 1400; const box = fitInside(mp.w, mp.h, bw, bh); const cx = Math.round(box.w * 635), cy = Math.round(box.h * 635); const rid = `rIdMap${i + 1}`;
+    mapParts.push({ name: `word/media/map${i + 1}.jpeg`, rid, bytes: mp.bytes });
+    body.push(heading(mp.title), `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="120" w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${100 + i}" name="${esc(mp.title)}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${100 + i}" name="map${i + 1}.jpeg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`);
+  });
+  if (book.mapsPlace === 'front') mapPages();
   book.chapters.forEach((c) => body.push(heading(c.heading), blocks(c.blocks)));
+  if (book.mapsPlace === 'back') mapPages();
   book.back.forEach((s) => body.push(heading(s.title), blocks(s.blocks)));
   if (msf) body.push(wp('Center', wrun('THE END'), '<w:spacing w:before="480"/>'));
   if (o.toc && !msf) {
@@ -99,10 +108,11 @@ ${style('SceneBreak', 'Scene Break', '<w:keepNext/><w:ind w:firstLine="0"/><w:jc
 ${style('Question', 'Reader Question', '<w:keepNext/><w:ind w:firstLine="0"/><w:jc w:val="left"/><w:spacing w:before="360" w:after="120"/>', '<w:b/>', 'NoInd')}
 </w:styles>`;
   const rels = [header ? '<Relationship Id="rIdHdr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>' : '', '<Relationship Id="rIdFtr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>', titlePg ? '<Relationship Id="rIdHdr1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/><Relationship Id="rIdFtr1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer2.xml"/>' : '',
-    coverPart ? `<Relationship Id="rIdCover" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/cover.${coverPart.ext}"/>` : '', '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>', '<Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>'].join('');
+    coverPart ? `<Relationship Id="rIdCover" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/cover.${coverPart.ext}"/>` : '',
+    ...mapParts.map((mp) => `<Relationship Id="${mp.rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${mp.name.replace('word/', '')}"/>`), '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>', '<Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>'].join('');
   const files = [
     { name: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${coverPart ? `<Default Extension="${coverPart.ext}" ContentType="image/${coverPart.ext}"/>` : ''}
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${[...new Set([coverPart ? coverPart.ext : null, mapParts.length ? 'jpeg' : null].filter(Boolean))].map((x) => `<Default Extension="${x}" ContentType="image/${x}"/>`).join('')}
 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
 ${header ? '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' : ''}<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>${titlePg ? '<Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>' : ''}
 <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>` },
@@ -115,6 +125,7 @@ ${header ? '<Override PartName="/word/header1.xml" ContentType="application/vnd.
   if (header) files.push({ name: 'word/header1.xml', data: header });
   files.push({ name: 'word/footer1.xml', data: footer });
   if (coverPart) files.push({ name: coverPart.name, data: coverPart.bytes });
+  for (const mp of mapParts) files.push({ name: mp.name, data: mp.bytes });
   if (titlePg) files.push({ name: 'word/header2.xml', data: firstHeader }, { name: 'word/footer2.xml', data: firstFooter });
   return makeZip(files);
 }

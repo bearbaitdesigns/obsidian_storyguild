@@ -8,6 +8,8 @@ const MAP_W = 1000;
 
 
 /* ---------- small helpers for maps ---------- */
+/** replace an element's contents, skipping empty values (replaceChildren would print null as text) */
+function setKids(el, ...kids) { el.replaceChildren(); ap(el, ...kids); return el; }
 const MS = () => P.settings.maps;
 const mDisplay = (v) => { const n = linkName(v); return n.split('/').pop().replace(/\.md$/, ''); };
 const fmtD = (n, d = 0) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: d });

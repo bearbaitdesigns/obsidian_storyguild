@@ -129,12 +129,13 @@ function openExport(map, d, img) {
   const fmtBtns = h('div', { class: 'wkm-seg' }); const opts = h('div', { class: 'wkm-exp-opts' });
   const FMT = { png: ['PNG', 'Picture, sharp text'], jpg: ['JPEG', 'Smaller picture'], pdf: ['PDF', 'Print or share, with a key page'], svg: ['SVG', 'Markup stays editable in design apps'], json: ['Markup', 'Pins, lines, labels and notes as data (JSON)'] };
   const refresh = debounce(async () => {
-    if (o.fmt === 'json') { preview.replaceChildren(h('pre', { class: 'wkm-json' }, JSON.stringify(markupJson(map, d), null, 1).slice(0, 1600) + '\n…')); return; }
-    const c = await exportCanvas(map, d, img, Object.assign({}, o, { width: 520 })); c.className = 'wkm-exp-canvas'; preview.replaceChildren(c);
+    if (o.fmt === 'json') { setKids(preview, h('pre', { class: 'wkm-json' }, JSON.stringify(markupJson(map, d), null, 1).slice(0, 1600) + '\n…')); return; }
+    const c = await exportCanvas(map, d, img, Object.assign({}, o, { width: 520 })); c.className = 'wkm-exp-canvas'; setKids(preview, c);
   }, 120);
-  const chk = (k, label, hint) => { const c = h('input', { type: 'checkbox', checked: !!o[k] }); c.addEventListener('change', () => { o[k] = c.checked; refresh(); }); return h('label', { class: 'wkm-check', title: hint || '' }, c, label); };
+  const sw = (on, label, cb, hint) => { const b = h('button', { class: 'wk-toggle' + (on ? ' is-on' : ''), onclick: () => { on = !on; b.classList.toggle('is-on', on); cb(on); } }); return h('div', { class: 'wkm-switch', title: hint || '', onclick: (e) => { if (e.target !== b) b.click(); } }, h('div', {}, h('span', {}, label)), b); };
+  const chk = (k, label, hint) => sw(!!o[k], label, (v) => { o[k] = v; refresh(); }, hint);
   const draw = () => {
-    fmtBtns.replaceChildren(...Object.entries(FMT).map(([k, [l, sub]]) => h('button', { class: o.fmt === k ? 'is-on' : '', title: sub, onclick: () => { o.fmt = k; draw(); refresh(); } }, l)));
+    setKids(fmtBtns, ...Object.entries(FMT).map(([k, [l, sub]]) => h('button', { class: o.fmt === k ? 'is-on' : '', title: sub, onclick: () => { o.fmt = k; draw(); refresh(); } }, l)));
     opts.replaceChildren();
     ap(opts, h('div', { class: 'wkm-hint' }, FMT[o.fmt][1]));
     if (o.fmt !== 'json') {
@@ -144,7 +145,7 @@ function openExport(map, d, img) {
       if (o.fmt === 'pdf') { const pp = h('select', { class: 'dropdown' }, ...Object.entries(PAPER).map(([k, l]) => h('option', { value: k, selected: o.paper === k }, l))); pp.addEventListener('change', () => { o.paper = pp.value; }); ap(opts, h('label', { class: 'wkm-f' }, h('span', {}, 'Paper'), pp)); }
       ap(opts, h('div', { class: 'wkm-sec-h' }, 'Include'), chk('names', 'Pin names'), chk('scaleBar', 'Scale bar', d.scale ? '' : 'Set a scale first'), chk('legend', 'Legend'), chk('title', 'Map name as a title'), chk('openNotes', 'Note text on the map', 'Off: notes show as numbered markers'),
         o.fmt === 'pdf' ? chk('key', 'Key page: places, routes with distances, notes, linked notes') : null,
-        h('div', { class: 'wkm-sec-h' }, 'Layers'), ...Object.entries(LAYER_NAMES).map(([k, l]) => { const c = h('input', { type: 'checkbox', checked: !o.hidden[k] }); c.addEventListener('change', () => { o.hidden[k] = !c.checked; refresh(); }); return h('label', { class: 'wkm-check' }, c, l); }));
+        h('div', { class: 'wkm-sec-h' }, 'Layers'), ...Object.entries(LAYER_NAMES).map(([k, l]) => sw(!o.hidden[k], l, (v) => { o.hidden[k] = !v; refresh(); })));
     }
   };
   const save = async (download) => {

@@ -19,7 +19,7 @@ class Stage {
   render(d, extra = {}) {
     this.d = d;
     const g = drawMarkup(d, { H: this.H, interactive: this.interactive || extra.clickable, selected: this.selected, numbers: noteNumbers(d), scaleBar: true, idp: this.idp || (this.idp = uid()), ...extra });
-    this.svg.replaceChildren(g, this.top);
+    setKids(this.svg, g, this.top);
     this.onRender && this.onRender();
   }
   apply() { this.world.style.transform = `translate(${this.tx}px, ${this.ty}px) scale(${this.z})`; this.el.style.setProperty('--wkm-z', this.z); this.onZoom && this.onZoom(this.z); }
@@ -73,7 +73,7 @@ class Stage {
    Viewer: read-only map for embeds, sheets and the library
    ===================================================================== */
 async function renderViewer(el, map, { height = 420, focus = null, comp = null, toolbar = true } = {}) {
-  const wrap = h('div', { class: 'wkm wkm-viewer', style: { height: height + 'px' } }); ap(el, wrap);
+  const wrap = h('div', { class: 'wk wkm wkm-viewer', style: { height: height + 'px' } }); ap(el, wrap);
   const d = await M.read(map); let img = null;
   try { img = await loadMapImage(map); } catch (e) { ap(wrap, h('div', { class: 'wkm-empty' }, '⚠ ' + (e.message || e))); return wrap; }
   if (!img) { ap(wrap, h('div', { class: 'wkm-empty' }, 'This map has no image yet. ', h('button', { onclick: () => P.openMap(map) }, 'Open the map editor'))); return wrap; }
@@ -82,7 +82,7 @@ async function renderViewer(el, map, { height = 420, focus = null, comp = null, 
   const showPop = (it, cx, cy) => {
     const r = wrap.getBoundingClientRect(); const ln = it.link ? M.resolve(it.link, map.path) : null; const sub = it.map ? M.resolve(it.map, map.path) : null;
     const len = it.k === 'line' || it.k === 'area' ? fmtDist(pathLen(it.pts, it.k === 'area'), d.scale) : null;
-    pop.replaceChildren(h('div', { class: 'wkm-pop-h' }, h('b', {}, itemTitle(it)), h('button', { class: 'wkm-x', onclick: () => { pop.style.display = 'none'; } }, '✕')),
+    setKids(pop, h('div', { class: 'wkm-pop-h' }, h('b', {}, itemTitle(it)), h('button', { class: 'wkm-x', onclick: () => { pop.style.display = 'none'; } }, '✕')),
       it.k === 'note' ? h('div', { class: 'wkm-pop-t' }, it.text) : null, it.desc ? h('div', { class: 'wkm-pop-t' }, it.desc) : null, len ? h('div', { class: 'wkm-hint' }, (it.k === 'area' ? 'Perimeter ' : 'Length ') + len) : null,
       arr(it.chars).length ? h('div', { class: 'wkm-hint' }, 'Travellers: ' + arr(it.chars).map(mDisplay).join(', ')) : null,
       h('div', { class: 'wkm-row' }, ln ? h('button', { class: 'mod-cta wkm-sm', onclick: (e) => openFile(ln, e) }, `${noteIcon(ln)} ${ln.basename}`) : null, sub ? h('button', { class: 'wkm-sm', onclick: () => P.openMap(sub) }, `🗺 ${sub.basename}`) : null));

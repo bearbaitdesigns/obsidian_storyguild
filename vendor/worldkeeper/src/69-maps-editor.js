@@ -15,12 +15,12 @@ class MapEditorView extends ItemView {
   getState() { return { file: this.file ? this.file.path : null, focus: this.focusPath }; }
   async setState(state, result) { const f = state && state.file && app().vault.getAbstractFileByPath(state.file); this.focusPath = state && state.focus || null; if (f instanceof TFile) await this.openMapFile(f); return super.setState ? super.setState(state, result) : undefined; }
   async onOpen() {
-    this.root = this.contentEl.appendChild(h('div', { class: 'wkm wkm-editor' }));
+    this.root = this.contentEl.appendChild(h('div', { class: 'wk wkm wkm-editor' }));
     this.registerEvent(app().vault.on('modify', (f) => { if (this.file && f.path === this.file.path) this.externalChange(); }));
     this.registerEvent(app().metadataCache.on('changed', (f) => { if (this.file && f.path === this.file.path && !this.saving) { if (!this.typingInPanel()) this.drawPanel(); this.drawCrumbs(); } }));
     this.registerEvent(app().vault.on('rename', (f, old) => { if (this.file && f === this.file) { this.leaf.updateHeader && this.leaf.updateHeader(); this.drawCrumbs(); } }));
     this.saveSoon = debounce(() => this.doSave(), 500);
-    if (!this.file) this.root.replaceChildren(h('div', { class: 'wkm-empty' }, 'Open a map from the Maps library.'));
+    if (!this.file) setKids(this.root, h('div', { class: 'wkm-empty' }, 'Open a map from the Maps library.'));
   }
   async onClose() { if (this.saveSoon) await this.saveSoon.flush(); }
   async openMapFile(f) {
@@ -65,7 +65,7 @@ class MapEditorView extends ItemView {
     this.readout = h('div', { class: 'wkm-readout', style: { display: 'none' } });
     this.zoomEl = h('span', { class: 'wkm-zoom' });
     this.body = h('div', { class: 'wkm-body' + (this.panelOpen() ? '' : ' is-closed') }, this.stageWrap, this.panel);
-    ap(this.root, this.crumbs, this.bar, this.optBar, this.body);
+    ap(this.root, this.crumbs, h('div', { class: 'wkm-toolcard' }, this.bar, this.optBar), this.body);
     this.stage = new Stage(this.stageWrap, { interactive: true }); ap(this.stageWrap, this.readout, this.pop);
     this.stage.onZoom = (z) => { this.zoomEl.textContent = Math.round(z * 100) + '%'; this.placePop(); };
     this.bindStage(); this.bindKeys();
@@ -75,13 +75,14 @@ class MapEditorView extends ItemView {
     if (!this.crumbs) return; const chain = []; let cur = M.parent(this.file); const seen = new Set([this.file.path]);
     while (cur && !seen.has(cur.path)) { seen.add(cur.path); chain.unshift(cur); cur = M.parent(cur); }
     const kids = M.children(this.file); const of = M.resolve(M.fm(this.file)['map-of'], this.file.path);
-    this.crumbs.replaceChildren(h('button', { class: 'wkm-crumb', onclick: () => P.openMaps() }, '🧭 Wayfinder'), ...chain.map((m) => [h('span', { class: 'wkm-sep' }, '›'), h('button', { class: 'wkm-crumb', onclick: () => this.openMapFile(m) }, m.basename)]),
-      h('span', { class: 'wkm-sep' }, '›'), h('b', {}, this.file.basename), of ? h('span', { class: 'wkm-of', title: 'This map shows', onclick: (e) => openFile(of, e) }, `${noteIcon(of)} ${of.basename}`) : null,
-      kids.length ? h('span', { class: 'wkm-kids' }, h('span', { class: 'wkm-hint' }, 'Maps inside:'), ...kids.map((k) => h('button', { class: 'wkm-chip', onclick: () => this.openMapFile(k) }, '⤵ ' + k.basename))) : null);
+    const trail = h('div', { class: 'wkm-trail' }, h('a', { onclick: () => P.openMaps() }, '🧭 Wayfinder'), ...chain.map((m) => [h('span', {}, '›'), h('a', { onclick: () => this.openMapFile(m) }, m.basename)]));
+    setKids(this.crumbs, h('div', { class: 'wkm-head-l' }, trail, h('div', { class: 'wkm-title-row' }, h('h2', { class: 'wkm-title' }, this.file.basename),
+      of ? h('button', { class: 'apill', title: 'This map shows ' + of.basename, onclick: (e) => openFile(of, e) }, h('span', {}, noteIcon(of)), of.basename) : null)),
+      kids.length ? h('div', { class: 'wkm-kids' }, h('span', { class: 'wkm-hint' }, 'Maps inside'), ...kids.map((k) => h('button', { class: 'apill', onclick: () => this.openMapFile(k) }, h('span', {}, '⤵'), k.basename))) : null);
   }
   drawBar() {
     const tb = (id, ic, tip) => h('button', { class: 'wkm-tool' + (this.tool === id ? ' is-on' : ''), title: tip, onclick: () => this.setTool(id) }, h('span', {}, ic));
-    this.bar.replaceChildren(h('div', { class: 'wkm-tools' }, ...TOOLS.map(([id, ic, tip]) => tb(id, ic, tip))),
+    setKids(this.bar, h('div', { class: 'wkm-tools' }, ...TOOLS.map(([id, ic, tip]) => tb(id, ic, tip))),
       h('div', { class: 'wkm-tools' }, h('button', { class: 'wkm-tool', title: 'Pin a note: pick a character, place or entry, then click the map', onclick: () => this.pinANote() }, '＋📄'), h('button', { class: 'wkm-tool', title: 'Undo (Ctrl+Z)', onclick: () => this.doUndo() }, '↶'), h('button', { class: 'wkm-tool', title: 'Redo (Ctrl+Shift+Z)', onclick: () => this.doRedo() }, '↷')),
       h('span', { class: 'wkm-sp' }),
       h('div', { class: 'wkm-tools' }, h('button', { class: 'wkm-tool', title: 'Zoom out', onclick: () => this.stage.zoomBy(1 / 1.3) }, '−'), this.zoomEl, h('button', { class: 'wkm-tool', title: 'Zoom in', onclick: () => this.stage.zoomBy(1.3) }, '+'), h('button', { class: 'wkm-tool', title: 'Fit the whole map', onclick: () => this.stage.fit() }, '⤢')),
@@ -105,7 +106,7 @@ class MapEditorView extends ItemView {
     if (t === 'measure') ap(o, tip(this.d.scale ? 'Click points to measure · double-click or Enter to finish · Esc clears' : 'Set the scale first (⚖) to measure real distances. Until then, distances show in map units.'));
     if (t === 'scale') ap(o, tip('Click both ends of something whose length you know, such as the map’s own scale bar, then enter its length.'), this.d.scale ? h('span', { class: 'wkm-pill' }, `Current: ${fmtD(MAP_W / this.d.scale.per)} ${this.d.scale.unit} across`) : null);
   }
-  setTool(t) { this.tool = t; this.draft = null; this.readout.style.display = 'none'; this.stage.el.dataset.tool = t; this.drawBar(); this.drawOpts(); this.drawDraft(); }
+  setTool(t) { if (t !== 'select' && this.sel && this.sel.size && !this.pending) { this.sel = new Set(); this.draw(); this.drawPanel(); } this.tool = t; this.draft = null; this.readout.style.display = 'none'; this.stage.el.dataset.tool = t; this.drawBar(); this.drawOpts(); this.drawDraft(); }
 
   /* ---------- drawing ---------- */
   draw() { this.stage.selected = this.sel; this.stage.render(this.d); this.drawHandles(); this.drawDraft(); }
@@ -127,7 +128,7 @@ class MapEditorView extends ItemView {
     top.append(g);
     if (dr.kind === 'measure' || dr.kind === 'scale' || dr.kind === 'line') {
       const L = pathLen(pts, false); const real = fmtDist(L, this.d.scale);
-      this.readout.style.display = ''; this.readout.replaceChildren(h('b', {}, real || `${fmtD(L)} map units`), dr.kind === 'measure' && real ? h('span', {}, travelTimes(L, this.d.scale).slice(0, 2).map((t) => `${t.name}: ${fmtDays(t.days)}`).join(' · ')) : null,
+      this.readout.style.display = ''; setKids(this.readout, h('b', {}, real || `${fmtD(L)} map units`), dr.kind === 'measure' && real ? h('span', {}, travelTimes(L, this.d.scale).slice(0, 2).map((t) => `${t.name}: ${fmtDays(t.days)}`).join(' · ')) : null,
         dr.kind === 'measure' && dr.done ? h('button', { class: 'wkm-sm', onclick: () => { const p = dr.pts.slice(); this.draft = null; this.readout.style.display = 'none'; this.addLine('line', p); } }, 'Save as route') : null);
     }
   }
@@ -266,9 +267,9 @@ class MapEditorView extends ItemView {
   togglePanel() { MS().view = Object.assign({}, MS().view, { panel: !this.panelOpen() }); P.saveSettingsQuiet(); this.body.classList.toggle('is-closed', !this.panelOpen()); this.drawBar(); this.drawPanel(); requestAnimationFrame(() => this.placePop()); }
   drawPanel() {
     if (!this.panel || !this.d) return; const items = this.selItems();
-    if (this.panelOpen()) this.panel.replaceChildren(this.mapPanel()); else this.panel.replaceChildren();
+    if (this.panelOpen()) setKids(this.panel, this.mapPanel()); else this.panel.replaceChildren();
     if (!items.length) { this.pop.style.display = 'none'; this.pop.replaceChildren(); return; }
-    this.pop.replaceChildren(items.length === 1 ? this.inspector(items[0]) : this.multiPanel(items));
+    setKids(this.pop, items.length === 1 ? this.inspector(items[0]) : this.multiPanel(items));
     this.pop.style.display = ''; this.placePop();
   }
   /** keep the pop-up beside the selected item, inside the map area */
@@ -282,36 +283,37 @@ class MapEditorView extends ItemView {
     const y = clamp((Math.min(...ys) + Math.max(...ys)) / 2 - ph / 2, 8, Math.max(8, Hh - ph - 8));
     this.pop.style.left = x + 'px'; this.pop.style.top = y + 'px';
   }
-  section(title, ...kids) { return h('div', { class: 'wkm-sec' }, title ? h('div', { class: 'wkm-sec-h' }, title) : null, ...kids); }
+  section(title, ...kids) { return h('section', { class: 'wkm-sec' }, title ? h('h4', { class: 'wkm-sec-h' }, title) : null, ...kids); }
+  switchRow(label, on, cb, extra = null) { const b = h('button', { class: 'wk-toggle' + (on ? ' is-on' : ''), onclick: () => cb(!on) }); return h('div', { class: 'wkm-switch', onclick: (e) => { if (e.target !== b) b.click(); } }, h('div', {}, h('span', {}, label)), extra, b); }
   field(label, ...kids) { return h('label', { class: 'wkm-f' }, h('span', {}, label), ...kids); }
   noteChip(v, onX, src) { const f = M.resolve(v, src || this.file.path); return h('span', { class: 'wkm-chip' + (f ? '' : ' is-missing'), title: f ? f.path : 'No note with this name yet' }, h('span', { class: 'wkm-chip-l', onclick: (e) => (f ? openFile(f, e) : openName(linkName(v), this.file.path)) }, `${noteIcon(f)} ${mDisplay(v)}`), onX ? h('span', { class: 'wkm-x', title: 'Remove', onclick: onX }, '✕') : null); }
   mapPanel() {
     const fm = M.fm(this.file); const d = this.d; const of = fm['map-of']; const parent = fm['map-parent'];
     const setFm = (k, v) => app().fileManager.processFrontMatter(this.file, (x) => { if (v == null) delete x[k]; else x[k] = v; });
-    const wrap = h('div', {});
+    const wrap = h('div', {}, h('div', { class: 'wkm-panel-h' }, h('b', {}, '⚙ Map settings'), h('span', { class: 'wkm-sp' }), h('button', { class: 'wkm-iconbtn', title: 'Close', onclick: () => this.togglePanel() }, '✕')));
     const img = M.imageFile(this.file);
-    ap(wrap, this.section('Map', h('div', { class: 'wkm-kv' }, h('span', {}, 'Image'), h('span', {}, img ? img.name : '—'), h('button', { class: 'wkm-sm', onclick: () => this.changeImage() }, 'Change')),
+    ap(wrap, this.section('🗺 Map', h('div', { class: 'wkm-kv' }, h('span', {}, 'Image'), h('span', {}, img ? img.name : '—'), h('button', { class: 'wkm-sm', onclick: () => this.changeImage() }, 'Change')),
       this.img && this.img.pdf ? h('div', { class: 'wkm-kv' }, h('span', {}, 'PDF page'), ((i) => { i.addEventListener('change', async () => { await setFm('map-page', clamp(+i.value || 1, 1, this.img.pages)); setTimeout(() => this.openMapFile(this.file), 150); }); return i; })(h('input', { type: 'number', min: 1, max: this.img.pages, value: fm['map-page'] || 1, class: 'wkm-num' })), h('span', { class: 'wkm-hint' }, `of ${this.img.pages}`)) : null,
       h('div', { class: 'wkm-kv' }, h('span', {}, 'Shows'), of ? this.noteChip(of, () => setFm('map-of', null)) : h('span', { class: 'wkm-hint' }, 'Not set'), h('button', { class: 'wkm-sm', title: 'The place this map shows: a planet, continent, kingdom, place…', onclick: () => pickNote('This map shows…', (f) => setFm('map-of', M.link(f, this.file.path)), { exclude: [this.file] }) }, of ? 'Change' : 'Set')),
       h('div', { class: 'wkm-kv' }, h('span', {}, 'Inside map'), parent ? this.noteChip(parent, () => setFm('map-parent', null)) : h('span', { class: 'wkm-hint' }, 'None (top level)'), h('button', { class: 'wkm-sm', title: 'A bigger map this one is part of', onclick: () => pickNote('This map sits inside…', (f) => setFm('map-parent', M.link(f, this.file.path)), { onlyMaps: true, exclude: [this.file] }) }, parent ? 'Change' : 'Set'))));
-    ap(wrap, this.section('Linked notes', h('div', { class: 'wkm-chips' }, ...arr(d.linked).map((v, i) => this.noteChip(v, () => this.change((dd) => dd.linked.splice(i, 1)))), h('button', { class: 'wkm-add', title: 'Link a note: character, encyclopedia entry, place…', onclick: () => pickNote('Link a note to this map', (f) => this.change((dd) => { dd.linked = [...arr(dd.linked), M.link(f, this.file.path)]; }), { exclude: [this.file] }) }, '+')),
+    ap(wrap, this.section('🔗 Linked notes', h('div', { class: 'wkm-chips' }, ...arr(d.linked).map((v, i) => this.noteChip(v, () => this.change((dd) => dd.linked.splice(i, 1)))), h('button', { class: 'wkm-add', title: 'Link a note: character, encyclopedia entry, place…', onclick: () => pickNote('Link a note to this map', (f) => this.change((dd) => { dd.linked = [...arr(dd.linked), M.link(f, this.file.path)]; }), { exclude: [this.file] }) }, '+')),
       h('div', { class: 'wkm-hint' }, 'Linked notes, and every note a pin or line links to, list this map on their own page.')));
     const sc = d.scale;
-    ap(wrap, this.section('Scale', sc ? h('div', { class: 'wkm-kv' }, h('span', {}, 'Map width'), h('b', {}, `${fmtD(MAP_W / sc.per)} ${unitName(sc.unit)}`)) : h('div', { class: 'wkm-hint' }, 'No scale yet. Set one to measure distances and travel times.'),
+    ap(wrap, this.section('📏 Scale', sc ? h('div', { class: 'wkm-kv' }, h('span', {}, 'Map width'), h('b', {}, `${fmtD(MAP_W / sc.per)} ${unitName(sc.unit)}`)) : h('div', { class: 'wkm-hint' }, 'No scale yet. Set one to measure distances and travel times.'),
       h('div', { class: 'wkm-row' }, h('button', { class: 'wkm-sm', onclick: () => this.setTool('scale') }, '⚖ Set by drawing'), h('button', { class: 'wkm-sm', onclick: () => mPrompt('How wide is the whole map?', 'e.g. 600', (v) => { const n = Number(v); if (n > 0) this.change((dd) => { dd.scale = { per: MAP_W / n, unit: (dd.scale && dd.scale.unit) || MS().defaultUnit }; }); }) }, 'Set by width'),
         sc ? h('select', { class: 'dropdown wkm-sm', onchange: (e) => this.change((dd) => { dd.scale.unit = e.target.value; }) }, ...Object.entries(UNITS).map(([k, l]) => h('option', { value: k, selected: k === sc.unit }, l))) : null,
         sc ? h('button', { class: 'wkm-sm', title: 'Remove the scale', onclick: () => this.change((dd) => { dd.scale = null; }) }, '✕') : null)));
     const ps = h('input', { type: 'range', min: 12, max: 60, value: d.pinSize || MS().pinSize }); ps.addEventListener('input', () => this.live((dd) => { dd.pinSize = +ps.value; }));
-    const names = h('input', { type: 'checkbox', checked: d.showNames ?? MS().showNames }); names.addEventListener('change', () => this.change((dd) => { dd.showNames = names.checked; }));
-    ap(wrap, this.section('Display', this.field('Pin size', ps), h('label', { class: 'wkm-check' }, names, 'Show pin names'),
-      h('div', { class: 'wkm-layers' }, ...Object.entries(LAYER_NAMES).map(([k, l]) => { const n = d.items.filter((x) => KIND_LAYER[x.k] === k).length; const c = h('input', { type: 'checkbox', checked: !(d.hidden || {})[k] }); c.addEventListener('change', () => this.change((dd) => { dd.hidden = Object.assign({}, dd.hidden, { [k]: !c.checked }); })); return h('label', { class: 'wkm-check' }, c, `${l}`, h('span', { class: 'wkm-n' }, String(n))); }))));
+    const namesOn = d.showNames ?? MS().showNames;
+    ap(wrap, this.section('🎨 Display', this.field('Pin size', ps), this.switchRow('Show pin names', namesOn, (v) => this.change((dd) => { dd.showNames = v; }))),
+      this.section('🗂 Layers', ...Object.entries(LAYER_NAMES).map(([k, l]) => { const n = d.items.filter((x) => KIND_LAYER[x.k] === k).length; return this.switchRow(l, !(d.hidden || {})[k], (v) => this.change((dd) => { dd.hidden = Object.assign({}, dd.hidden, { [k]: !v }); }), h('span', { class: 'wkm-n' }, String(n))); })));
     // items list
     const list = h('div', { class: 'wkm-items' }); const q = h('input', { type: 'search', placeholder: 'Find on this map…', value: this.q, class: 'wkm-search' });
-    const fill = () => { const qq = this.q.toLowerCase(); list.replaceChildren(...d.items.filter((it) => !qq || (itemTitle(it) + ' ' + (it.desc || '') + ' ' + mDisplay(it.link || '')).toLowerCase().includes(qq)).map((it) => h('div', { class: 'wkm-item', onclick: () => { this.sel = new Set([it.id]); const c = it.pts || [[it.x, it.y]]; this.stage.focusBox(Math.min(...c.map((p) => p[0])), Math.min(...c.map((p) => p[1])), Math.max(...c.map((p) => p[0])), Math.max(...c.map((p) => p[1]))); this.draw(); this.drawPanel(); this.stage.flash([it.id]); } },
+    const fill = () => { const qq = this.q.toLowerCase(); setKids(list, ...d.items.filter((it) => !qq || (itemTitle(it) + ' ' + (it.desc || '') + ' ' + mDisplay(it.link || '')).toLowerCase().includes(qq)).map((it) => h('div', { class: 'wkm-item', onclick: () => { this.sel = new Set([it.id]); const c = it.pts || [[it.x, it.y]]; this.stage.focusBox(Math.min(...c.map((p) => p[0])), Math.min(...c.map((p) => p[1])), Math.max(...c.map((p) => p[0])), Math.max(...c.map((p) => p[1]))); this.draw(); this.drawPanel(); this.stage.flash([it.id]); } },
       h('span', { class: 'wkm-item-ic' }, it.k === 'pin' ? iconSvg(it.icon, 16, it) : itemIcon(it)), h('span', { class: 'wkm-item-t' }, itemTitle(it)), it.link ? h('span', { class: 'wkm-item-sub' }, noteIcon(M.resolve(it.link, this.file.path))) : null))); if (!list.children.length) ap(list, h('div', { class: 'wkm-hint' }, d.items.length ? 'Nothing matches.' : 'Nothing on this map yet. Pick a tool above and click the map.')); };
     q.addEventListener('input', () => { this.q = q.value; fill(); }); fill();
-    ap(wrap, this.section(`On this map · ${d.items.length}`, q, list));
-    ap(wrap, this.section('', h('div', { class: 'wkm-row' }, h('button', { class: 'wkm-sm', onclick: () => openFile(this.file) }, '↗ Open map note'), h('button', { class: 'wkm-sm', onclick: () => P.newMap({ parent: this.file }) }, '＋ Map inside this one'))));
+    ap(wrap, this.section(`📍 On this map · ${d.items.length}`, q, list));
+    ap(wrap, h('div', { class: 'wkm-row wkm-panel-foot' }, h('button', { class: 'wkm-addpill', onclick: () => openFile(this.file) }, '↗ Open map note'), h('button', { class: 'wkm-addpill', onclick: () => P.newMap({ parent: this.file }) }, '＋ Map inside this one')));
     return wrap;
   }
   multiPanel(items) {
@@ -321,49 +323,55 @@ class MapEditorView extends ItemView {
   }
   inspector(it) {
     const wrap = h('div', { class: 'wkm-insp' }); const src = this.file.path;
-    const txt = (key, ph, { multi = false, cls = '' } = {}) => { const i = multi ? h('textarea', { rows: 4, placeholder: ph, class: cls }) : h('input', { type: 'text', placeholder: ph, value: it[key] || '', class: cls }); if (multi) i.value = it[key] || ''; i.addEventListener('input', () => this.live(() => { it[key] = i.value; })); i.addEventListener('change', () => this.drawPanelSoon()); return i; };
-    const num = (key, min, max, step, def) => { const i = h('input', { type: 'range', min, max, step, value: it[key] ?? def }); const out = h('span', { class: 'wkm-n' }, String(it[key] ?? def)); i.addEventListener('input', () => { out.textContent = i.value; this.live(() => { it[key] = +i.value; }); }); return h('div', { class: 'wkm-range' }, i, out); };
-    const color = (def) => { const i = h('input', { type: 'color', value: it.color || def }); i.addEventListener('input', () => this.live(() => { it.color = i.value; })); return h('div', { class: 'wkm-row' }, i, it.color ? h('button', { class: 'wkm-sm', onclick: () => this.change(() => { delete it.color; }) }, 'Reset') : null); };
-    const toggle = (key, label, def) => { const c = h('input', { type: 'checkbox', checked: it[key] ?? def }); c.addEventListener('change', () => this.change(() => { it[key] = c.checked; })); return h('label', { class: 'wkm-check' }, c, label); };
-    const sel = (key, opts, def) => h('select', { class: 'dropdown', onchange: (e) => this.change(() => { it[key] = e.target.value; ['color', 'dash', 'width', 'arrow', 'smooth', 'fill', 'size', 'font', 'italic', 'caps', 'spacing'].forEach((k) => { if (key === 'style') delete it[k]; }); }) }, ...Object.entries(opts).map(([k, l]) => h('option', { value: k, selected: k === (it[key] ?? def) }, typeof l === 'string' ? l : l.label)));
-    const linkRow = (label = 'Linked note') => this.field(label, h('div', { class: 'wkm-chips' }, it.link ? this.noteChip(it.link, () => this.change(() => { delete it.link; })) : null,
-      h('button', { class: 'wkm-add', title: 'Link a note', onclick: () => pickNote('Link to which note?', (f) => this.change(() => { it.link = M.link(f, src); if (it.k === 'pin' && !it.name) it.name = f.basename; if (it.k === 'pin' && !it._iconSet && ICON_FOR_TYPE[WK.typeOf(f)] && it.icon === 'poi') it.icon = ICON_FOR_TYPE[WK.typeOf(f)]; }), { exclude: [this.file] }) }, it.link ? '⇄' : '+')));
-    const head = h('div', { class: 'wkm-insp-h' }, h('span', { class: 'wkm-kind' }, itemIcon(it), ' ', { pin: 'Pin', line: 'Line', area: 'Area', label: 'Label', note: 'Note' }[it.k]), h('span', { class: 'wkm-sp' }),
-      h('button', { class: 'wkm-sm', title: 'Duplicate (Ctrl+D)', onclick: () => this.duplicate() }, '⧉'), h('button', { class: 'wkm-sm mod-warning', title: 'Delete', onclick: () => this.deleteSel() }, '🗑'), h('button', { class: 'wkm-sm', title: 'Done', onclick: () => { this.sel = new Set(); this.draw(); this.drawPanel(); } }, '✓'));
-    ap(wrap, head);
+    const txt = (key, ph, { multi = false, cls = '' } = {}) => { const i = multi ? h('textarea', { rows: 3, placeholder: ph, class: cls }) : h('input', { type: 'text', placeholder: ph, value: it[key] || '', class: cls }); if (multi) i.value = it[key] || ''; i.addEventListener('input', () => this.live(() => { it[key] = i.value; })); i.addEventListener('change', () => this.drawPanelSoon()); return i; };
+    const num = (key, min, max, step, def, unit = '') => { const i = h('input', { type: 'range', min, max, step, value: it[key] ?? def }); const out = h('span', { class: 'wkm-n' }, String(it[key] ?? def) + unit); i.addEventListener('input', () => { out.textContent = i.value + unit; this.live(() => { it[key] = +i.value; }); }); return h('div', { class: 'wkm-range' }, i, out); };
+    const color = (def) => { const i = h('input', { type: 'color', value: it.color || def }); i.addEventListener('input', () => this.live(() => { it.color = i.value; })); return h('div', { class: 'wkm-colour' }, i, it.color ? h('button', { class: 'wkm-link', onclick: () => this.change(() => { delete it.color; }) }, 'Reset') : null); };
+    const toggle = (key, label, def, hint) => { const on = it[key] ?? def; const b = h('button', { class: 'wk-toggle' + (on ? ' is-on' : ''), 'aria-pressed': on ? 'true' : 'false', onclick: () => this.change(() => { it[key] = !on; }) }); return h('div', { class: 'wkm-switch', onclick: (e) => { if (e.target !== b) b.click(); } }, h('div', {}, h('span', {}, label), hint ? h('small', {}, hint) : null), b); };
+    const sel = (key, opts, def) => h('select', { class: 'dropdown', onchange: (e) => this.change(() => { it[key] = e.target.value; if (key === 'style') ['color', 'dash', 'width', 'arrow', 'smooth', 'fill', 'size', 'font', 'italic', 'caps', 'spacing'].forEach((k) => delete it[k]); }) }, ...Object.entries(opts).map(([k, l]) => h('option', { value: k, selected: k === (it[key] ?? def) }, typeof l === 'string' ? l : l.label)));
+    const f = (label, ...kids) => h('div', { class: 'wkm-field' }, h('label', {}, label), ...kids);
+    const two = (...kids) => h('div', { class: 'wkm-2col' }, ...kids);
+    const group = (title, ...kids) => h('section', { class: 'wkm-grp' }, title ? h('h4', {}, title) : null, ...kids);
+    const linkRow = (label = 'Linked note', hint = null) => f(label, h('div', { class: 'wkm-chips' }, it.link ? this.noteChip(it.link, () => this.change(() => { delete it.link; })) : null,
+      h('button', { class: 'wkm-addpill', title: 'Link a note', onclick: () => pickNote('Link to which note?', (ff) => this.change(() => { it.link = M.link(ff, src); if (it.k === 'pin' && !it.name) it.name = ff.basename; if (it.k === 'pin' && !it._iconSet && ICON_FOR_TYPE[WK.typeOf(ff)] && it.icon === 'poi') it.icon = ICON_FOR_TYPE[WK.typeOf(ff)]; }), { exclude: [this.file] }) }, it.link ? '⇄ Change' : '＋ Link a note')), hint ? h('small', { class: 'wkm-hint' }, hint) : null);
+    const KIND = { pin: 'Pin', line: 'Line', area: 'Area', label: 'Label', note: 'Note' }[it.k];
+    const swatch = it.k === 'pin' ? iconSvg(it.icon, 30, it) : h('span', { class: 'wkm-kind-ic' }, itemIcon(it));
+    ap(wrap, h('header', { class: 'wkm-insp-h' }, swatch, h('div', { class: 'wkm-insp-t' }, h('small', {}, KIND), h('b', {}, itemTitle(it))), h('span', { class: 'wkm-sp' }),
+      h('button', { class: 'wkm-iconbtn', title: 'Duplicate (Ctrl+D)', onclick: () => this.duplicate() }, '⧉'), h('button', { class: 'wkm-iconbtn is-danger', title: 'Delete', onclick: () => this.deleteSel() }, '🗑'), h('button', { class: 'wkm-iconbtn', title: 'Close', onclick: () => { this.sel = new Set(); this.draw(); this.drawPanel(); } }, '✕')));
+    const body = h('div', { class: 'wkm-insp-b' }); ap(wrap, body);
     if (it.k === 'pin') {
       const grid = iconPalette(it.icon, (k) => { if (k === 'emoji') mPrompt('Symbol', 'An emoji, e.g. 🐉', (v) => this.change(() => { it.icon = 'emoji'; it.emoji = [...v][0]; })); else this.change(() => { it.icon = k; it._iconSet = true; delete it.emoji; }); }, it.emoji, true);
       const sub = it.map ? M.resolve(it.map, src) : null;
-      ap(wrap, this.field('Name', txt('name', 'e.g. Saltgate', { cls: 'wkm-name' })), linkRow(), this.field('Icon', grid), this.field('Colour', color((iconDef(it.icon) || ICONS.poi).color)), this.field('Size', num('size', 0.5, 2.5, 0.1, 1)), toggle('hideName', 'Hide the name on the map', false),
-        this.field('Description', txt('desc', 'Shown when someone clicks the pin', { multi: true })),
-        this.field('Opens a map', h('div', { class: 'wkm-chips' }, it.map ? this.noteChip(it.map, () => this.change(() => { delete it.map; })) : null,
-          h('button', { class: 'wkm-add', title: 'A more detailed map of this spot', onclick: () => pickNote('Open which map from this pin?', (f) => this.change(() => { it.map = M.link(f, src); }), { onlyMaps: true, exclude: [this.file] }) }, it.map ? '⇄' : '+'),
-          !it.map ? h('button', { class: 'wkm-sm', onclick: () => P.newMap({ parent: this.file, name: it.name ? it.name + ' map' : '', of: it.link, fromPin: { view: this, it } }) }, '＋ New map') : null, sub ? h('button', { class: 'wkm-sm', onclick: () => this.openMapFile(sub) }, 'Open') : null)));
+      ap(body, group(null, f('Name', txt('name', 'e.g. Saltgate', { cls: 'wkm-name' })), linkRow(), f('Description', txt('desc', 'Shown when someone clicks the pin', { multi: true }))),
+        group('Appearance', f('Icon', grid), two(f('Colour', color((iconDef(it.icon) || ICONS.poi).color)), f('Size', num('size', 0.5, 2.5, 0.1, 1, '×'))), toggle('hideName', 'Hide the name on the map', false)),
+        group('Map of this place', h('div', { class: 'wkm-chips' }, it.map ? this.noteChip(it.map, () => this.change(() => { delete it.map; })) : null,
+          sub ? h('button', { class: 'wkm-addpill', onclick: () => this.openMapFile(sub) }, '↗ Open') : null,
+          h('button', { class: 'wkm-addpill', title: 'A more detailed map of this spot', onclick: () => pickNote('Open which map from this pin?', (ff) => this.change(() => { it.map = M.link(ff, src); }), { onlyMaps: true, exclude: [this.file] }) }, it.map ? '⇄ Change' : '＋ Pick a map'),
+          !it.map ? h('button', { class: 'wkm-addpill', onclick: () => P.newMap({ parent: this.file, name: it.name ? it.name + ' map' : '', of: it.link, fromPin: { view: this, it } }) }, '＋ New map') : null),
+          h('small', { class: 'wkm-hint' }, 'Clicking the pin in a map view opens this map.')));
     }
     if (it.k === 'line' || it.k === 'area') {
       const isLine = it.k === 'line'; const pre = isLine ? LINES[it.style] || LINES.custom : AREAS[it.style] || AREAS.custom;
-      const L = pathLen(it.pts, !isLine); const real = fmtDist(L, this.d.scale);
-      ap(wrap, this.field('Name', txt('name', isLine ? 'e.g. Ilsa’s flight north' : 'e.g. The Northmarch', { cls: 'wkm-name' })), this.field('Kind', sel('style', isLine ? LINES : AREAS, 'custom')), linkRow(),
-        h('div', { class: 'wkm-stat' }, h('b', {}, real || `${fmtD(L)} map units`), h('span', {}, isLine ? 'long' : 'around'), !this.d.scale ? h('button', { class: 'wkm-sm', onclick: () => this.setTool('scale') }, 'Set scale') : null),
-        isLine && real && TRAVEL_STYLES.has(it.style || 'custom') ? h('div', { class: 'wkm-travel' }, ...travelTimes(L, this.d.scale).map((t) => h('div', {}, h('span', {}, t.name), h('b', {}, fmtDays(t.days))))) : null,
-        isLine && TRAVEL_STYLES.has(it.style || 'custom') ? this.field('Travellers', h('div', { class: 'wkm-chips' }, ...arr(it.chars).map((v, i) => this.noteChip(v, () => this.change(() => it.chars.splice(i, 1)))), h('button', { class: 'wkm-add', title: 'Who travels this route? The route shows on their page.', onclick: () => pickNote('Who travels this route?', (f) => this.change(() => { it.chars = [...arr(it.chars), M.link(f, src)]; }), { exclude: [this.file] }) }, '+'))) : null,
-        this.field('Colour', color(pre.color)), this.field('Width', num('width', 0.5, 12, 0.5, pre.width)), this.field('Line', sel('dash', DASHES, pre.dash)),
-        !isLine ? this.field('Fill', num('fill', 0, 0.8, 0.02, pre.fill)) : null,
-        isLine ? toggle('arrow', 'Arrow at the end', pre.arrow) : null, toggle('smooth', 'Smooth curve', isLine ? pre.smooth : false),
-        isLine ? h('button', { class: 'wkm-sm', onclick: () => this.change(() => { it.pts.reverse(); }) }, '⇄ Reverse direction') : null,
-        this.field('Description', txt('desc', 'Notes about this ' + (isLine ? 'route or border' : 'area'), { multi: true })),
-        h('div', { class: 'wkm-hint' }, 'Drag the dots to reshape. Double-click the line to add a dot; right-click a dot to remove it.'));
+      const L = pathLen(it.pts, !isLine); const real = fmtDist(L, this.d.scale); const travel = isLine && TRAVEL_STYLES.has(it.style || 'custom');
+      ap(body, h('div', { class: 'wkm-stat' }, h('div', {}, h('b', {}, real || `${fmtD(L)} map units`), h('span', {}, isLine ? 'long' : 'around the edge')), !this.d.scale ? h('button', { class: 'wkm-addpill', onclick: () => this.setTool('scale') }, '⚖ Set the scale') : null),
+        travel && real ? h('div', { class: 'wkm-travel' }, ...travelTimes(L, this.d.scale).map((t) => h('div', {}, h('span', {}, t.name), h('b', {}, fmtDays(t.days))))) : null,
+        group(null, two(f('Name', txt('name', isLine ? 'e.g. Ilsa’s flight north' : 'e.g. The Northmarch', { cls: 'wkm-name' })), f('Kind', sel('style', isLine ? LINES : AREAS, 'custom'))), linkRow(),
+          travel ? f('Travellers', h('div', { class: 'wkm-chips' }, ...arr(it.chars).map((v, i) => this.noteChip(v, () => this.change(() => it.chars.splice(i, 1)))), h('button', { class: 'wkm-addpill', title: 'The route shows on their page', onclick: () => pickNote('Who travels this route?', (ff) => this.change(() => { it.chars = [...arr(it.chars), M.link(ff, src)]; }), { exclude: [this.file] }) }, '＋ Add'))) : null,
+          f('Description', txt('desc', 'Notes about this ' + (isLine ? 'route or border' : 'area'), { multi: true }))),
+        group('Style', two(f('Colour', color(pre.color)), f('Line', sel('dash', DASHES, pre.dash))), two(f('Width', num('width', 0.5, 12, 0.5, pre.width)), !isLine ? f('Fill', num('fill', 0, 0.8, 0.02, pre.fill)) : h('div')),
+          isLine ? toggle('arrow', 'Arrow at the end', pre.arrow) : null, toggle('smooth', 'Smooth curve', isLine ? pre.smooth : false),
+          isLine ? h('button', { class: 'wkm-addpill', onclick: () => this.change(() => { it.pts.reverse(); }) }, '⇄ Reverse direction') : null),
+        h('p', { class: 'wkm-hint wkm-foot' }, 'Drag the dots to reshape. Double-click the line to add a dot; right-click a dot to remove it.'));
     }
     if (it.k === 'label') {
       const pre = LABELS[it.style] || LABELS.place;
-      ap(wrap, this.field('Text', txt('text', 'Label', { multi: true })), this.field('Style', sel('style', LABELS, 'place')), this.field('Size', num('size', 6, 90, 1, pre.size)), this.field('Rotation', num('rot', -90, 90, 1, 0)), this.field('Letter spacing', num('spacing', 0, 20, 0.5, pre.spacing)),
-        this.field('Colour', color(pre.color)), this.field('Font', sel('font', { serif: 'Serif (classic map)', sans: 'Sans-serif' }, pre.font)),
-        h('div', { class: 'wkm-row' }, toggle('caps', 'Capitals', pre.caps), toggle('italic', 'Italic', pre.italic), toggle('halo', 'Halo', true)), linkRow('Links to'));
+      ap(body, group(null, f('Text', txt('text', 'Label', { multi: true })), f('Style', sel('style', LABELS, 'place')), linkRow('Links to')),
+        group('Lettering', two(f('Size', num('size', 6, 90, 1, pre.size)), f('Rotation', num('rot', -90, 90, 1, 0, '°'))), two(f('Letter spacing', num('spacing', 0, 20, 0.5, pre.spacing)), f('Colour', color(pre.color))),
+          f('Font', sel('font', { serif: 'Serif (classic map)', sans: 'Sans-serif' }, pre.font)), toggle('caps', 'Capitals', pre.caps), toggle('italic', 'Italic', pre.italic), toggle('halo', 'Halo', true, 'A soft outline so it reads over busy map areas')));
     }
     if (it.k === 'note') {
-      ap(wrap, this.field('Note', txt('text', 'Write your note…', { multi: true })), this.field('Colour', h('div', { class: 'wkm-swatches' }, ...NOTE_COLORS.map((c) => h('button', { class: 'wkm-sw' + ((it.color || NOTE_COLORS[0]) === c ? ' is-on' : ''), style: { background: c }, onclick: () => this.change(() => { it.color = c; }) })))),
-        toggle('open', 'Show the text on the map', false), it.open ? this.field('Width', num('w', 100, 400, 10, 170)) : null, linkRow('Links to'),
-        h('div', { class: 'wkm-hint' }, 'Closed notes show as numbered markers. In a PDF export their text is listed on a key page.'));
+      ap(body, group(null, f('Note', txt('text', 'Write your note…', { multi: true })), linkRow('Links to')),
+        group('Appearance', f('Colour', h('div', { class: 'wkm-swatches' }, ...NOTE_COLORS.map((c) => h('button', { class: 'wkm-sw' + ((it.color || NOTE_COLORS[0]) === c ? ' is-on' : ''), style: { background: c }, onclick: () => this.change(() => { it.color = c; }) })))),
+          toggle('open', 'Show the text on the map', false, 'Off: a numbered marker; the PDF key lists the text'), it.open ? f('Width', num('w', 100, 400, 10, 170)) : null));
     }
     return wrap;
   }

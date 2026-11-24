@@ -84,7 +84,7 @@ function renderCustomPins() {
     const setO = (k, v, re) => { if (isCustom) getO()[k] = v; else st.pinOverrides[key] = Object.assign({}, st.pinOverrides[key], { [k]: v }); save(); paint(); if (re) redraw(); };
     const o = getO(); const d = iconDef(key); const base = ICONS[key];
     const changed = !isCustom && Object.keys(o).some((k) => k !== 'hidden' && o[k] !== '' && o[k] != null);
-    const prev = h('span', { class: 'wkm-cp-prev' }); const paint = () => prev.replaceChildren(iconSvg(key, 34));
+    const prev = h('span', { class: 'wkm-cp-prev' }); const paint = () => setKids(prev, iconSvg(key, 34));
     paint();
     const open = CP_OPEN.has(key);
     const head = h('div', { class: 'wkm-cp-row', onclick: () => { open ? CP_OPEN.delete(key) : CP_OPEN.add(key); redraw(); } }, prev,

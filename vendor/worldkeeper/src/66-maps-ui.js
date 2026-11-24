@@ -6,7 +6,7 @@ let CLOSE_MODAL = null;
 const activeDoc = () => (typeof activeDocument !== 'undefined' && activeDocument) || document;
 function mModal(inner, { wide = false, onClose } = {}) {
   if (CLOSE_MODAL) CLOSE_MODAL();
-  const bg = h('div', { class: 'wkm wkm-modal-bg' + (wide ? ' is-wide' : '') });
+  const bg = h('div', { class: 'wk wkm wkm-modal-bg' + (wide ? ' is-wide' : '') });
   const doc = activeDoc(); const close = () => { bg.remove(); doc.removeEventListener('keydown', escK, true); if (CLOSE_MODAL === close) CLOSE_MODAL = null; onClose && onClose(); };
   const escK = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } };
   bg.addEventListener('mousedown', (e) => { if (e.target === bg) close(); });
@@ -25,7 +25,7 @@ function mSuggest({ title, items, onPick, placeholder = 'Find…', create = null
     shown = items.filter((o) => !q || (o.label + ' ' + (o.sub || '')).toLowerCase().includes(q)).slice(0, 80);
     if (create && q && !items.some((o) => o.label.toLowerCase() === q)) shown.push({ label: `Create “${inp.value.trim()}”`, icon: '＋', value: inp.value.trim(), create: true });
     active = clamp(active, 0, Math.max(0, shown.length - 1));
-    list.replaceChildren(...(shown.length ? shown.map((o, i) => h('div', { class: 'wkm-sg-opt' + (i === active ? ' is-active' : ''), onclick: () => choose(o) }, o.icon ? h('span', { class: 'wkm-sg-ic' }, o.icon) : null, h('span', { class: 'wkm-sg-l' }, o.label), o.sub ? h('span', { class: 'wkm-sg-sub' }, o.sub) : null)) : [h('div', { class: 'wkm-sg-empty' }, emptyText)]));
+    setKids(list, ...(shown.length ? shown.map((o, i) => h('div', { class: 'wkm-sg-opt' + (i === active ? ' is-active' : ''), onclick: () => choose(o) }, o.icon ? h('span', { class: 'wkm-sg-ic' }, o.icon) : null, h('span', { class: 'wkm-sg-l' }, o.label), o.sub ? h('span', { class: 'wkm-sg-sub' }, o.sub) : null)) : [h('div', { class: 'wkm-sg-empty' }, emptyText)]));
   };
   inp.addEventListener('input', () => { active = 0; draw(); });
   inp.addEventListener('keydown', (e) => {

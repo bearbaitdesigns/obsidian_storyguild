@@ -288,7 +288,7 @@ async def main():
         # Wayfinder is part of Storyguild: commands, views, Draftsmith header button, Home pill, Maps tab
         r = await ev("""async () => { const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view; v.setTab('compile'); await new Promise(r => setTimeout(r, 200));
           const hb = [...document.querySelectorAll('.ds-head button')].find(b => b.textContent.startsWith('🧭 Wayfinder')); const headBtn = hb ? hb.textContent : null; hb && hb.click(); await new Promise(r => setTimeout(r, 900));
-          const lib = app.workspace.getLeavesOfType('worldkeeper-maps-library').length; const cards = [...document.querySelectorAll('.wkm-card-t')].map(x => x.textContent);
+          const lib = app.workspace.getLeavesOfType('worldkeeper-maps-library').length; const cards = [...document.querySelectorAll('.wkm-mcard-name')].map(x => x.textContent);
           await HOST_WORLD().openMap(app.vault.getAbstractFileByPath('World/Maps/Brineholt.md')); await new Promise(r => setTimeout(r, 1200));
           const ed = app.workspace.getLeavesOfType('worldkeeper-map-editor').map(l => l.view.d && l.view.d.items.length);
           const cmds = Object.keys(app.commands.commands).filter(k => /map|wayfinder/i.test(k));

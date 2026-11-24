@@ -13,17 +13,20 @@ function mapStats(map) {
   // counts from the note's map-links/front matter are cheap; item counts need the note text
   const fm = M.fm(map); return { of: M.resolve(fm['map-of'], map.path), links: arr(fm['map-links']).length };
 }
-async function mapCard(map, { focus = null, compact = false } = {}) {
+async function mapCard(map, { focus = null } = {}) {
   const st = mapStats(map); const d = await M.read(map);
   const n = (k) => d.items.filter((x) => x.k === k).length;
-  const counts = [['pin', '📍'], ['line', '〰️'], ['area', '⬠'], ['label', '🔤'], ['note', '📝']].filter(([k]) => n(k)).map(([k, ic]) => `${ic} ${n(k)}`).join('  ');
-  const chain = st.of ? WK.chain(st.of).map((x) => x.basename) : [];
-  const card = h('div', { class: 'wkm-card' + (compact ? ' is-compact' : '') }, await thumb(map),
-    h('div', { class: 'wkm-card-b' }, h('div', { class: 'wkm-card-t' }, map.basename),
-      st.of ? h('div', { class: 'wkm-card-of' }, `${noteIcon(st.of)} ${[...chain, st.of.basename].join(' › ')}`) : null,
-      h('div', { class: 'wkm-card-n' }, counts || 'No markup yet', d.scale ? h('span', { class: 'wkm-pill' }, `${fmtD(MAP_W / d.scale.per)} ${d.scale.unit} across`) : null)));
+  const counts = [['pin', '📍', 'pins'], ['line', '〰️', 'lines'], ['area', '⬠', 'areas'], ['label', '🔤', 'labels'], ['note', '📝', 'notes']].filter(([k]) => n(k)).map(([k, ic, l]) => h('span', { class: 'wkm-count', title: `${n(k)} ${l}` }, ic, ' ', String(n(k))));
+  const chain = st.of ? WK.chain(st.of).map((x) => x.basename) : []; const parent = M.parent(map); const img = M.imageFile(map);
+  const card = h('div', { class: 'wkm-mcard' },
+    h('div', { class: 'wkm-mcard-img' }, await thumb(map, 'wkm-mcard-thumb'), h('div', { class: 'wkm-mcard-shade' }),
+      parent ? h('span', { class: 'wkm-badge' }, '⤵ Inside ' + parent.basename) : null, img && img.extension.toLowerCase() === 'pdf' ? h('span', { class: 'wkm-badge is-r' }, 'PDF') : null,
+      h('div', { class: 'wkm-mcard-name' }, map.basename)),
+    h('div', { class: 'wkm-mcard-b' },
+      st.of ? h('div', { class: 'wkm-mcard-of' }, h('span', {}, noteIcon(st.of)), [...chain, st.of.basename].join(' › ')) : h('div', { class: 'wkm-mcard-of is-none' }, 'Not linked to a place yet'),
+      h('div', { class: 'wkm-mcard-n' }, counts.length ? counts : h('span', { class: 'wkm-dim' }, 'Nothing marked yet'), h('span', { class: 'wkm-sp' }), d.scale ? h('span', { class: 'wkm-pill' }, `${fmtD(MAP_W / d.scale.per)} ${d.scale.unit} across`) : null)));
   card.addEventListener('click', (e) => P.openMap(map, focus, e));
-  card.addEventListener('contextmenu', (e) => { e.preventDefault(); const m = new Menu(); m.addItem((i) => i.setTitle('Open map editor').setIcon('map').onClick(() => P.openMap(map, focus))); m.addItem((i) => i.setTitle('Open map note').setIcon('file-text').onClick(() => openFile(map))); m.addItem((i) => i.setTitle('Export…').setIcon('download').onClick(async () => openExport(map, await M.read(map), await loadMapImage(map)))); m.showAtMouseEvent(e); });
+  card.addEventListener('contextmenu', (e) => { e.preventDefault(); const m = new Menu(); m.addItem((i) => i.setTitle('Open in Wayfinder').setIcon('compass').onClick(() => P.openMap(map, focus))); m.addItem((i) => i.setTitle('Open map note').setIcon('file-text').onClick(() => openFile(map))); m.addItem((i) => i.setTitle('Export…').setIcon('download').onClick(async () => openExport(map, await M.read(map), await loadMapImage(map)))); m.showAtMouseEvent(e); });
   return card;
 }
 
@@ -33,51 +36,59 @@ class MapsLibraryView extends ItemView {
   getDisplayText() { return 'Wayfinder'; }
   getIcon() { return 'compass'; }
   async onOpen() {
-    this.body = this.contentEl.appendChild(h('div', { class: 'wkm wkm-libview' }));
+    this.body = this.contentEl.appendChild(h('div', { class: 'wk wkm wkm-libview cd-view' }));
     const re = debounce(() => this.run(), 400);
     this.registerEvent(app().metadataCache.on('changed', (f) => { if (M.isMap(f)) re(); }));
     this.registerEvent(app().vault.on('delete', re)); this.registerEvent(app().vault.on('rename', re));
     this.run();
   }
-  async run() { const el = h('div', {}); await renderLibrary(el, this); this.body.replaceChildren(el); }
+  async run() { const el = h('div', {}); await renderLibrary(el, this); setKids(this.body, el); }
 }
-/** the library: maps nested by "Inside map", searchable; also used by Worldkeeper's World Atlas */
+/** the Wayfinder page: every map as a card, searchable; "Nested" groups maps under the map they sit inside. Also shown in the World Atlas. */
 async function renderLibrary(el, state = {}) {
-  const maps = M.all(); state.q = state.q || '';
-  const head = h('div', { class: 'wkm-lib-h' }, h('h2', {}, '🧭 Wayfinder'), h('span', { class: 'wkm-pill' }, String(maps.length)), h('span', { class: 'wkm-sp' }),
-    h('input', { type: 'search', class: 'wkm-search', placeholder: 'Find a map, or a place on one…', value: state.q }), h('button', { class: 'mod-cta', onclick: () => P.newMap() }, '＋ New map'));
-  ap(el, head);
-  const body = h('div', { class: 'wkm-lib' }); ap(el, body);
-  const inp = head.querySelector('input');
+  const maps = M.all(); state.q = state.q || ''; const v = MS().view || (MS().view = {}); const mode = v.lib === 'nested' ? 'nested' : 'cards'; const sort = v.libSort || 'name';
+  const setV = (k, val) => { MS().view = Object.assign({}, MS().view, { [k]: val }); P.saveSettingsQuiet(); redraw(); };
+  const head = h('div', { class: 'cd-top' }, h('div', { class: 'cd-h1' }, '🧭 Wayfinder'), h('span', { class: 'cd-count' }, `${maps.length} map${maps.length === 1 ? '' : 's'}`), h('span', { class: 'cd-spacer' }),
+    ...[['cards', '▦ Cards'], ['nested', '⤵ Nested']].map(([m, l]) => h('button', { class: 'cd-btn' + (mode === m ? ' is-active' : ''), onclick: () => setV('lib', m) }, l)),
+    h('button', { class: 'mod-cta cd-new', onclick: () => P.newMap() }, '＋ New map'));
+  const search = h('input', { type: 'search', placeholder: 'Find a map, or a place on one…', value: state.q });
+  const sortSel = h('select', { class: 'dropdown' }, ...[['name', 'Sort: name'], ['recent', 'Sort: recently changed'], ['place', 'Sort: place']].map(([k, l]) => h('option', { value: k, selected: sort === k }, l)));
+  sortSel.addEventListener('change', () => setV('libSort', sortSel.value));
+  const filters = h('div', { class: 'cd-filters' }, search, sortSel);
+  const body = h('div', {}); const root = h('div', { class: 'cd-root wkm-lib' }, head, maps.length ? filters : null, body); setKids(el, root);
+  async function redraw() { const r = await renderLibrary(h('div'), state); root.replaceWith(r.firstChild || r); }
+  const ordered = maps.slice().sort((a, b) => sort === 'recent' ? b.stat.mtime - a.stat.mtime : sort === 'place' ? (display(linkName(M.fm(a)['map-of'] || '~')) || '~').localeCompare(display(linkName(M.fm(b)['map-of'] || '~')) || '~') || a.basename.localeCompare(b.basename) : a.basename.localeCompare(b.basename));
   const draw = async () => {
     const q = state.q.toLowerCase(); body.replaceChildren();
-    if (!maps.length) { ap(body, h('div', { class: 'wkm-welcome' }, h('div', { class: 'wkm-big' }, '🗺'), h('h3', {}, 'No maps yet'), h('p', {}, 'Add a JPEG, PNG or PDF of a map, set its scale, then add pins, routes, borders, labels and notes. Link maps to places, characters and encyclopedia entries, and they show up on those pages.'), h('button', { class: 'mod-cta', onclick: () => P.newMap() }, '＋ Add your first map'))); return; }
+    if (!maps.length) { ap(body, h('div', { class: 'wkm-welcome' }, h('div', { class: 'wkm-big' }, '🧭'), h('h3', {}, 'No maps yet'), h('p', {}, 'Add a JPEG, PNG or PDF of a map, set its scale, then add pins, routes, borders, labels and notes. Link maps to places, characters and encyclopedia entries, and they show up on those pages.'), h('button', { class: 'mod-cta cd-new', onclick: () => P.newMap() }, '＋ Add your first map'))); return; }
     if (q) {
       const hits = [];
-      for (const m of maps) { const d = await M.read(m); const its = d.items.filter((it) => (itemTitle(it) + ' ' + (it.desc || '') + ' ' + mDisplay(it.link || '')).toLowerCase().includes(q)); if (m.basename.toLowerCase().includes(q) || its.length) hits.push([m, its]); }
-      if (!hits.length) { ap(body, h('div', { class: 'wkm-empty' }, 'No maps or places match.')); return; }
-      for (const [m, its] of hits) { const c = await mapCard(m); if (its.length) ap(c.querySelector('.wkm-card-b'), h('div', { class: 'wkm-hits' }, ...its.slice(0, 6).map((it) => h('span', { class: 'wkm-chip', onclick: (e) => { e.stopPropagation(); P.openMap(m, null, e, it.id); } }, `${itemIcon(it)} ${itemTitle(it)}`)))); ap(body, c); }
+      for (const m of ordered) { const d = await M.read(m); const its = d.items.filter((it) => (itemTitle(it) + ' ' + (it.desc || '') + ' ' + mDisplay(it.link || '')).toLowerCase().includes(q)); if (m.basename.toLowerCase().includes(q) || its.length) hits.push([m, its]); }
+      if (!hits.length) { ap(body, h('div', { class: 'cd-empty wkm-dim' }, 'No maps or places match.')); return; }
+      const grid = h('div', { class: 'wkm-mgrid' }); ap(body, grid);
+      for (const [m, its] of hits) { const c = await mapCard(m); if (its.length) ap(c.querySelector('.wkm-mcard-b'), h('div', { class: 'wkm-hits' }, ...its.slice(0, 6).map((it) => h('button', { class: 'apill', onclick: (e) => { e.stopPropagation(); P.openMap(m, null, e, it.id); } }, h('span', {}, itemIcon(it)), itemTitle(it))))); ap(grid, c); }
       return;
     }
-    const byParent = new Map(); const top = [];
-    for (const m of maps) { const p = M.parent(m); if (p && maps.some((x) => x.path === p.path) && p.path !== m.path) { if (!byParent.has(p.path)) byParent.set(p.path, []); byParent.get(p.path).push(m); } else top.push(m); }
-    const seen = new Set();
+    if (mode === 'cards') { const grid = h('div', { class: 'wkm-mgrid' }); ap(body, grid); for (const m of ordered) ap(grid, await mapCard(m)); return; }
+    // nested: each top-level map with the maps inside it
+    const inLib = new Set(maps.map((m) => m.path)); const kidsOf = (m) => ordered.filter((x) => { const p = M.parent(x); return p && p.path === m.path && x.path !== m.path; });
+    const top = ordered.filter((m) => { const p = M.parent(m); return !p || !inLib.has(p.path) || p.path === m.path; }); const seen = new Set();
     const branch = async (m, depth) => {
-      if (seen.has(m.path)) return null; seen.add(m.path);
-      const kids = byParent.get(m.path) || []; const g = h('div', { class: 'wkm-branch', style: { '--d': depth } }, await mapCard(m));
-      if (kids.length) { const sub = h('div', { class: 'wkm-sub' }); for (const k of kids) ap(sub, await branch(k, depth + 1)); ap(g, sub); }
-      return g;
+      if (seen.has(m.path)) return null; seen.add(m.path); const kids = kidsOf(m);
+      const sec = h('section', { class: 'wkm-branch' + (depth ? ' is-sub' : '') }, h('div', { class: 'wkm-mgrid' }, await mapCard(m)));
+      if (kids.length) { const sub = h('div', { class: 'wkm-sub' }, h('div', { class: 'wkm-sub-h' }, `⤵ Inside ${m.basename}`)); const g = h('div', { class: 'wkm-mgrid' }); ap(sub, g); for (const k of kids) { const kk = kidsOf(k); if (kk.length) ap(sub, await branch(k, depth + 1)); else { seen.add(k.path); ap(g, await mapCard(k)); } } ap(sec, sub); }
+      return sec;
     };
     for (const m of top) ap(body, await branch(m, 0));
   };
-  inp.addEventListener('input', debounce(() => { state.q = inp.value; draw(); }, 200));
+  search.addEventListener('input', debounce(() => { state.q = search.value; draw(); }, 200));
   await draw();
   return el;
 }
 
 /** maps that show or mention a note: used on Worldkeeper sheets, encyclopedia entries and the maps code block */
 async function renderMapsFor(el, file, { comp = null, preview = true, newButton = true } = {}) {
-  const list = M.mapsFor(file); const wrap = h('div', { class: 'wkm wkm-for' }); ap(el, wrap);
+  const list = M.mapsFor(file); const wrap = h('div', { class: 'wk wkm wkm-for' }); ap(el, wrap);
   if (!list.length) {
     ap(wrap, h('div', { class: 'wkm-empty' }, `No maps show or mention ${file.basename} yet.`, newButton ? h('div', { class: 'wkm-row wkm-center' }, h('button', { class: 'mod-cta', onclick: () => P.newMap({ of: M.link(file) }) }, `＋ New map of ${file.basename}`), h('button', { onclick: () => P.openMaps() }, 'Open Wayfinder')) : null));
     return wrap;
@@ -131,8 +142,8 @@ class MapBlock extends MarkdownRenderChild {
       this.target = here; if (!here) return;
       const d = M.parse('```worldkeeper-map\n' + raw + '\n```');
       if (d.broken) ap(el, h('div', { class: 'wkm wkm-empty' }, '⚠ This map’s data could not be read: ' + d.broken + '. Undo your last edit to this block, or open the map editor.'));
-      ap(el, h('div', { class: 'wkm wkm-blockbar' }, h('b', {}, '🗺 ' + here.basename), h('span', { class: 'wkm-hint' }, `${d.items.length} item${d.items.length === 1 ? '' : 's'}${d.scale ? ' · ' + fmtD(MAP_W / d.scale.per) + ' ' + d.scale.unit + ' across' : ''}`), h('span', { class: 'wkm-sp' }),
-        h('button', { class: 'mod-cta', onclick: () => P.openMap(here) }, '✎ Open map editor')));
+      // one way into the editor: the ✎ Edit map button on the map itself
+      ap(el, h('div', { class: 'wk wkm wkm-blockbar' }, h('b', {}, '🧭 ' + here.basename), h('span', { class: 'wkm-hint' }, `${d.items.length} item${d.items.length === 1 ? '' : 's'}${d.scale ? ' · ' + fmtD(MAP_W / d.scale.per) + ' ' + d.scale.unit + ' across' : ''}`)));
       await renderViewer(el, here, { height: 460, toolbar: true }); return;
     }
     const opts = {}; for (const line of raw.split('\n')) { const m = line.match(/^\s*([\w-]+)\s*:\s*(.*)$/); if (m) opts[m[1].toLowerCase()] = m[2].trim().replace(/^["']|["']$/g, ''); }

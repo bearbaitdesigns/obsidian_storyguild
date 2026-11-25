@@ -99,48 +99,109 @@ const wwPos = (w) => { for (const [k, l] of Object.entries(WW_FUNC)) if (l.inclu
  * words built from the language's sounds (the base form, with the plural / past affix added when there is one).
  * Returns { text, tokens, coined, missing }. Nothing is written; see wwTranslateAndSave.
  */
-function wwTranslate(fm, text, { coin = false, drop = true } = {}) {
+const WW_AUX = ['will', 'would', 'shall', 'did', 'do', 'does', 'can', 'could', 'must', 'may', 'might', 'should', 'is', 'are', 'was', 'were', 'am', 'be', 'been', 'has', 'have', 'had'];
+/** the part of speech a translated word plays in its English sentence */
+function wwRole(lw, entry, fallback) {
+  if (WW_AUX.includes(lw)) return 'aux';
+  if (['not', 'never', "don't", "didn't", "won't", "can't"].includes(lw)) return 'neg';
+  if (entry && entry.pos) return entry.pos;
+  return fallback || (typeof lhGuessPos === 'function' ? lhGuessPos(lw) : wwPos(lw));
+}
+/**
+ * Put one clause's words into the language's word order. Subject = the words before the verb, verb = the verb with
+ * any helping words and "not" next to it, object = what follows up to the first preposition, the rest (places,
+ * times) goes before the verb in verb-final orders and at the end otherwise. Adjectives follow their noun when the
+ * grammar says so. Clauses without a verb, and "Free" order, keep the English order.
+ */
+function wwReorder(words, order, adjAfter) {
+  let w = words.slice();
+  if (adjAfter) for (let i = 0; i < w.length - 1; i++) if (w[i].role === 'adj' && ['noun', 'name', 'pron'].includes(w[i + 1].role)) { const t = w[i]; w[i] = w[i + 1]; w[i + 1] = t; i++; }
+  if (!/^[SVO]{3}$/.test(order || '')) return w;
+  const v = w.findIndex((x) => x.role === 'verb'); if (v < 0) return w;
+  let a = v, z = v;
+  while (a > 0 && ['aux', 'neg', 'adv'].includes(w[a - 1].role)) a--;
+  while (z + 1 < w.length && ['verb', 'aux', 'neg'].includes(w[z + 1].role) && w[z + 1].role !== 'neg') z++;
+  const S = w.slice(0, a), V = w.slice(a, z + 1), after = w.slice(z + 1);
+  const pi = after.findIndex((x) => x.role === 'prep');
+  const O = pi < 0 ? after : after.slice(0, pi), X = pi < 0 ? [] : after.slice(pi);
+  const groups = { S, V, O }; const out = [];
+  for (const k of order) { if (k === 'V' && order.endsWith('V')) out.push(...X); out.push(...groups[k]); }
+  if (!order.endsWith('V')) out.push(...X);
+  return out;
+}
+/**
+ * Translate English text. Words in the lexicon are swapped in (longest phrase first); articles can be dropped;
+ * capitalised words inside a sentence are treated as names and kept. With coin = true, missing words get new
+ * words built from the language's sounds (the base form, with the plural / past affix added when there is one).
+ * With arrange = true (the default) each clause is put into the language's word order.
+ * Returns { text, tokens, coined, missing, arranged }. Nothing is written; see wwTranslateAndSave.
+ */
+function wwTranslate(fm, text, { coin = false, drop = true, arrange = true } = {}) {
   const ph = Object.assign({}, WW_PH, fm.phonology || {}); const lex = arr(fm.lexicon).slice(); const fmx = Object.assign({}, fm, { lexicon: lex });
   const parts = String(text || '').match(/[A-Za-zÀ-ÖØ-öø-ÿ'’]+|[^A-Za-zÀ-ÖØ-öø-ÿ'’]+/g) || [];
   const isWord = (p) => /[A-Za-zÀ-ÖØ-öø-ÿ]/.test(p);
-  const existing = new Set(lex.map((e) => e.word)); const coined = []; const missing = []; const tokens = [];
-  const out = []; let sentenceStart = true; let capNext = false;
+  const existing = new Set(lex.map((e) => e.word)); const coined = []; const missing = [];
   const canCoin = coin && sayInventory(ph).C.length && sayInventory(ph).V.length;
+  const order = arrange ? fm.wordOrder : ''; const adjAfter = arrange && /after/i.test(String((fm.grammar || {}).adjPos || ''));
+  // sentences: [{ words: [{ o, gloss, role, name, cap, punct }], end }]
+  const sentences = []; let cur = { words: [], lead: '', cap: false, end: '' }; let sentenceStart = true; let capNext = false; let arranged = false;
+  const flush = (end) => { if (cur.words.length || end.trim()) { cur.end = end; sentences.push(cur); } else if (end) { if (sentences.length) sentences[sentences.length - 1].end += end; else cur.lead += end; } cur = { words: [], lead: cur.words.length ? '' : cur.lead, cap: false, end: '' }; };
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i];
-    if (!isWord(p)) { out.push(p); if (/[.!?]/.test(p)) sentenceStart = true; continue; }
+    if (!isWord(p)) {
+      if (/[.!?;:\n]/.test(p)) { flush(p); sentenceStart = true; continue; }
+      const punct = p.replace(/\s+/g, ''); if (punct && cur.words.length) cur.words[cur.words.length - 1].punct += punct; else if (!cur.words.length && !sentences.length) cur.lead += p.replace(/\s+/g, ' ').trimStart();
+      continue;
+    }
     const lw = p.toLowerCase().replace(/’/g, "'");
-    if (drop && WW_ARTICLES.includes(lw)) { if (/^[A-Z]/.test(p)) capNext = true; if (parts[i + 1] && /^\s+$/.test(parts[i + 1])) i++; continue; }
+    if (drop && WW_ARTICLES.includes(lw)) { if (/^[A-Z]/.test(p) && sentenceStart) cur.cap = true; if (parts[i + 1] && /^\s+$/.test(parts[i + 1])) i++; continue; }
+    if (sentenceStart && /^[A-Z]/.test(p)) cur.cap = true;
     // longest phrase: up to three words joined by single spaces
     let hit = null; let used = 0;
     for (let n = 3; n >= 2 && !hit; n--) {
       const seq = []; let j = i; let ok = true;
       for (let k = 0; k < n; k++) { if (!parts[j] || !isWord(parts[j])) { ok = false; break; } seq.push(parts[j].toLowerCase()); if (k < n - 1) { if (!parts[j + 1] || !/^ +$/.test(parts[j + 1])) { ok = false; break; } j += 2; } }
-      if (!ok) continue; const e = wwFind(lex, seq.join(' ')); if (e) { hit = { out: e.word, gloss: wwSplit(e.meaning)[0] }; used = (n - 1) * 2; }
+      if (!ok) continue; const e = wwFind(lex, seq.join(' ')); if (e) { hit = { out: e.word, gloss: wwSplit(e.meaning)[0], entry: e }; used = (n - 1) * 2; }
     }
     if (!hit) hit = wwLookup(fmx, lw);
-    const isName = !sentenceStart && /^[A-Z]/.test(p);
+    if (hit && hit.gloss && /^PST-/.test(hit.gloss)) hit.role = 'verb';
+    const isName = !sentenceStart && /^[A-Z]/.test(p) && lw !== 'i';
     sentenceStart = false;
-    if (!hit && isName) { out.push(p); tokens.push({ src: p, out: p, gloss: 'name', name: true }); continue; }
+    if (!hit && isName) { cur.words.push({ o: p, src: p, gloss: 'name', role: 'name', name: true, punct: '' }); continue; }
     if (!hit && canCoin) {
       const pl = wwAff(fmx, /plural/i), pt = wwAff(fmx, /past/i);
       let base = lw, aff = null;
-      if (pl && /[^s]s$/.test(lw) && lw.length > 3) { base = lw.replace(/ies$/, 'y').replace(/(?<=[sxz]|ch|sh)es$/, '').replace(/s$/, ''); aff = pl; }
+      if (pl && /[^s]s$/.test(lw) && lw.length > 3 && wwRole(lw.replace(/s$/, ''), null) !== 'verb') { base = lw.replace(/ies$/, 'y').replace(/(?<=[sxz]|ch|sh)es$/, '').replace(/s$/, ''); aff = pl; }
       else if (pt && /ed$/.test(lw) && lw.length > 4) { base = lw.replace(/ied$/, 'y').replace(/ed$/, ''); aff = pt; }
+      else if (/[^s]s$/.test(lw) && lw.length > 3 && wwRole(lw.replace(/s$/, ''), null) === 'verb') base = lw.replace(/s$/, '');
       const ex = wwFind(lex, base);
       const w = ex ? ex.word : genWord(ph, existing);
       if (w) {
-        if (!ex) { existing.add(w); const entry = { word: w, pos: aff === pt && aff ? 'verb' : wwPos(base), meaning: base }; lex.push(entry); coined.push(entry); }
-        hit = { out: aff ? wwApply(aff, w) : w, gloss: aff === pl && aff ? base + '-PL' : aff ? 'PST-' + base : base, coined: !ex };
+        let entry = ex;
+        if (!ex) { existing.add(w); entry = { word: w, pos: aff === pt && aff ? 'verb' : wwRole(base, null), meaning: base }; if (WW_AUX.includes(base)) entry.pos = 'verb'; lex.push(entry); coined.push(entry); }
+        hit = { out: aff ? wwApply(aff, w) : w, gloss: aff === pl && aff ? base + '-PL' : aff ? 'PST-' + base : base, coined: !ex, entry, role: aff === pt && aff ? 'verb' : null };
       }
     }
-    if (!hit) { missing.push(lw); out.push(`[${p}]`); tokens.push({ src: p, out: null, gloss: '?', unknown: true }); continue; }
-    let o = hit.out; if (/^[A-Z]/.test(p) || capNext) o = o.charAt(0).toUpperCase() + o.slice(1); capNext = false;
-    out.push(o); tokens.push({ src: used ? parts.slice(i, i + used + 1).join('') : p, out: o, gloss: hit.gloss, coined: !!hit.coined });
+    if (!hit) { missing.push(lw); cur.words.push({ o: `[${p}]`, src: p, gloss: '?', role: wwRole(lw, null), unknown: true, punct: '' }); continue; }
+    cur.words.push({ o: hit.out, src: used ? parts.slice(i, i + used + 1).join('') : p, gloss: hit.gloss, coined: !!hit.coined, role: hit.role || wwRole(lw, hit.entry), punct: '' });
     i += used;
   }
-  return { text: out.join('').replace(/ {2,}/g, ' ').replace(/^ +/, ''), tokens, coined, missing: [...new Set(missing)] };
+  flush('');
+  // arrange each sentence, then write it out
+  const tokens = []; let outText = '';
+  for (const sn of sentences) {
+    const ws = arrange ? wwReorder(sn.words, order, adjAfter) : sn.words;
+    if (ws.some((x, i) => x !== sn.words[i])) arranged = true;
+    // commas stay where they were in the sentence: re-attach them by position
+    const commas = sn.words.map((x) => x.punct);
+    const line = ws.map((x, i) => { let o = x.o; if (i === 0 && sn.cap && !x.name) o = o.charAt(0).toUpperCase() + o.slice(1); return o + (commas[i] || ''); }).join(' ');
+    outText += (sn.lead || '') + line + (sn.end || '');
+    for (const x of ws) tokens.push({ src: x.src, out: x.unknown ? null : x.o, gloss: x.gloss, coined: x.coined, name: x.name, unknown: x.unknown, role: x.role });
+  }
+  return { text: outText.replace(/ {2,}/g, ' ').replace(/^ +/, '').replace(/ +([.!?;:,])/g, '$1'), tokens, coined, missing: [...new Set(missing)], arranged, order: order || '' };
 }
+/** copy text to the clipboard, with a small confirmation */
+function wwCopy(text, what = 'Translation') { try { navigator.clipboard.writeText(text).then(() => toast(`${what} copied`), () => toast('Couldn’t copy; select the text and copy it instead')); } catch (e) { toast('Couldn’t copy; select the text and copy it instead'); } }
 /** translate, add any coined words to the conlang's lexicon, and say so */
 async function wwTranslateAndSave(c, text, opts = {}) {
   const r = wwTranslate(S.fm(c), text, opts);
@@ -334,7 +395,10 @@ function renderLanguageConlang(f, fm) {
   const ta = h('textarea', { class: 'cl-in ww-quick-in', placeholder: `English to ${f.basename}…` }, st.input); ta.addEventListener('input', () => { st.input = ta.value; });
   const coin = h('input', { type: 'checkbox', checked: st.coin }); coin.addEventListener('change', () => { st.coin = coin.checked; });
   const outBox = h('div', { class: 'ww-quick-out' });
-  const show = (r) => { if (!r) return outBox.replaceChildren(); outBox.replaceChildren(h('div', { class: 'ww-quick-text' }, r.text, canSpeak() ? h('button', { class: 'cl-hear', title: 'Hear an approximation', onclick: () => speakSay(r.tokens.filter((t) => t.out).map((t) => pronounce(ph, t.out)).join(' ')) }, '🔊') : null),
+  const sayOf_ = (r) => r.tokens.filter((t) => t.out && !t.name).map((t) => pronounce(ph, t.out)).join(' ');
+  const show = (r) => { if (!r) return outBox.replaceChildren(); outBox.replaceChildren(h('div', { class: 'ww-quick-text' }, h('span', { class: 'ww-out-text' }, r.text), canSpeak() ? h('button', { class: 'cl-hear', title: 'Hear an approximation', onclick: () => speakSay(sayOf_(r)) }, '🔊') : null),
+    h('div', { class: 'ww-copy-row' }, h('button', { class: 'ww-copy', onclick: () => wwCopy(r.text) }, '⧉ Copy'), h('button', { class: 'ww-copy', onclick: () => wwCopy(`${r.text}\n(${sayOf_(r)})`, 'Translation and pronunciation') }, '⧉ Copy with pronunciation'),
+      h('span', { class: 'cs-hint' }, r.order && /^[SVO]{3}$/.test(r.order) ? `Arranged for ${r.order} word order.` : 'Set a word order on the conlang’s Grammar tab and translations follow it.')),
     h('div', { class: 'cl-out' }, ...r.tokens.map((t) => h('span', { class: 'cl-tok' + (t.unknown ? ' is-unk' : '') + (t.coined ? ' is-new' : '') }, h('b', {}, t.out || t.src), h('small', {}, t.unknown ? '?' : t.gloss)))),
     ...(r.missing.length ? [h('div', { class: 'cs-hint' }, `Not in the lexicon yet: ${r.missing.join(', ')}. Tick “Create missing words” or add them in Wordwright.`)] : [])); };
   const go = async () => { st.res = st.coin ? await wwTranslateAndSave(c, st.input, { coin: true }) : wwTranslate(cf, st.input); show(st.res); };

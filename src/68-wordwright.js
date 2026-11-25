@@ -10,12 +10,16 @@ function conlangs() { const a = WWA(); try { return a ? a.WW.all() : []; } catch
 const conlangName = (c) => c.basename.replace(/\s*\(conlang\)$/i, '');
 
 /** translate the editor's selection into a conlang and put the translation in its place */
-async function translateSelection(editor, conlang) {
+/** mode "replace" swaps the selection for the translation; "copy" leaves the text and copies the translation */
+async function translateSelection(editor, conlang, mode = 'replace') {
   const a = WWA(); const text = editor.getSelection(); if (!a || !text.trim()) return null;
   const r = await a.translateAndSave(conlang, text, { coin: true });
-  editor.replaceSelection(r.text);
+  if (mode === 'copy') { try { await navigator.clipboard.writeText(r.text); } catch (e) { /* clipboard not allowed */ } }
+  else editor.replaceSelection(r.text);
   DS().ui.lastConlang = conlang.path; SG.saveSoon();
-  if (!r.coined.length) notice(`Translated into ${conlangName(conlang)}${r.missing.length ? `. Left in [brackets]: ${r.missing.join(', ')} (set up its sounds to coin new words)` : ''}.`);
+  const order = r.arranged && r.order ? ` in ${r.order} word order` : '';
+  if (!r.coined.length) notice(`${mode === 'copy' ? 'Copied the translation' : 'Translated'} into ${conlangName(conlang)}${order}${mode === 'copy' ? `: ${r.text}` : ''}${r.missing.length ? `. Left in [brackets]: ${r.missing.join(', ')} (set up its sounds to coin new words)` : ''}.`, 6000);
+  else if (mode === 'copy') notice(`${mode === 'copy' ? 'Copied the translation' : 'Translated'} into ${conlangName(conlang)}${order}${mode === 'copy' ? `: ${r.text}` : ''}.`, 6000);
   return r;
 }
 function pickConlang(cb) {
@@ -31,10 +35,13 @@ function installWordwrightDraftsmith(plugin) {
     if (!WWA() || !editor || !editor.getSelection || !editor.getSelection().trim() || !conlangs().length) return;
     const last = conlangs().find((c) => c.path === DS().ui.lastConlang);
     menu.addItem((i) => { i.setTitle('Translate to a conlang…').setIcon('languages'); i.onClick(() => pickConlang((c) => translateSelection(editor, c))); });
+    menu.addItem((i) => { i.setTitle('Copy a conlang translation…').setIcon('copy'); i.onClick(() => pickConlang((c) => translateSelection(editor, c, 'copy'))); });
     if (last && conlangs().length > 1) menu.addItem((i) => { i.setTitle(`Translate to ${conlangName(last)}`).setIcon('languages'); i.onClick(() => translateSelection(editor, last)); });
   }));
   plugin.addCommand({ id: 'translate-selection', name: 'Translate the selection to a conlang (Wordwright)', editorCheckCallback: (chk, editor) => {
     if (!WWA() || !conlangs().length || !editor.getSelection().trim()) return false; if (!chk) pickConlang((c) => translateSelection(editor, c)); return true; } });
+  plugin.addCommand({ id: 'copy-translation', name: 'Copy a conlang translation of the selection (Wordwright)', editorCheckCallback: (chk, editor) => {
+    if (!WWA() || !conlangs().length || !editor.getSelection().trim()) return false; if (!chk) pickConlang((c) => translateSelection(editor, c, 'copy')); return true; } });
   HOST.exportGuide = exportLanguageGuide;
 }
 

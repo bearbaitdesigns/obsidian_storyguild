@@ -241,3 +241,11 @@
 .sg-phone .wk .lh-found-row { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 .wk .lh-affix { min-width: 0; box-sizing: border-box; }
 .wk .lh-affrow small { padding-left: 4px; }
+.wk .ww-copy-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -2px 0 10px; }
+.wk .ww-copy { font-size: .8em; padding: 3px 11px; border-radius: 999px; }
+.wk .ww-out-text { user-select: text; -webkit-user-select: text; }
+.wk .lh-flairs { display: flex; flex-wrap: wrap; gap: 6px; }
+.wk .lh-flair { border-radius: 999px; padding: 4px 12px; font-size: .88em; }
+.wk .lh-flair.is-on { background: var(--interactive-accent); color: var(--text-on-accent); }
+.wk .lh-flair-in { width: 100%; box-sizing: border-box; }
+.wk .lh-flair-sum { font-size: .86em; color: var(--text-muted); font-family: var(--font-monospace); }

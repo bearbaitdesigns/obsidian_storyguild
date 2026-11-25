@@ -13,6 +13,8 @@ function genWord(ph, existing) {
     const k = mn + Math.floor(Math.random() * (mx - mn + 1)); let w = '';
     for (let i = 0; i < k; i++) for (const ch of pick(Pt)) w += ch === 'C' ? pick(C) : ch === 'V' ? pick(V) : WORD_MARKS.test(ch) ? (ch === '-' ? '-' : '\'') : '';
     w = w.replace(/^['’ʼ-]+|['’ʼ-]+$/g, '').replace(/(['’ʼ-])['’ʼ-]+/g, '$1');
+    // a flair can prefer some word endings (-iel, -heim, -ach…)
+    const FI = sp(ph.finals); if (FI.length && Math.random() < (ph.finalRate ?? 0.35)) { const fin = pick(FI); const vEnd = /[aeiouyáéíóúāēīōū]$/i.test(w), vStart = /^[aeiouyáéíóúāēīōū]/i.test(fin); w = (vEnd && vStart ? w.replace(/[aeiouyáéíóúāēīōū]+$/i, '') : w) + fin; }
     if (!F.some((x) => w.includes(x)) && !existing.has(w)) return w;
   }
   return null;
@@ -294,18 +296,23 @@ function renderConlang(f, fm) {
       h('div', { class: 'cl-row' }, h('label', {}, 'Romanization: how it is spelled in our letters'), area('romanization', 'e.g. “x” is the throaty sound in loch; long vowels have a line on top (ā)…')),
       h('div', { class: 'cl-row' }, h('label', {}, 'Notes'), area('notes', 'Where the script came from, who can read it, what it is written on…'))));
   } else if (st.tab === 'tr') {
-    const r = wwTranslate(fm, st.input, { drop: st.skip });
+    if (st.arrange === undefined) st.arrange = true;
+    const r = wwTranslate(fm, st.input, { drop: st.skip, arrange: st.arrange });
     const out = h('div', { class: 'cl-out' }, ...r.tokens.map((t) => h('span', { class: 'cl-tok' + (t.unknown ? ' is-unk' : ''), title: t.unknown ? 'Not in the lexicon. Click to coin a word.' : '' },
       h('b', { onclick: t.unknown ? async () => { await wwTranslateAndSave(f, t.src, { coin: true }); } : null }, t.out || t.src), h('small', {}, t.gloss))));
     const ta = h('textarea', { class: 'cl-in' }, st.input); ta.addEventListener('input', () => { st.input = ta.value; });
     const skip = h('input', { type: 'checkbox', checked: st.skip }); skip.addEventListener('change', () => { st.skip = skip.checked; rerender(); });
+    const arrange = h('input', { type: 'checkbox', checked: st.arrange }); arrange.addEventListener('change', () => { st.arrange = arrange.checked; rerender(); });
     const sayLine = r.tokens.filter((t) => t.out && !t.name).map((t) => pronounce(ph, t.out));
+    const hasOrder = /^[SVO]{3}$/.test(fm.wordOrder || '');
     ap(wrap, h('div', { class: 'cl-card' }, h('h4', {}, 'English'), ta,
       h('div', { class: 'cl-actions' }, h('button', { class: 'mod-cta', onclick: rerender }, 'Translate'), h('label', { class: 'cs-hint cl-inline' }, skip, 'Drop articles (the, a, an)'),
-        r.missing.length ? h('button', { onclick: () => wwTranslateAndSave(f, st.input, { coin: true, drop: st.skip }) }, `🎲 Coin ${r.missing.length} missing`) : null)),
-      h('div', { class: 'cl-card cs-mt' }, h('h4', {}, 'Translation'), h('div', { class: 'ww-quick-text' }, r.text), out,
+        hasOrder ? h('label', { class: 'cs-hint cl-inline' }, arrange, `Arrange for ${fm.wordOrder}`) : null,
+        r.missing.length ? h('button', { onclick: () => wwTranslateAndSave(f, st.input, { coin: true, drop: st.skip, arrange: st.arrange }) }, `🎲 Coin ${r.missing.length} missing`) : null)),
+      h('div', { class: 'cl-card cs-mt' }, h('h4', {}, 'Translation'), h('div', { class: 'ww-quick-text' }, h('span', { class: 'ww-out-text' }, r.text)),
+        h('div', { class: 'ww-copy-row' }, h('button', { class: 'ww-copy', onclick: () => wwCopy(r.text) }, '⧉ Copy'), sayLine.length ? h('button', { class: 'ww-copy', onclick: () => wwCopy(`${r.text}\n(${sayLine.join(' ')})`, 'Translation and pronunciation') }, '⧉ Copy with pronunciation') : null, h('button', { class: 'ww-copy', onclick: () => wwCopy(r.tokens.map((t) => `${t.out || t.src} (${t.gloss})`).join(' '), 'Word-by-word gloss') }, '⧉ Copy gloss')), out,
         sayLine.length ? h('div', { class: 'cl-sayline' }, h('span', { class: 'cs-hint' }, 'Say it: '), sayLine.join(' '), canSpeak() ? h('button', { class: 'cl-hear', title: 'Hear an approximation', onclick: () => speakSay(sayLine.join(' ')) }, '🔊') : null) : null,
-        h('div', { class: 'cs-hint cs-mt' }, `Words stay in English order. Rearrange them for ${fm.wordOrder || 'your'} word order when you write. Names (capitalised words inside a sentence) are kept as they are.`)));
+        h('div', { class: 'cs-hint cs-mt' }, hasOrder ? (st.arrange ? `Arranged for ${fm.wordOrder}: ${LH_ORDER_HELP[fm.wordOrder] || ''} Phrases like “to the sea” go ${fm.wordOrder.endsWith('V') ? 'before the verb' : 'at the end'}${/after/i.test(String((fm.grammar || {}).adjPos || '')) ? ', and describing words follow their noun' : ''}.` : 'Shown in English order.') : 'Pick a word order on the Grammar tab and translations are arranged to match.', ' Names (capitalised words inside a sentence) are kept as they are.')));
   } else if (st.tab === 'export') {
     st.sections = st.sections || Object.fromEntries(WW_SECTIONS.map(([k]) => [k, true]));
     const checks = WW_SECTIONS.map(([k, l]) => { const c = h('input', { type: 'checkbox', checked: st.sections[k] }); c.addEventListener('change', () => { st.sections[k] = c.checked; }); return h('label', { class: 'lh-check' }, c, l); });

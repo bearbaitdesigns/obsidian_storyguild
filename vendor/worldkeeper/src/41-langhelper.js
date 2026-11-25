@@ -48,12 +48,46 @@ const LH_AFFIXES = [
   { m: 'one who does (agent)', on: true }, { m: 'place of', on: false }, { m: 'small (diminutive)', on: false },
 ];
 
+/* ---------- flair: an optional flavour laid over the chosen sounds ---------- */
+const LH_FLAIRS = [
+  { id: 'dark', icon: '🌑', name: 'Dark', words: ['dark', 'grim', 'evil', 'shadow', 'gothic', 'sinister', 'menacing'], add: { C: 'gr kr z v th', V: 'u o' }, drop: { C: 'w y h', V: 'ie ia' }, finals: 'oth ul rak goth mor', patterns: 'CVC' },
+  { id: 'germanic', icon: '🏰', name: 'Germanic', words: ['german', 'germanic', 'teutonic', 'saxon', 'dutch'], add: { C: 'sch ch k g w z r', V: 'ei au ü ö' }, finals: 'en er heim burg ling wald', patterns: 'CVCC CVC' },
+  { id: 'celtic', icon: '☘️', name: 'Celtic', words: ['celtic', 'irish', 'welsh', 'gaelic', 'breton', 'druid'], add: { C: 'bh dh mh ll ch', V: 'ae ai ea ui' }, finals: 'an ach wyn eth mor', patterns: 'CV CVC' },
+  { id: 'whisky', icon: '🥃', name: 'Whisky (smoky Highland)', words: ['whisky', 'whiskey', 'smoky', 'smokey', 'highland', 'peat', 'scotch', 'scottish', 'tavern'], add: { C: 'ch gh mh bh', V: 'ai ea oi' }, finals: 'ach aig ie more dhu', patterns: 'CVC' },
+  { id: 'elvish', icon: '🧝', name: 'Elvish', words: ['elvish', 'elven', 'elf', 'fair', 'ethereal', 'graceful'], add: { C: 'l r n th v s', V: 'ie ae ë' }, drop: { C: 'k g kh gh q z b x sch' }, finals: 'iel wen ion dil las riel', patterns: 'CV CV V' },
+  { id: 'norse', icon: '⚔️', name: 'Norse', words: ['norse', 'viking', 'nordic', 'scandinavian', 'icelandic'], add: { C: 'sk kn rn ð þ', V: 'ø å ei' }, finals: 'heim gard vik ir dr', patterns: 'CVCC CVC' },
+  { id: 'latin', icon: '🏛️', name: 'Latin', words: ['latin', 'roman', 'classical', 'imperial', 'legal'], add: { C: 'c qu x', V: 'ae' }, finals: 'us um ia ius or ae', patterns: 'CV CVC' },
+  { id: 'slavic', icon: '🌲', name: 'Slavic', words: ['slavic', 'russian', 'polish', 'czech', 'slav'], add: { C: 'zh cz sk ch v', V: 'y' }, finals: 'ov ska ich ek ava', patterns: 'CVC CCVC' },
+  { id: 'infernal', icon: '🔥', name: 'Infernal', words: ['infernal', 'demonic', 'demon', 'hell', 'hellish', 'fiendish'], add: { C: 'z x gr kh', V: 'a u' }, drop: { V: 'ie' }, finals: 'oth azz ul gor zak', patterns: 'CVC CVCC' },
+  { id: 'fae', icon: '🍄', name: 'Fae', words: ['fae', 'fairy', 'faerie', 'fey', 'whimsical', 'sprite', 'pixie'], add: { C: 'ph l s w', V: 'ee i' }, drop: { C: 'kh gh q x' }, finals: 'ie wyn ette ella', patterns: 'CV CVC' },
+  { id: 'oceanic', icon: '🌊', name: 'Sea-worn', words: ['sea', 'ocean', 'oceanic', 'island', 'tidal', 'sailor', 'maritime'], add: { C: 'l m n w h', V: 'a o u' }, drop: { C: 'kh gh z x' }, finals: 'a o ua ali', patterns: 'CV V' },
+];
+/** flair ids for words in free text ("dark, whisky, elvish"), plus the words nothing matched */
+function lhFlairMatch(text) {
+  const ws = String(text || '').toLowerCase().split(/[^a-zà-ÿ]+/).filter(Boolean); const ids = new Set(); const unknown = [];
+  for (const w of ws) { const f = LH_FLAIRS.find((x) => x.id === w || x.words.includes(w)); if (f) ids.add(f.id); else if (w.length > 2 && !['and', 'with', 'but', 'like', 'very', 'bit', 'touch', 'little', 'some'].includes(w)) unknown.push(w); }
+  return { ids: [...ids], unknown };
+}
+/** the sounds with the chosen flairs laid over them: added and dropped sounds, extra syllable shapes, preferred endings */
+function lhApplyFlair(ph, ids) {
+  const out = Object.assign({}, ph); if (!ids || !ids.length) return out;
+  const sp = (x) => String(x || '').split(/\s+/).filter(Boolean);
+  let C = sp(ph.consonants), V = sp(ph.vowels), Pt = sp(ph.patterns), F = sp(ph.finals);
+  for (const id of ids) { const fl = LH_FLAIRS.find((x) => x.id === id); if (!fl) continue;
+    const dropC = sp(fl.drop && fl.drop.C), dropV = sp(fl.drop && fl.drop.V);
+    C = C.filter((x) => !dropC.includes(x)); V = V.filter((x) => !dropV.includes(x));
+    for (const x of sp(fl.add && fl.add.C)) if (!C.includes(x)) C.push(x); for (const x of sp(fl.add && fl.add.V)) if (!V.includes(x)) V.push(x);
+    for (const x of sp(fl.patterns)) Pt.push(x); for (const x of sp(fl.finals)) if (!F.includes(x)) F.push(x); }
+  if (!C.length) C = sp(ph.consonants); if (!V.length) V = sp(ph.vowels);
+  return Object.assign(out, { consonants: C.join(' '), vowels: V.join(' '), patterns: Pt.join(' '), finals: F.join(' '), finalRate: 0.35, flair: ids.map((id) => (LH_FLAIRS.find((x) => x.id === id) || {}).name).filter(Boolean).join(', ') });
+}
+
 function openLanguageHelper(f) {
   const fm0 = S.fm(f); const cur = Object.assign({}, fm0.phonology || {});
   const hasSounds = !!(cur.consonants && cur.vowels);
   const st = {
     step: 0, mode: null, mineText: arr(fm0.lexicon).map((e) => `${e.word} = ${e.meaning || ''}`).join('\n'), englishFirst: false, mine: [], found: null, ans: {}, affType: '',
-    feel: hasSounds ? 'keep' : null,
+    feel: hasSounds ? 'keep' : null, flairs: [], flairText: '',
     ph: hasSounds ? Object.assign({ patterns: 'CV CVC', forbidden: '', minSyl: 1, maxSyl: 2 }, cur) : null,
     order: fm0.wordOrder || '', morph: fm0.morphology || '',
     groups: Object.assign(Object.fromEntries(LH_WORDS.map((g) => [g.id, true])), { more: true }), extra: '', words: {},
@@ -63,10 +97,12 @@ function openLanguageHelper(f) {
   const knownNow = () => new Set([...meaningsOf(fm0.lexicon), ...(st.mode === 'words' ? meaningsOf(st.mine) : [])]);
   const taken = () => new Set([...arr(S.fm(f).lexicon).map((e) => e.word), ...(st.mode === 'words' ? st.mine.map((e) => e.word) : []), ...Object.values(st.words)]);
   /* everyday words stay short, as they do in real languages: little words get one syllable, core words at most one more than the shortest */
-  const shortPh = () => Object.assign({}, st.ph, { minSyl: 1, maxSyl: 1 });
-  const corePh = () => { const mn = Math.max(1, +st.ph.minSyl || 1); return Object.assign({}, st.ph, { minSyl: mn, maxSyl: Math.min(Math.max(mn, +st.ph.maxSyl || mn), mn + 1) }); };
-  const phFor = (x) => (x.short ? shortPh() : x.story ? st.ph : corePh());
-  const sample = () => { const ex = taken(); st.samples = []; for (let i = 0; i < 10; i++) { const w = genWord(st.ph, ex); if (w) { st.samples.push(w); ex.add(w); } } };
+  const shortPh = () => Object.assign({}, effPh(), { minSyl: 1, maxSyl: 1, finals: '' });
+  const corePh = () => { const mn = Math.max(1, +st.ph.minSyl || 1); return Object.assign({}, effPh(), { minSyl: mn, maxSyl: Math.min(Math.max(mn, +st.ph.maxSyl || mn), mn + 1) }); };
+  const phFor = (x) => (x.short ? shortPh() : x.story ? effPh() : corePh());
+  /** the sounds new words are made from: the chosen sounds with any flair laid over them */
+  const effPh = () => lhApplyFlair(st.ph, st.flairs);
+  const sample = () => { const ex = taken(); st.samples = []; for (let i = 0; i < 10; i++) { const w = genWord(effPh(), ex); if (w) { st.samples.push(w); ex.add(w); } } };
   const wantedWords = () => {
     const out = [];
     for (const g of LH_WORDS) if (st.groups[g.id]) for (const m of g.words) out.push({ m, pos: g.pos || (g.id === 'people' && /^(I|you|we|they)$/.test(m) ? 'pron' : 'noun'), short: !!g.short || (g.id === 'people' && /^(I|you|we|they)$/.test(m)) });
@@ -90,7 +126,7 @@ function openLanguageHelper(f) {
   const affixType = () => st.affType || (st.order === 'VSO' || st.order === 'VOS' ? 'prefix' : 'suffix');
   const typeOf = (a) => a.type || affixType();
   const coinAffixes = (force) => {
-    const ex = new Set(); const base = Object.assign({}, st.ph, { patterns: 'V VC CV', minSyl: 1, maxSyl: 1 });
+    const ex = new Set(); const base = Object.assign({}, effPh(), { patterns: 'V VC CV', minSyl: 1, maxSyl: 1, finals: '' });
     for (const a of st.affixes) { if (a.detected || (a.form && !force)) { ex.add(a.form); continue; } const w = genWord(base, ex) || 'a'; ex.add(w); a.form = w; }
   };
 
@@ -184,6 +220,17 @@ function openLanguageHelper(f) {
   }
   const tip = (t) => h('div', { class: 'lh-tip' }, h('b', {}, '💡 '), t);
 
+  function flairCard() {
+    const toggle = (id) => { st.flairs = st.flairs.includes(id) ? st.flairs.filter((x) => x !== id) : [...st.flairs, id]; st.words = {}; sample(); draw(); };
+    const txt = h('input', { type: 'text', class: 'lh-flair-in', value: st.flairText, placeholder: 'Or describe it: dark, whisky, elvish…' });
+    const msg = h('div', { class: 'cs-hint' });
+    txt.addEventListener('change', () => { st.flairText = txt.value; const m = lhFlairMatch(txt.value); for (const id of m.ids) if (!st.flairs.includes(id)) st.flairs.push(id); st.flairNote = m.unknown.length ? `No flair for “${m.unknown.join('”, “')}” yet; try one of the chips.` : ''; st.words = {}; sample(); draw(); });
+    const E = effPh(); const base = String(st.ph.consonants).split(/\s+/); const added = String(E.consonants).split(/\s+/).filter((x) => x && !base.includes(x));
+    return h('div', { class: 'lh-card' }, h('h4', {}, 'Flair (optional)'), h('div', { class: 'cs-hint' }, 'Give the language a flavour on top of its sounds. Pick one or mix a few.'),
+      h('div', { class: 'lh-flairs' }, ...LH_FLAIRS.map((fl) => h('button', { class: 'lh-flair' + (st.flairs.includes(fl.id) ? ' is-on' : ''), onclick: () => toggle(fl.id) }, fl.icon + ' ' + fl.name))),
+      txt, st.flairNote ? h('div', { class: 'cs-hint' }, st.flairNote) : null,
+      st.flairs.length ? h('div', { class: 'lh-flair-sum' }, `${E.flair}: `, added.length ? `adds ${added.join(' ')}; ` : '', `words often end in ${String(E.finals).split(/\s+/).slice(0, 8).map((x) => '-' + x).join(' ')}`) : null);
+  }
   function stepSound(body) {
     ap(body, h('p', { class: 'lh-lead' }, st.found ? 'These sounds and syllable shapes come from your words. New words will follow them; tune anything that looks off, or try a different feel.' : 'Start with how the language sounds. Readers judge a language by its sounds long before its grammar, so pick a feel and tune it until the sample words sound right for the people who speak it.'));
     const feels = [...(st.found ? [{ id: 'detected', icon: '📝', name: 'From your words', blurb: `The ${st.found.stats.words} words you gave: their sounds, syllables and length.`, ph: st.foundPh }] : []), ...(hasSounds ? [{ id: 'keep', icon: '🔊', name: 'Keep my sounds', blurb: 'Use the consonants and vowels already on this note.', ph: cur }] : []), ...LH_FEELS];
@@ -208,6 +255,7 @@ function openLanguageHelper(f) {
       flag('Apostrophes for a catch in the voice (ka\u2019el)', hasApos, (on) => { const p = sp(st.ph.patterns).filter((x) => !/'/.test(x)); st.ph.patterns = (on ? [...p, "CV'V"] : p).join(' '); }),
       flag('Show the stressed vowel with an accent (talássa)', hasAcute, (on) => { st.ph.acute = on; }),
       h('div', { class: 'cs-hint' }, 'Hyphens are for compound words; type them into your own words (sea-lantern) or add - to a syllable shape.')));
+    ap(body, flairCard());
     ap(body, h('div', { class: 'lh-card' }, h('h4', {}, 'Sample words'), h('div', { class: 'cl-gen' }, ...st.samples.map((w) => h('span', { class: 'lh-sample' }, w, h('small', {}, pronounce(st.ph, w))))),
       h('div', { class: 'cl-actions' }, h('button', { onclick: () => { sample(); draw(); } }, '🎲 New samples'))));
     ap(body, tip('Fewer sounds make a language feel more distinct. Around 10–15 consonants and 3–6 vowels is plenty. If a word looks unpronounceable, add the clumsy pair to “Never allow”.'));
@@ -264,7 +312,8 @@ function openLanguageHelper(f) {
   async function apply() {
     const words = wantedWords().filter((x) => st.words[x.m]); const aff = st.affixes.filter((a) => a.on && a.form); const isol = st.morph === 'Isolating';
     await S.write(f, (x) => {
-      if (st.doSounds !== false) x.phonology = Object.assign({}, x.phonology || {}, { consonants: st.ph.consonants, vowels: st.ph.vowels, patterns: st.ph.patterns, forbidden: st.ph.forbidden || '', minSyl: +st.ph.minSyl || 1, maxSyl: +st.ph.maxSyl || 2 }, st.ph.stress ? { stress: st.ph.stress } : {});
+      const E = effPh();
+      if (st.doSounds !== false) { x.phonology = Object.assign({}, x.phonology || {}, { consonants: E.consonants, vowels: E.vowels, patterns: E.patterns, forbidden: E.forbidden || '', minSyl: +E.minSyl || 1, maxSyl: +E.maxSyl || 2 }, E.stress ? { stress: E.stress } : {}); if (E.finals) { x.phonology.finals = E.finals; x.phonology.finalRate = E.finalRate; x.phonology.flair = E.flair; } else { delete x.phonology.finals; delete x.phonology.flair; } }
       if (st.doGrammar !== false) { if (st.order) x.wordOrder = st.order; if (st.morph) x.morphology = st.morph; }
       x.lexicon = arr(x.lexicon); x.affixes = arr(x.affixes);
       if (st.mode === 'words' && st.doMine !== false) { const have = new Set(x.lexicon.map((e) => String(e.word).toLowerCase())); for (const e of st.mine) if (!have.has(String(e.word).toLowerCase())) { x.lexicon.push({ word: e.word, pos: e.pos || lhGuessPos(e.meaning), meaning: e.meaning }); have.add(String(e.word).toLowerCase()); } }

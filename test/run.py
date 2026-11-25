@@ -409,14 +409,17 @@ async def main():
           const helper = !!document.querySelector('.lh'); const btn = (t) => [...document.querySelectorAll('.lh-foot button')].find(b => b.textContent.includes(t));
           [...document.querySelectorAll('.lh-start')].find(b => b.textContent.includes('Build from scratch')).click(); await new Promise(r => setTimeout(r, 50)); btn('Next').click(); await new Promise(r => setTimeout(r, 50));
           [...document.querySelectorAll('.lh-feel')].find(b => b.textContent.includes('Harsh')).click(); await new Promise(r => setTimeout(r, 50));
+          const fin = document.querySelector('.lh-flair-in'); fin.value = 'dark whisky blorpish'; fin.dispatchEvent(new Event('change')); await new Promise(r => setTimeout(r, 60));
+          window.__flair = { on: [...document.querySelectorAll('.lh-flair.is-on')].map(b => b.textContent), sum: (document.querySelector('.lh-flair-sum') || {}).textContent, note: [...document.querySelectorAll('.lh-card .cs-hint')].map(x => x.textContent).find(t => t.includes('No flair')) };
           btn('Next').click(); await new Promise(r => setTimeout(r, 50)); btn('Next').click(); await new Promise(r => setTimeout(r, 80));
           const preview = (document.querySelector('.lh-card h4:last-of-type') || {}).textContent; const more = !!document.querySelector('.lh-group-more input:checked');
           for (let i = 0; i < 2; i++) { btn('Next').click(); await new Promise(r => setTimeout(r, 50)); } btn('Add to my language').click(); await new Promise(r => setTimeout(r, 800));
           const c = app.vault.getMarkdownFiles().find(f => (app.metadataCache.getFileCache(f)?.frontmatter || {}).type === 'conlang'); const cf = app.metadataCache.getFileCache(c).frontmatter;
           const lf = app.metadataCache.getFileCache(app.vault.getAbstractFileByPath('Story/Languages/Old Tide.md')).frontmatter;
-          return { offer, helper, more, preview, path: c.path, langLink: cf.language, back: lf.conlang, words: (cf.lexicon || []).length, order: [cf.wordOrder, lf.wordOrder], legacy: 'lexicon' in lf || 'phonology' in lf }; }""")
+          return { flair: window.__flair, phFlair: cf.phonology.flair, finals: cf.phonology.finals, offer, helper, more, preview, path: c.path, langLink: cf.language, back: lf.conlang, words: (cf.lexicon || []).length, order: [cf.wordOrder, lf.wordOrder], legacy: 'lexicon' in lf || 'phonology' in lf }; }""")
         print('12. wordwright create:', json.dumps(r, ensure_ascii=False))
         CONLANG = r['path']
+        assert len(r['flair']['on']) == 2 and 'Dark' in r['phFlair'] and 'Whisky' in r['phFlair'] and 'goth' in r['finals'] and 'blorpish' in (r['flair']['note'] or '')
         assert r['offer'] and r['helper'] and r['more'] and r['langLink'] == '[[Old Tide]]' and r['back'] == '[[Old Tide (conlang)]]' and r['words'] >= 190 and r['order'] == ['SOV', 'SOV'] and not r['legacy'], r
         # 12b. the helper can start from words you already have: it works out the rules, asks about the rest, then makes the words
         await ev("async () => { await app.vault.create('World/Conlangs/Sindral (conlang).md', '---\\ntype: conlang\\nlexicon: []\\n---\\n```wordwright\\n```\\n'); await new Promise(r => setTimeout(r, 300)); }")
@@ -475,6 +478,20 @@ async def main():
           const res = await SGP.api.translateSelection(ed, c); return { out: ed.out, coined: res.coined.map(e => e.meaning), notice: __notices.slice(-1)[0], menu: typeof SGP.api.conlangs === 'function' && SGP.api.conlangs().length }; }""", CONLANG)
         print('15. draftsmith translate:', json.dumps(r, ensure_ascii=False))
         assert r['out'] and r['out'].endswith('.') and r['out'][0].isupper() and 'glimmerfang' in r['coined'] and 'glimmerfang' in r['notice'] and r['menu'] == 2
+        # 15b. translations follow the language's word order (Draftsmith too)
+        r = await ev("""async () => { const path = 'World/Conlangs/Order Test (conlang).md'; await app.vault.create(path, '---\\ntype: conlang\\n---\\n```wordwright\\n```\\n'); await new Promise(r => setTimeout(r, 200));
+          const f = app.vault.getAbstractFileByPath(path); const set = async (o) => { await app.fileManager.processFrontMatter(f, (fm) => { Object.assign(fm, o); }); await new Promise(r => setTimeout(r, 150)); };
+          await set({ phonology: { consonants: 't k r', vowels: 'a o' }, lexicon: [{ word: 'vul', pos: 'noun', meaning: 'fox' }, { word: 'esa', pos: 'verb', meaning: 'eat' }, { word: 'brak', pos: 'noun', meaning: 'bread' }, { word: 'mi', pos: 'pron', meaning: 'I' }, { word: 'nu', pos: 'particle', meaning: 'not' }, { word: 'ira', pos: 'verb', meaning: 'go' }, { word: 'ad', pos: 'prep', meaning: 'to' }, { word: 'sel', pos: 'noun', meaning: 'sea' }, { word: 'ruda', pos: 'adj', meaning: 'red' }, { word: 'hus', pos: 'noun', meaning: 'house' }, { word: 'sor', pos: 'verb', meaning: 'see' }] });
+          const tr = async (t) => { const ed = { sel: t, getSelection() { return this.sel; }, replaceSelection(x) { this.out = x; } }; await SGP.api.translateSelection(ed, f); return ed.out; };
+          const out = {};
+          for (const o of ['SVO', 'SOV', 'VSO', 'VOS', 'OVS', 'OSV', 'Free']) { await set({ wordOrder: o }); out[o] = await tr('The fox eats the bread.'); }
+          await set({ wordOrder: 'SOV' }); out.sovPlace = await tr('I not go to the sea.');
+          await set({ wordOrder: 'SVO', grammar: { adjPos: 'After the noun (house red)' } }); out.adj = await tr('I see the red house, the fox eats bread.');
+          const ed2 = { sel: 'The fox eats the bread.', getSelection() { return this.sel; }, replaceSelection(x) { this.out = x; } }; await set({ wordOrder: 'OSV' }); const r2 = await SGP.api.translateSelection(ed2, f, 'copy'); out.copyKept = ed2.out === undefined; out.copyNotice = __notices.slice(-1)[0];
+          return out; }""")
+        print('15b. word order:', json.dumps(r, ensure_ascii=False))
+        assert r['SVO'] == 'Vul esa brak.' and r['SOV'] == 'Vul brak esa.' and r['VSO'] == 'Esa vul brak.' and r['VOS'] == 'Esa brak vul.' and r['OVS'] == 'Brak esa vul.' and r['OSV'] == 'Brak vul esa.' and r['Free'] == 'Vul esa brak.'
+        assert r['sovPlace'] == 'Mi ad sel nu ira.' and r['adj'] == 'Mi sor hus ruda, vul esa brak.' and r['copyKept'] and 'OSV word order' in r['copyNotice'] and 'Brak vul esa.' in r['copyNotice'], r
         # 16. language guide: Word and PDF from the conlang, and as an appendix in a published book
         r = await ev("""async (p) => { const c = app.vault.getAbstractFileByPath(p); const a = await SGP.api.exportGuide(c, 'pdf'); const b = await SGP.api.exportGuide(c, 'docx');
           const bk = SGP.data.manuscript.projects[0]; Object.assign(bk.compile, { langGuides: [p], format: 'md', manuscriptFormat: false });
@@ -499,7 +516,7 @@ async def main():
         r = await ev("""async () => { app.commands.executeCommandById('worldkeeper:open-wordwright'); await new Promise(r => setTimeout(r, 600));
           const cards = [...document.querySelectorAll('.ww-card-name')].map(x => x.textContent); return { cards, cmds: Object.keys(app.commands.commands).filter(k => /conlang|wordwright|translate/.test(k)) }; }""")
         print('18. library:', json.dumps(r, ensure_ascii=False))
-        assert set(r['cards']) == {'Old Tide', 'Deep Speech', 'Sindral'} and 'storyguild:translate-selection' in r['cmds'] and 'worldkeeper:open-wordwright' in r['cmds']
+        assert set(r['cards']) == {'Old Tide', 'Deep Speech', 'Sindral', 'Order Test'} and 'storyguild:translate-selection' in r['cmds'] and 'worldkeeper:open-wordwright' in r['cmds']
         await ev("() => document.querySelectorAll('.ww-test').forEach(e => e.remove())")
         # Unload cleanly
         r = await ev("""async () => { SGP.unload(); await new Promise(r => setTimeout(r, 300)); return { views: Object.keys(app.viewRegistry), blocks: Object.keys(app.codeblocks), cmds: Object.keys(app.commands.commands).length, saved: JSON.parse(app.vault.adapter.data.get('.obsidian/plugins/storyguild/data.json')).manuscript.projects.length }; }""")

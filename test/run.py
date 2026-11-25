@@ -411,14 +411,18 @@ async def main():
           [...document.querySelectorAll('.lh-feel')].find(b => b.textContent.includes('Harsh')).click(); await new Promise(r => setTimeout(r, 50));
           const fin = document.querySelector('.lh-flair-in'); fin.value = 'dark whisky blorpish'; fin.dispatchEvent(new Event('change')); await new Promise(r => setTimeout(r, 60));
           window.__flair = { on: [...document.querySelectorAll('.lh-flair.is-on')].map(b => b.textContent), sum: (document.querySelector('.lh-flair-sum') || {}).textContent, note: [...document.querySelectorAll('.lh-card .cs-hint')].map(x => x.textContent).find(t => t.includes('No flair')) };
-          btn('Next').click(); await new Promise(r => setTimeout(r, 50)); btn('Next').click(); await new Promise(r => setTimeout(r, 80));
+          btn('Next').click(); await new Promise(r => setTimeout(r, 50));
+          [...document.querySelectorAll('.lh-opt')].find(b => b.querySelector('b').textContent === 'Masculine / feminine').click(); await new Promise(r => setTimeout(r, 50));
+          btn('Next').click(); await new Promise(r => setTimeout(r, 80));
           const preview = (document.querySelector('.lh-card h4:last-of-type') || {}).textContent; const more = !!document.querySelector('.lh-group-more input:checked');
           for (let i = 0; i < 2; i++) { btn('Next').click(); await new Promise(r => setTimeout(r, 50)); } btn('Add to my language').click(); await new Promise(r => setTimeout(r, 800));
           const c = app.vault.getMarkdownFiles().find(f => (app.metadataCache.getFileCache(f)?.frontmatter || {}).type === 'conlang'); const cf = app.metadataCache.getFileCache(c).frontmatter;
           const lf = app.metadataCache.getFileCache(app.vault.getAbstractFileByPath('Story/Languages/Old Tide.md')).frontmatter;
-          return { flair: window.__flair, phFlair: cf.phonology.flair, finals: cf.phonology.finals, offer, helper, more, preview, path: c.path, langLink: cf.language, back: lf.conlang, words: (cf.lexicon || []).length, order: [cf.wordOrder, lf.wordOrder], legacy: 'lexicon' in lf || 'phonology' in lf }; }""")
+          const kq = (cf.lexicon || []).filter(e => ['father', 'mother'].includes(e.meaning)).map(e => [e.meaning, e.word, e.gender, e.root]);
+          return { kq, classes: (cf.genders || {}).classes, gram: (cf.grammar || {}).gender, flair: window.__flair, phFlair: cf.phonology.flair, finals: cf.phonology.finals, offer, helper, more, preview, path: c.path, langLink: cf.language, back: lf.conlang, words: (cf.lexicon || []).length, order: [cf.wordOrder, lf.wordOrder], legacy: 'lexicon' in lf || 'phonology' in lf }; }""")
         print('12. wordwright create:', json.dumps(r, ensure_ascii=False))
         CONLANG = r['path']
+        assert len(r['classes']) == 2 and r['gram'] == 'Masculine / feminine' and len(r['kq']) == 2 and r['kq'][0][3] and r['kq'][0][3] == r['kq'][1][3] and {x[2] for x in r['kq']} == {'m', 'f'}, r['kq']
         assert len(r['flair']['on']) == 2 and 'Dark' in r['phFlair'] and 'Whisky' in r['phFlair'] and 'goth' in r['finals'] and 'blorpish' in (r['flair']['note'] or '')
         assert r['offer'] and r['helper'] and r['more'] and r['langLink'] == '[[Old Tide]]' and r['back'] == '[[Old Tide (conlang)]]' and r['words'] >= 190 and r['order'] == ['SOV', 'SOV'] and not r['legacy'], r
         # 12b. the helper can start from words you already have: it works out the rules, asks about the rest, then makes the words
@@ -461,7 +465,7 @@ async def main():
           return out; }""")
         print('13. conlang note:', json.dumps(r, ensure_ascii=False))
         cf = await ev("(p) => app.metadataCache.getFileCache(app.vault.getAbstractFileByPath(p)).frontmatter", CONLANG)
-        assert r['title'] == 'Old Tide' and 'Old Tide' in r['lang'] and len(r['tabs']) == 10 and r['groups'][:2] == ['Nouns', 'Verbs'] and (r['added'] > 0 or 'Every starter meaning' in r['addNotice']) and r['features'] == 10 and r['pron'] == 3
+        assert r['title'] == 'Old Tide' and 'Old Tide' in r['lang'] and len(r['tabs']) == 11 and r['groups'][:2] == ['Nouns', 'Verbs'] and (r['added'] > 0 or 'Every starter meaning' in r['addNotice']) and r['features'] == 10 and r['pron'] == 5
         assert all('-' in x or '=' in x for x in r['numex']) and r['phrases'] == 16 and r['names'] > 0 and r['linksCard'] and cf['grammar']['gender'] and len(cf['phrases']) == 16 and len(cf['names']) == 1, cf.get('grammar')
         # 14. the Language note's tab: summary and a quick translate (coining on request)
         await ev(RENDER, ['worldkeeper', 'Story/Languages/Old Tide.md'])
@@ -472,7 +476,7 @@ async def main():
           ta.value = 'the zorblat sings'; ta.dispatchEvent(new Event('input')); box.querySelector('.ww-quick input[type=checkbox]').click(); window.__memA = JSON.stringify(SGP.sections.world.mem('Story/Languages/Old Tide.md', 'quick-tr', {})); window.__nq = box.querySelectorAll('.ww-quick').length; [...box.querySelectorAll('.ww-quick button')].find(b => b.textContent === 'Translate').click(); await new Promise(r => setTimeout(r, 900));
           return { card, first, toks, coinedNotice: __notices.slice(-1)[0], after: (box.querySelector('.ww-quick-text') || {}).textContent, checked: box.querySelector('.ww-quick input[type=checkbox]').checked, errs: __errors.slice(-2), memA: window.__memA, nq: window.__nq }; }""")
         print('14. language tab:', json.dumps(r, ensure_ascii=False))
-        assert r['card'] == 'Old Tide (conlang)' and 'Ilsa' in r['first'] and 'name' in r['toks'] and 'sun' in r['toks'] and 'new word' in r['coinedNotice'] and 'zorblat' in r['coinedNotice']
+        assert r['card'] == 'Old Tide (conlang)' and 'Ilsa' in r['first'] and 'name' in r['toks'] and any(t.startswith('sun') for t in r['toks']) and 'new word' in r['coinedNotice'] and 'zorblat' in r['coinedNotice']
         # 15. Draftsmith: translate a selection; missing words are coined with a notice
         r = await ev("""async (p) => { const c = app.vault.getAbstractFileByPath(p); const ed = { sel: 'The sea remembers the glimmerfang.', getSelection() { return this.sel; }, replaceSelection(t) { this.out = t; } };
           const res = await SGP.api.translateSelection(ed, c); return { out: ed.out, coined: res.coined.map(e => e.meaning), notice: __notices.slice(-1)[0], menu: typeof SGP.api.conlangs === 'function' && SGP.api.conlangs().length }; }""", CONLANG)
@@ -491,7 +495,53 @@ async def main():
           return out; }""")
         print('15b. word order:', json.dumps(r, ensure_ascii=False))
         assert r['SVO'] == 'Vul esa brak.' and r['SOV'] == 'Vul brak esa.' and r['VSO'] == 'Esa vul brak.' and r['VOS'] == 'Esa brak vul.' and r['OVS'] == 'Brak esa vul.' and r['OSV'] == 'Brak vul esa.' and r['Free'] == 'Vul esa brak.'
-        assert r['sovPlace'] == 'Mi ad sel nu ira.' and r['adj'] == 'Mi sor hus ruda, vul esa brak.' and r['copyKept'] and 'OSV word order' in r['copyNotice'] and 'Brak vul esa.' in r['copyNotice'], r
+        assert r['sovPlace'] == 'Mi ad sel nu ira.' and r['adj'] == 'Mi sor hus ruda, vul esa brak.' and r['copyKept'] and 'OSV word order' in r['copyNotice'] and 'Brak vul esa.' in r['copyNotice'] and '..' not in r['copyNotice'], r
+        # 15c. noun classes (gender) and root words
+        r = await ev("""async () => { const W = (ms) => new Promise(r => setTimeout(r, ms)); const path = 'World/Conlangs/Order Test (conlang).md'; const f = app.vault.getAbstractFileByPath(path);
+          const set = async (fn) => { await app.fileManager.processFrontMatter(f, fn); await W(150); };
+          await set((fm) => { fm.wordOrder = 'SVO'; fm.lexicon.push({ word: 'brakar', pos: 'noun', meaning: 'baker' }, { word: 'kral', pos: 'noun', meaning: 'king' }); });
+          document.querySelectorAll('.ww-test').forEach(e => e.remove()); const box = document.createElement('div'); box.className = 'ww-test'; document.body.append(box);
+          await app.codeblocks['wordwright']('', box, { sourcePath: path, addChild(c) { c.load(); }, getSectionInfo() { return null; } }); await W(300);
+          const tab = async (t) => { [...box.querySelectorAll('.ww-subnav button')].find(b => b.textContent.includes(t)).click(); await W(350); };
+          await tab('Grammar'); [...box.querySelectorAll('.ww-classes button')].find(b => b.textContent === 'Masculine / feminine').click(); await W(500);
+          const made = (app.metadataCache.getFileCache(f).frontmatter.genders || {}).classes;
+          [...box.querySelectorAll('.ww-classes button')].find(b => /Give \\d+ nouns? a class/.test(b.textContent)).click(); await W(500);
+          let fm = app.metadataCache.getFileCache(f).frontmatter; const king = fm.lexicon.find(e => e.meaning === 'king').gender;
+          await set((x) => { x.genders.classes = [{ name: 'Masculine', short: 'm', marker: 'o', type: 'suffix' }, { name: 'Feminine', short: 'f', marker: 'el', type: 'suffix' }]; x.lexicon.find(e => e.meaning === 'house').gender = 'f'; });
+          const tr = async (t) => { const ed = { sel: t, getSelection() { return this.sel; }, replaceSelection(x) { this.out = x; } }; await SGP.api.translateSelection(ed, f); return ed.out; };
+          const agree = await tr('I see the red house.');
+          const coin = await tr('The queen sees the prince and the princess.'); fm = app.metadataCache.getFileCache(f).frontmatter;
+          const pp = fm.lexicon.filter(e => ['prince', 'princess'].includes(e.meaning)).map(e => [e.meaning, e.word, e.gender, e.root]);
+          await tab('Lexicon'); const lexCols = [...box.querySelectorAll('.cl-lexgroup thead th')].slice(0, 7).map(t => t.textContent);
+          await W(700); await tab('Roots'); await W(700); const famsBefore = box.querySelectorAll('.ww-fam').length;
+          const q = (sel, i = 0) => box.querySelectorAll(sel)[i];
+          q('.ww-derive input').value = 'sel'; q('.ww-derive input').dispatchEvent(new Event('input')); await W(30);
+          q('.ww-derive select').value = 'cmp'; q('.ww-derive select').dispatchEvent(new Event('change')); await W(30);
+          q('.ww-derive input', 1).value = 'hus'; q('.ww-derive input', 1).dispatchEvent(new Event('input')); await W(50); const meaning = q('.ww-derive input', 2).value; const howNow = q('.ww-derive select').value;
+          [...box.querySelectorAll('button')].find(b => b.textContent.includes('Add to lexicon')).click(); await W(900);
+          [...box.querySelectorAll('button')].find(b => b.textContent.includes('Find word families')).click(); await W(100);
+          const m = [...document.querySelectorAll('.wk-modal-bg')].pop(); const sug = m ? m.textContent : ''; const ok = m && [...m.querySelectorAll('button')].find(b => b.textContent === 'Link them'); if (ok) ok.click(); await W(500);
+          fm = app.metadataCache.getFileCache(f).frontmatter; const roots = Object.fromEntries(fm.lexicon.filter(e => e.root).map(e => [e.word, e.root]));
+          await tab('Roots'); const fams = [...box.querySelectorAll('.ww-fam-h b')].map(b => b.textContent);
+          return { made, king, agree, coin, pp, lexCols, famsBefore, meaning, howNow, sug: sug.slice(0, 120), roots, fams }; }""")
+        print('15c. classes & roots:', json.dumps(r, ensure_ascii=False))
+        assert len(r['made']) == 2 and r['king'] == 'm' and r['agree'] == 'Mi sor hus rudel.' and 'Class' in r['lexCols'] and 'Root' in r['lexCols']
+        assert len(r['pp']) == 2 and r['pp'][0][3] == r['pp'][1][3] and {x[2] for x in r['pp']} == {'m', 'f'} and any(x[1].endswith('el') for x in r['pp']) and any(x[1].endswith('o') for x in r['pp'])
+        assert r['meaning'] == 'sea house' and r['roots'].get('selhus') == 'sel' and r['roots'].get('brakar') == 'brak' and 'brak' in r['fams'] and 'sel' in r['fams']
+        # 15d. several conlang words for one English word (synonyms, a preferred one) and several English words for one conlang word
+        r = await ev("""async () => { const W = (ms) => new Promise(r => setTimeout(r, ms)); const path = 'World/Conlangs/Order Test (conlang).md'; const f = app.vault.getAbstractFileByPath(path);
+          await app.fileManager.processFrontMatter(f, (fm) => { fm.wordOrder = 'SVO'; fm.lexicon.push({ word: 'mor', pos: 'noun', meaning: 'sea, ocean' }, { word: 'tavel', pos: 'particle', meaning: 'thank you' }, { word: 'nai sor', pos: 'verb', meaning: 'ignore, overlook' }); }); await W(200);
+          const tr = async (t) => { const ed = { sel: t, getSelection() { return this.sel; }, replaceSelection(x) { this.out = x; } }; await SGP.api.translateSelection(ed, f); return ed.out; };
+          const out = { a: await tr('I ignore the sea.'), b: await tr('Thank you, I overlook the ocean.') };
+          document.querySelectorAll('.ww-test').forEach(e => e.remove()); const box = document.createElement('div'); box.className = 'ww-test'; document.body.append(box);
+          await app.codeblocks['wordwright']('', box, { sourcePath: path, addChild(c) { c.load(); }, getSectionInfo() { return null; } }); await W(400);
+          const tab = async (t) => { [...box.querySelectorAll('.ww-subnav button')].find(b => b.textContent.includes(t)).click(); await W(400); };
+          await tab('Translator'); const ta = box.querySelector('.cl-in'); ta.value = 'I see the sea'; ta.dispatchEvent(new Event('input')); [...box.querySelectorAll('.cl-actions button')].find(b => b.textContent === 'Translate').click(); await W(300);
+          out.before = box.querySelector('.ww-out-text').textContent; box.querySelector('.ww-alt').click(); await W(300); out.after = box.querySelector('.ww-out-text').textContent;
+          await tab('Lexicon'); const row = [...box.querySelectorAll('.cl-lexgroup tbody tr')].find(tr => tr.querySelector('input.w').value === 'mor'); out.syn = row.querySelector('.ww-syn').textContent; row.querySelector('.ww-pref').click(); await W(600);
+          out.pref = await tr('I see the sea.'); return out; }""")
+        print('15d. synonyms:', json.dumps(r, ensure_ascii=False))
+        assert r['a'] == 'Mi nai sor sel.' and r['b'] == 'Tavel, mi nai sor mor.' and r['before'] == 'Mi sor sel' and r['after'] == 'Mi sor mor' and r['syn'] == '= sel' and r['pref'] == 'Mi sor mor.', r
         # 16. language guide: Word and PDF from the conlang, and as an appendix in a published book
         r = await ev("""async (p) => { const c = app.vault.getAbstractFileByPath(p); const a = await SGP.api.exportGuide(c, 'pdf'); const b = await SGP.api.exportGuide(c, 'docx');
           const bk = SGP.data.manuscript.projects[0]; Object.assign(bk.compile, { langGuides: [p], format: 'md', manuscriptFormat: false });

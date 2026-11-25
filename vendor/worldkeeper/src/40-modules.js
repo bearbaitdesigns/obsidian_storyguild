@@ -136,7 +136,7 @@ function renderConlang(f, fm) {
     h('div', { class: 'cs-stat' }, h('b', {}, String(affixes.length)), h('span', {}, 'Affixes')),
     h('div', { class: 'cs-stat' }, h('b', {}, fm.wordOrder || '—'), h('span', {}, 'Word order')),
     h('div', { class: 'cs-stat' }, h('b', {}, fm.morphology || '—'), h('span', {}, 'Morphology'))));
-  const sub = [['phon', '🔊 Sounds'], ['lex', '📖 Lexicon'], ['gram', '🧩 Grammar'], ['num', '🔢 Numbers'], ['phrase', '💬 Phrasebook'], ['names', '🏷️ Names'], ['write', '✒️ Writing'], ['tr', '🔁 Translator'], ['export', '⇪ Export'], ['links', '🔗 Links']];
+  const sub = [['phon', '🔊 Sounds'], ['lex', '📖 Lexicon'], ['roots', '🌱 Roots'], ['gram', '🧩 Grammar'], ['num', '🔢 Numbers'], ['phrase', '💬 Phrasebook'], ['names', '🏷️ Names'], ['write', '✒️ Writing'], ['tr', '🔁 Translator'], ['export', '⇪ Export'], ['links', '🔗 Links']];
   if (!sub.some(([k]) => k === st.tab)) st.tab = 'phon';
   if (!lex.length && !(ph.consonants && ph.vowels)) ap(wrap, h('div', { class: 'cv-callout lh-intro' }, h('div', {}, h('b', {}, 'Building a language from scratch?'), h('div', { class: 'cs-hint' }, 'The language helper walks you through it: how it sounds, its grammar, a starter vocabulary of 200 words and word endings. It can also start from words you already have. Optional; nothing is saved until the last step.')),
     h('button', { class: 'mod-cta', onclick: () => openLanguageHelper(f) }, '🧭 Start the helper')));
@@ -175,7 +175,11 @@ function renderConlang(f, fm) {
         h('div', { class: 'cl-row cl-inline cs-mt' }, h('label', {}, 'Stress falls on the'), stressSel),
         ex.length ? h('div', { class: 'cl-sayex' }, ...ex.map((w) => h('span', {}, h('b', {}, w), ' → ', pronounce(ph, w)))) : null));
     }
+  } else if (st.tab === 'roots') {
+    ap(wrap, renderRootsTab(f, fm, st, W));
   } else if (st.tab === 'lex') {
+    const classes = wwClasses(wwGenderCfg(fm));
+    ap(wrap, h('datalist', { id: 'ww-lex-dl' }, ...[...new Set(lex.map((e) => e.root).filter(Boolean))].map((r) => h('option', { value: r }))));
     const search = h('input', { type: 'search', placeholder: 'Search word, meaning or sound…', value: st.q });
     const groupsEl = h('div', { class: 'cl-lexgroups' });
     search.addEventListener('input', () => { st.q = search.value; groupsEl.replaceChildren(...build()); });
@@ -186,7 +190,7 @@ function renderConlang(f, fm) {
     function sorted(rows) { return rows.slice().sort((x, y) => String(x[0].word).localeCompare(String(y[0].word), undefined, { sensitivity: 'base' })); }
     function build() {
       const qq = foldMarks(st.q).trim();
-      const rows = lex.map((e, i) => [e, i]).filter(([e]) => !qq || foldMarks(e.word).includes(qq) || foldMarks(e.meaning).includes(qq) || foldMarks(sayOf(ph, e)).includes(qq));
+      const rows = lex.map((e, i) => [e, i]).filter(([e]) => !qq || foldMarks(e.word).includes(qq) || foldMarks(e.meaning).includes(qq) || foldMarks(sayOf(ph, e)).includes(qq) || (e.root && foldMarks(e.root).includes(qq)));
       if (!rows.length) return [empty(lex.length ? 'No words match.' : 'No words yet. Generate some on the Sounds tab, or use the 🧭 Language helper.')];
       const order = [...s.posList, ...new Set(rows.map(([e]) => e.pos || '').filter((p) => p && !s.posList.includes(p)))];
       const by = new Map(); for (const r of rows) { const k = order.includes(r[0].pos) ? r[0].pos : ''; if (!by.has(k)) by.set(k, []); by.get(k).push(r); }
@@ -199,11 +203,18 @@ function renderConlang(f, fm) {
           si.addEventListener('change', () => W((x) => { const v = si.value.trim(); if (v && v !== auto) x.lexicon[i].say = v; else delete x.lexicon[i].say; }));
           const hear = canSpeak() ? h('button', { class: 'cl-hear', title: 'Hear an approximation (your device voice)', onclick: () => speakSay(si.value.trim() || auto) }, '🔊') : null;
           const ps = h('select', { 'aria-label': 'Type' }, e.pos ? null : h('option', { value: '', selected: true }, '—'), ...[...new Set([...s.posList, e.pos].filter(Boolean))].map((p) => h('option', { value: p, selected: p === e.pos }, p))); ps.addEventListener('change', () => W((x) => { x.lexicon[i].pos = ps.value; }));
-          const mi = h('input', { value: e.meaning || '', placeholder: 'meaning (comma-separate synonyms)', 'aria-label': 'Meaning' }); mi.addEventListener('change', () => W((x) => { x.lexicon[i].meaning = mi.value; }));
-          return h('tr', {}, h('td', {}, wi), h('td', { class: 'cl-saycell' }, si, hear), h('td', {}, mi), h('td', {}, ps), h('td', {}, h('span', { class: 'cs-x is-visible', title: 'Delete', onclick: () => W((x) => { x.lexicon.splice(i, 1); }) }, '✕')));
+          const mi = h('input', { value: e.meaning || '', placeholder: 'meaning: several English words? separate them with commas', 'aria-label': 'Meaning' }); mi.addEventListener('change', () => W((x) => { x.lexicon[i].meaning = mi.value; }));
+          const syn = [...new Set(wwSplit(e.meaning).flatMap((m) => wwFindAll(lex, m).filter((y) => y !== e).map((y) => y.word)))];
+          const star = syn.length ? h('button', { class: 'ww-pref' + (e.preferred ? ' is-on' : ''), title: e.preferred ? 'The translator uses this word first' : `Same meaning as ${syn.join(', ')}. Click to make this the word the translator uses first.`, onclick: () => W((x) => { for (const y of x.lexicon) if (y !== x.lexicon[i] && wwSplit(y.meaning).some((m) => wwSplit(e.meaning).includes(m))) delete y.preferred; if (e.preferred) delete x.lexicon[i].preferred; else x.lexicon[i].preferred = true; }) }, e.preferred ? '★' : '☆') : null;
+          const synHint = syn.length ? h('small', { class: 'ww-syn' }, `= ${syn.join(', ')}`) : null;
+          const gs = classes.length ? (e.pos === 'noun' || e.gender ? h('select', { class: 'ww-gsel', 'aria-label': 'Class', title: 'Noun class (gender)' }, h('option', { value: '' }, '—'), ...classes.map((c) => h('option', { value: c.short, selected: e.gender === c.short }, c.name))) : h('span', { class: 'cs-hint' }, '')) : null;
+          if (gs && gs.tagName === 'SELECT') gs.addEventListener('change', () => W((x) => { if (gs.value) x.lexicon[i].gender = gs.value; else delete x.lexicon[i].gender; }));
+          const ri = h('input', { class: 'ww-root', list: 'ww-lex-dl', value: e.root || '', placeholder: 'root', title: 'The root or stem this word is built from', 'aria-label': 'Root' });
+          ri.addEventListener('change', () => W((x) => { const v = ri.value.trim(); if (v) x.lexicon[i].root = v; else delete x.lexicon[i].root; }));
+          return h('tr', {}, h('td', { class: 'ww-wordcell' }, h('div', { class: 'cl-cellflex' }, wi, star)), h('td', { class: 'cl-saycell' }, h('div', { class: 'cl-cellflex' }, si, hear)), h('td', {}, mi, synHint), h('td', {}, ps), classes.length ? h('td', {}, gs) : null, h('td', {}, ri), h('td', {}, h('span', { class: 'cs-x is-visible', title: 'Delete', onclick: () => W((x) => { x.lexicon.splice(i, 1); }) }, '✕')));
         });
         return h('section', { class: 'cl-lexgroup' }, groupTitle(k ? POS_PLURAL[k] || k[0].toUpperCase() + k.slice(1) : 'No type yet', list.length),
-          h('table', { class: 'cl-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Word'), h('th', {}, 'Say it'), h('th', {}, 'Meaning'), h('th', {}, 'Type'), h('th', {}))), h('tbody', {}, ...trs)));
+          h('table', { class: 'cl-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Word'), h('th', {}, 'Say it'), h('th', {}, 'Meaning'), h('th', {}, 'Type'), classes.length ? h('th', {}, 'Class') : null, h('th', {}, 'Root'), h('th', {}))), h('tbody', {}, ...trs)));
       });
     }
     groupsEl.replaceChildren(...build());
@@ -221,7 +232,7 @@ function renderConlang(f, fm) {
     const feat = h('div', { class: 'cl-card cs-mt' }, h('h4', {}, 'Grammar features'), h('div', { class: 'cs-hint cs-mb' }, 'The usual building blocks of a grammar. Pick what fits and jot down examples; it all goes into the exported language guide.'));
     for (const x of WW_GRAMMAR) {
       const sel = h('select', { class: 'dropdown' }, h('option', { value: '' }, '—'), ...x.opts.map((v) => h('option', { selected: g[x.k] === v }, v)));
-      sel.addEventListener('change', () => S.write(f, (y) => { y.grammar = Object.assign({}, y.grammar || {}, { [x.k]: sel.value || null }); }));
+      sel.addEventListener('change', () => S.write(f, (y) => { y.grammar = Object.assign({}, y.grammar || {}, { [x.k]: sel.value || null }); if (x.k === 'gender' && WW_CLASS_SETS[sel.value] && !wwClasses(y.genders).length) y.genders = { classes: wwDefaultClasses(sel.value, ph), markNouns: true, agree: true }; }));
       const nt = h('input', { type: 'text', class: 'ww-note', value: notes[x.k] || '', placeholder: 'Notes or an example…' });
       nt.addEventListener('change', () => S.write(f, (y) => { const gg = Object.assign({}, y.grammar || {}); gg.notes = Object.assign({}, gg.notes || {}, { [x.k]: nt.value.trim() }); y.grammar = gg; }));
       ap(feat, h('div', { class: 'ww-feat' }, h('div', { class: 'ww-feat-h' }, h('b', {}, x.label), h('small', { class: 'cs-hint' }, x.help)), sel, nt));
@@ -229,6 +240,7 @@ function renderConlang(f, fm) {
     const gen = h('textarea', { class: 'cl-in', placeholder: 'Anything else about the grammar: word classes, verb forms, irregular words…' }, notes.general || '');
     gen.addEventListener('change', () => S.write(f, (y) => { const gg = Object.assign({}, y.grammar || {}); gg.notes = Object.assign({}, gg.notes || {}, { general: gen.value }); y.grammar = gg; }));
     ap(feat, h('div', { class: 'cl-row' }, h('label', {}, 'Other notes'), gen));
+    const classesCard = renderClassesCard(f, fm, W);
     // pronouns
     const short = Object.assign({}, ph, { minSyl: 1, maxSyl: 1 });
     const cell = (m) => { const e = wwFind(lex, m); return e ? h('td', {}, h('b', { class: 'ww-w' }, e.word), h('small', { class: 'cs-hint' }, ' ' + sayOf(ph, e))) : h('td', {}, h('span', { class: 'cs-hint' }, '—')); };
@@ -243,7 +255,7 @@ function renderConlang(f, fm) {
       const mi = h('input', { value: a.meaning || '' }); mi.addEventListener('change', () => W((x) => { x.affixes[i].meaning = mi.value; }));
       ap(at, h('tr', {}, h('td', {}, ai), h('td', {}, ty), h('td', {}, mi), h('td', {}, h('span', { class: 'cs-x is-visible', onclick: () => W((x) => { x.affixes.splice(i, 1); }) }, '✕'))));
     });
-    ap(wrap, h('div', { class: 'cl-grid' }, typ, pro), feat, h('div', { class: 'cl-card cs-mt' }, h('h4', {}, 'Word endings (affixes)'), at,
+    ap(wrap, h('div', { class: 'cl-grid' }, typ, pro), feat, classesCard, h('div', { class: 'cl-card cs-mt' }, h('h4', {}, 'Word endings (affixes)'), at,
       h('button', { class: 'cs-mt', onclick: () => W((x) => { x.affixes.push({ affix: '-', type: 'suffix', meaning: '' }); }) }, '+ Add affix'),
       h('div', { class: 'cs-hint cs-mt' }, 'The translator uses endings whose meaning includes “plural” or “past”; names use “place of” and “one who”.')));
   } else if (st.tab === 'num') {
@@ -297,9 +309,11 @@ function renderConlang(f, fm) {
       h('div', { class: 'cl-row' }, h('label', {}, 'Notes'), area('notes', 'Where the script came from, who can read it, what it is written on…'))));
   } else if (st.tab === 'tr') {
     if (st.arrange === undefined) st.arrange = true;
-    const r = wwTranslate(fm, st.input, { drop: st.skip, arrange: st.arrange });
-    const out = h('div', { class: 'cl-out' }, ...r.tokens.map((t) => h('span', { class: 'cl-tok' + (t.unknown ? ' is-unk' : ''), title: t.unknown ? 'Not in the lexicon. Click to coin a word.' : '' },
-      h('b', { onclick: t.unknown ? async () => { await wwTranslateAndSave(f, t.src, { coin: true }); } : null }, t.out || t.src), h('small', {}, t.gloss))));
+    st.choose = st.choose || {};
+    const r = wwTranslate(fm, st.input, { drop: st.skip, arrange: st.arrange, choose: st.choose });
+    const out = h('div', { class: 'cl-out' }, ...r.tokens.map((t) => h('span', { class: 'cl-tok' + (t.unknown ? ' is-unk' : '') + (t.alts ? ' has-alts' : ''), title: t.unknown ? 'Not in the lexicon. Click to coin a word.' : t.alts ? `Also: ${t.alts.join(', ')}. Click ⇄ to use another word.` : '' },
+      h('b', { onclick: t.unknown ? async () => { await wwTranslateAndSave(f, t.src, { coin: true }); } : null }, t.out || t.src), h('small', {}, t.gloss),
+      t.alts ? h('button', { class: 'ww-alt', title: `Other words for “${t.key}”: ${t.alts.join(', ')}`, onclick: () => { const cur = st.choose[t.key] || t.alts[0]; st.choose[t.key] = t.alts[(t.alts.indexOf(cur) + 1) % t.alts.length]; rerender(); } }, `⇄ ${t.alts.length}`) : null)));
     const ta = h('textarea', { class: 'cl-in' }, st.input); ta.addEventListener('input', () => { st.input = ta.value; });
     const skip = h('input', { type: 'checkbox', checked: st.skip }); skip.addEventListener('change', () => { st.skip = skip.checked; rerender(); });
     const arrange = h('input', { type: 'checkbox', checked: st.arrange }); arrange.addEventListener('change', () => { st.arrange = arrange.checked; rerender(); });

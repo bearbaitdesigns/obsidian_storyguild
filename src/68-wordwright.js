@@ -18,8 +18,8 @@ async function translateSelection(editor, conlang, mode = 'replace') {
   else editor.replaceSelection(r.text);
   DS().ui.lastConlang = conlang.path; SG.saveSoon();
   const order = r.arranged && r.order ? ` in ${r.order} word order` : '';
-  if (!r.coined.length) notice(`${mode === 'copy' ? 'Copied the translation' : 'Translated'} into ${conlangName(conlang)}${order}${mode === 'copy' ? `: ${r.text}` : ''}${r.missing.length ? `. Left in [brackets]: ${r.missing.join(', ')} (set up its sounds to coin new words)` : ''}.`, 6000);
-  else if (mode === 'copy') notice(`${mode === 'copy' ? 'Copied the translation' : 'Translated'} into ${conlangName(conlang)}${order}${mode === 'copy' ? `: ${r.text}` : ''}.`, 6000);
+  if (!r.coined.length) notice(`${mode === 'copy' ? 'Copied the translation' : 'Translated'} into ${conlangName(conlang)}${order}${mode === 'copy' ? `: ${r.text.replace(/[.!?]+$/, '')}` : ''}${r.missing.length ? `. Left in [brackets]: ${r.missing.join(', ')} (set up its sounds to coin new words)` : ''}.`, 6000);
+  else if (mode === 'copy') notice(`${mode === 'copy' ? 'Copied the translation' : 'Translated'} into ${conlangName(conlang)}${order}${mode === 'copy' ? `: ${r.text.replace(/[.!?]+$/, '')}` : ''}.`, 6000);
   return r;
 }
 function pickConlang(cb) {

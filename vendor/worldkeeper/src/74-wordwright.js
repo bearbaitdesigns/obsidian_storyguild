@@ -78,13 +78,16 @@ const WW = {
 /* ---------- translation (English → conlang) ---------- */
 const WW_ARTICLES = ['the', 'a', 'an'];
 const wwSplit = (m) => String(m || '').toLowerCase().split(/\s*[,;/]\s*/).map((x) => x.trim()).filter(Boolean);
-function wwFind(lex, meaning) { const w = String(meaning).toLowerCase(); return lex.find((e) => wwSplit(e.meaning).includes(w)) || null; }
+/** every word with this meaning (synonyms), the preferred one first */
+function wwFindAll(lex, meaning) { const w = String(meaning).toLowerCase(); const l = arr(lex).filter((e) => wwSplit(e.meaning).includes(w)); return l.sort((a, b) => (b.preferred ? 1 : 0) - (a.preferred ? 1 : 0)); }
+/** the word for a meaning: the one chosen in this translation, else the preferred one, else the first */
+function wwFind(lex, meaning, choose) { const l = wwFindAll(lex, meaning); if (!l.length) return null; const c = choose && choose[String(meaning).toLowerCase()]; return (c && l.find((e) => e.word === c)) || l[0]; }
 const wwAff = (fm, re) => arr(fm.affixes).find((a) => re.test(a.meaning || ''));
 const wwApply = (a, b) => (a.type === 'prefix' ? String(a.affix).replace(/-$/, '') + b : b + String(a.affix).replace(/^-/, ''));
 /** One English word or phrase → { out, gloss } using the lexicon and the plural / past-tense affixes; null if unknown. */
-function wwLookup(fm, word) {
+function wwLookup(fm, word, choose) {
   const lex = arr(fm.lexicon); const w = String(word).toLowerCase(); const first = (e) => wwSplit(e.meaning)[0] || '';
-  const e = wwFind(lex, w); if (e) return { out: e.word, gloss: first(e), entry: e };
+  const e = wwFind(lex, w, choose); if (e) return { out: e.word, gloss: first(e), entry: e, key: w, alts: wwFindAll(lex, w).map((x) => x.word) };
   const pl = wwAff(fm, /plural/i);
   if (/s$/.test(w)) { const b = wwFind(lex, w.replace(/(ies)$/, 'y')) || wwFind(lex, w.replace(/(es|s)$/, '')) || wwFind(lex, w.slice(0, -1)); if (b && b.pos === 'verb') return { out: b.word, gloss: first(b), entry: b }; if (b && pl) return { out: wwApply(pl, b.word), gloss: first(b) + '-PL', entry: b }; }
   const pt = wwAff(fm, /past/i);
@@ -136,13 +139,13 @@ function wwReorder(words, order, adjAfter) {
  * With arrange = true (the default) each clause is put into the language's word order.
  * Returns { text, tokens, coined, missing, arranged }. Nothing is written; see wwTranslateAndSave.
  */
-function wwTranslate(fm, text, { coin = false, drop = true, arrange = true } = {}) {
+function wwTranslate(fm, text, { coin = false, drop = true, arrange = true, choose = null } = {}) {
   const ph = Object.assign({}, WW_PH, fm.phonology || {}); const lex = arr(fm.lexicon).slice(); const fmx = Object.assign({}, fm, { lexicon: lex });
   const parts = String(text || '').match(/[A-Za-zÀ-ÖØ-öø-ÿ'’]+|[^A-Za-zÀ-ÖØ-öø-ÿ'’]+/g) || [];
   const isWord = (p) => /[A-Za-zÀ-ÖØ-öø-ÿ]/.test(p);
   const existing = new Set(lex.map((e) => e.word)); const coined = []; const missing = [];
   const canCoin = coin && sayInventory(ph).C.length && sayInventory(ph).V.length;
-  const order = arrange ? fm.wordOrder : ''; const adjAfter = arrange && /after/i.test(String((fm.grammar || {}).adjPos || ''));
+  const order = arrange ? fm.wordOrder : ''; const adjAfter = /after/i.test(String((fm.grammar || {}).adjPos || '')); const gcfg = wwGenderCfg(fm);
   // sentences: [{ words: [{ o, gloss, role, name, cap, punct }], end }]
   const sentences = []; let cur = { words: [], lead: '', cap: false, end: '' }; let sentenceStart = true; let capNext = false; let arranged = false;
   const flush = (end) => { if (cur.words.length || end.trim()) { cur.end = end; sentences.push(cur); } else if (end) { if (sentences.length) sentences[sentences.length - 1].end += end; else cur.lead += end; } cur = { words: [], lead: cur.words.length ? '' : cur.lead, cap: false, end: '' }; };
@@ -158,12 +161,12 @@ function wwTranslate(fm, text, { coin = false, drop = true, arrange = true } = {
     if (sentenceStart && /^[A-Z]/.test(p)) cur.cap = true;
     // longest phrase: up to three words joined by single spaces
     let hit = null; let used = 0;
-    for (let n = 3; n >= 2 && !hit; n--) {
+    for (let n = 4; n >= 2 && !hit; n--) {
       const seq = []; let j = i; let ok = true;
       for (let k = 0; k < n; k++) { if (!parts[j] || !isWord(parts[j])) { ok = false; break; } seq.push(parts[j].toLowerCase()); if (k < n - 1) { if (!parts[j + 1] || !/^ +$/.test(parts[j + 1])) { ok = false; break; } j += 2; } }
-      if (!ok) continue; const e = wwFind(lex, seq.join(' ')); if (e) { hit = { out: e.word, gloss: wwSplit(e.meaning)[0], entry: e }; used = (n - 1) * 2; }
+      if (!ok) continue; const key = seq.join(' '); const e = wwFind(lex, key, choose); if (e) { hit = { out: e.word, gloss: wwSplit(e.meaning)[0], entry: e, key, alts: wwFindAll(lex, key).map((x) => x.word) }; used = (n - 1) * 2; }
     }
-    if (!hit) hit = wwLookup(fmx, lw);
+    if (!hit) hit = wwLookup(fmx, lw, choose);
     if (hit && hit.gloss && /^PST-/.test(hit.gloss)) hit.role = 'verb';
     const isName = !sentenceStart && /^[A-Z]/.test(p) && lw !== 'i';
     sentenceStart = false;
@@ -178,25 +181,28 @@ function wwTranslate(fm, text, { coin = false, drop = true, arrange = true } = {
       const w = ex ? ex.word : genWord(ph, existing);
       if (w) {
         let entry = ex;
-        if (!ex) { existing.add(w); entry = { word: w, pos: aff === pt && aff ? 'verb' : wwRole(base, null), meaning: base }; if (WW_AUX.includes(base)) entry.pos = 'verb'; lex.push(entry); coined.push(entry); }
-        hit = { out: aff ? wwApply(aff, w) : w, gloss: aff === pl && aff ? base + '-PL' : aff ? 'PST-' + base : base, coined: !ex, entry, role: aff === pt && aff ? 'verb' : null };
+        if (!ex) { existing.add(w); entry = { word: w, pos: aff === pt && aff ? 'verb' : wwRole(base, null), meaning: base }; if (WW_AUX.includes(base)) entry.pos = 'verb'; wwGenderize(gcfg, [entry], existing); lex.push(entry); coined.push(entry); }
+        hit = { out: aff ? wwApply(aff, entry.word) : entry.word, gloss: aff === pl && aff ? base + '-PL' : aff ? 'PST-' + base : base, coined: !ex, entry, aff, role: aff === pt && aff ? 'verb' : null };
       }
     }
     if (!hit) { missing.push(lw); cur.words.push({ o: `[${p}]`, src: p, gloss: '?', role: wwRole(lw, null), unknown: true, punct: '' }); continue; }
-    cur.words.push({ o: hit.out, src: used ? parts.slice(i, i + used + 1).join('') : p, gloss: hit.gloss, coined: !!hit.coined, role: hit.role || wwRole(lw, hit.entry), punct: '' });
+    const gender = hit.entry && hit.entry.gender; const role = hit.role || wwRole(lw, hit.entry);
+    cur.words.push({ o: hit.out, src: used ? parts.slice(i, i + used + 1).join('') : p, gloss: hit.gloss + (gender && role === 'noun' ? `.${String(gender).toUpperCase()}` : ''), coined: !!hit.coined, role, gender, punct: '', entry: hit.coined ? hit.entry : null, aff: hit.aff || null, key: hit.key || '', alts: hit.alts && hit.alts.length > 1 ? hit.alts : null });
     i += used;
   }
   flush('');
+  // pairs coined together (prince / princess) share one root: rewrite them now
+  if (coined.length > 1) { wwGenderize(gcfg, coined, existing); for (const sn of sentences) for (const x of sn.words) if (x.entry) x.o = x.aff ? wwApply(x.aff, x.entry.word) : x.entry.word; }
   // arrange each sentence, then write it out
   const tokens = []; let outText = '';
   for (const sn of sentences) {
-    const ws = arrange ? wwReorder(sn.words, order, adjAfter) : sn.words;
+    const ws = wwAgree(gcfg, arrange ? wwReorder(sn.words, order, arrange && adjAfter) : sn.words, arrange && adjAfter);
     if (ws.some((x, i) => x !== sn.words[i])) arranged = true;
     // commas stay where they were in the sentence: re-attach them by position
     const commas = sn.words.map((x) => x.punct);
     const line = ws.map((x, i) => { let o = x.o; if (i === 0 && sn.cap && !x.name) o = o.charAt(0).toUpperCase() + o.slice(1); return o + (commas[i] || ''); }).join(' ');
     outText += (sn.lead || '') + line + (sn.end || '');
-    for (const x of ws) tokens.push({ src: x.src, out: x.unknown ? null : x.o, gloss: x.gloss, coined: x.coined, name: x.name, unknown: x.unknown, role: x.role });
+    for (const x of ws) tokens.push({ src: x.src, out: x.unknown ? null : x.o, gloss: x.gloss, coined: x.coined, name: x.name, unknown: x.unknown, role: x.role, key: x.key, alts: x.alts });
   }
   return { text: outText.replace(/ {2,}/g, ' ').replace(/^ +/, '').replace(/ +([.!?;:,])/g, '$1'), tokens, coined, missing: [...new Set(missing)], arranged, order: order || '' };
 }
@@ -234,7 +240,7 @@ function wwCoinMore(fm, n = 100) {
   const known = new Set(lex.flatMap((e) => wwSplit(e.meaning))); const existing = new Set(lex.map((e) => e.word)); const out = [];
   const mn = Math.max(1, +ph.minSyl || 1); const core = Object.assign({}, ph, { maxSyl: Math.min(Math.max(mn, +ph.maxSyl || mn), mn + 1) }); const short = Object.assign({}, ph, { minSyl: 1, maxSyl: 1 });
   for (const x of wwMasterList()) { if (out.length >= n) break; if (known.has(x.m.toLowerCase())) continue; const w = genWord(x.short ? short : core, existing); if (!w) break; existing.add(w); out.push({ word: w, pos: x.pos, meaning: x.m }); }
-  return out;
+  return wwGenderize(wwGenderCfg(fm), out, existing);
 }
 
 /* ---------- grammar features, numbers, phrasebook, names ---------- */
@@ -292,7 +298,7 @@ function wwNames(fm, kind, count = 12) {
 const P_ = (text, extra = {}) => ({ t: 'p', runs: Array.isArray(text) ? text : [{ text: String(text) }], first: true, ...extra });
 const H_ = (text) => ({ t: 'h', text: String(text) });
 const B_ = (text) => ({ text: String(text), b: true }); const I_ = (text) => ({ text: String(text), i: true }); const T_ = (text) => ({ text: String(text) });
-const WW_SECTIONS = [['intro', 'About the language'], ['sounds', 'Sounds & pronunciation'], ['grammar', 'Grammar'], ['numbers', 'Numbers'], ['lexicon', 'Dictionary'], ['index', 'English index'], ['phrases', 'Phrasebook'], ['names', 'Names'], ['writing', 'Writing']];
+const WW_SECTIONS = [['intro', 'About the language'], ['sounds', 'Sounds & pronunciation'], ['grammar', 'Grammar'], ['numbers', 'Numbers'], ['lexicon', 'Dictionary'], ['roots', 'Word families'], ['index', 'English index'], ['phrases', 'Phrasebook'], ['names', 'Names'], ['writing', 'Writing']];
 /** [{ title, blocks }] for the chosen sections */
 function wwGuide(c, sections = WW_SECTIONS.map(([k]) => k)) {
   const fm = S.fm(c); const ph = Object.assign({}, WW_PH, fm.phonology || {}); const lex = arr(fm.lexicon).slice().sort((a, b) => String(a.word).localeCompare(String(b.word), undefined, { sensitivity: 'base' }));
@@ -322,18 +328,21 @@ function wwGuide(c, sections = WW_SECTIONS.map(([k]) => k)) {
     const pr = WW_PRONOUNS.map(([p, s, pl]) => [p, wwFind(arr(fm.lexicon), s), wwFind(arr(fm.lexicon), pl), s, pl]).filter(([, a, b]) => a || b);
     if (pr.length) { L.push(H_('Pronouns')); for (const [p, a, b, s, pl] of pr) L.push(P_([B_(p + ': '), T_(`${a ? a.word : '—'} (${s}), ${b ? b.word : '—'} (${pl})`)])); }
     if (arr(fm.affixes).length) { L.push(H_('Word endings')); for (const a of arr(fm.affixes)) L.push(P_([B_(a.affix), T_(` — ${a.meaning || ''} (${a.type || 'suffix'})`)])); }
+    const gcl = wwClasses(wwGenderCfg(fm)); if (gcl.length) { L.push(H_('Noun classes')); for (const c of gcl) L.push(P_([B_(c.name), T_(c.marker ? ` — ${c.type === 'prefix' ? c.marker + '-' : '-' + c.marker}` : ' — no ending')])); if (wwGenderCfg(fm).agree !== false) L.push(P_('Describing words take the ending of the noun they go with.')); }
     if (g.notes && g.notes.general) L.push(P_(g.notes.general));
     add('grammar', 'Grammar', L); }
+  { const L = []; for (const [r, list] of [...wwFamilies(fm.lexicon).entries()].sort((a, b) => a[0].localeCompare(b[0]))) { L.push(P_([B_(r), T_(` (${pronounce(ph, r)})`)])); for (const e of list) if (e.word !== r) L.push(P_([T_('    '), B_(e.word), T_(` — ${e.meaning || ''}`)])); }
+    add('roots', 'Word families', L); }
   { const L = []; const base = +fm.numberBase || 10; const list = WW_BASES[base] || WW_BASES[10];
     const rows = list.map((m) => [m, wwFind(arr(fm.lexicon), m)]).filter(([, e]) => e);
     if (rows.length) { L.push(P_(`Counting is in base ${base}.`)); for (const [m, e] of rows) L.push(P_([B_(e.word), T_(` — ${m}`)])); const ex = [base + 1, base * 2 + 3].map((n) => [n, wwNumber(fm, n)]).filter(([, w]) => w); if (ex.length) L.push(P_([I_('For example: '), T_(ex.map(([n, w]) => `${n} = ${w}`).join(' · '))])); }
     add('numbers', 'Numbers', L); }
   { const L = []; const order = [...ST().posList, '']; const by = new Map();
     for (const e of lex) { const k = order.includes(e.pos) ? e.pos : ''; if (!by.has(k)) by.set(k, []); by.get(k).push(e); }
-    for (const k of order) if (by.has(k)) { L.push(H_(k ? POS_PLURAL[k] || k : 'Other words')); for (const e of by.get(k)) L.push(P_([B_(e.word), T_(` (${sayOf(ph, e)}) `), I_(e.pos || ''), T_(` — ${e.meaning || ''}`)])); }
+    for (const k of order) if (by.has(k)) { L.push(H_(k ? POS_PLURAL[k] || k : 'Other words')); for (const e of by.get(k)) { const gc = e.gender ? wwClassByShort(wwGenderCfg(fm), e.gender) : null; L.push(P_([B_(e.word), T_(` (${sayOf(ph, e)}) `), I_([e.pos, gc ? gc.name.toLowerCase() : e.gender].filter(Boolean).join(', ')), T_(` — ${e.meaning || ''}`), e.root && e.root !== e.word ? I_(` (from ${e.root})`) : T_('')])); } }
     add('lexicon', `Dictionary: ${name} to English`, L); }
-  { const L = []; const pairs = []; for (const e of lex) for (const m of wwSplit(e.meaning)) pairs.push([m, e]);
-    pairs.sort((a, b) => a[0].localeCompare(b[0])); for (const [m, e] of pairs) L.push(P_([B_(m), T_(` — ${e.word}`)]));
+  { const L = []; const by = new Map(); for (const e of lex) for (const m of wwSplit(e.meaning)) { if (!by.has(m)) by.set(m, []); by.get(m).push(e); }
+    for (const [m, es] of [...by.entries()].sort((a, b) => a[0].localeCompare(b[0]))) L.push(P_([B_(m), T_(` — ${es.sort((a, b) => (b.preferred ? 1 : 0) - (a.preferred ? 1 : 0)).map((e) => e.word).join(', ')}`)]));
     add('index', `English to ${name}`, L); }
   { const L = []; for (const x of arr(fm.phrases)) if (x && x.en) { const t = x.cl || wwTranslate(fm, x.en).text; L.push(P_([B_(x.en), T_(' — '), I_(t), T_(` (${t.split(/\s+/).filter((w) => w && !/^\[|\]$/.test(w)).map((w) => pronounce(ph, w.replace(/[^\p{L}'’ʼ-]/gu, ''))).filter(Boolean).join(' ')})`)])); }
     add('phrases', 'Phrasebook', L); }

@@ -88,6 +88,7 @@ function openLanguageHelper(f) {
   const st = {
     step: 0, mode: null, mineText: arr(fm0.lexicon).map((e) => `${e.word} = ${e.meaning || ''}`).join('\n'), englishFirst: false, mine: [], found: null, ans: {}, affType: '',
     feel: hasSounds ? 'keep' : null, flairs: [], flairText: '',
+    genderChoice: wwClasses(fm0.genders).length ? 'keep' : ((fm0.grammar || {}).gender && WW_CLASS_SETS[(fm0.grammar || {}).gender] ? (fm0.grammar || {}).gender : ''), markNouns: (fm0.genders || {}).markNouns !== false, agreeAdj: (fm0.genders || {}).agree !== false, info: {},
     ph: hasSounds ? Object.assign({ patterns: 'CV CVC', forbidden: '', minSyl: 1, maxSyl: 2 }, cur) : null,
     order: fm0.wordOrder || '', morph: fm0.morphology || '',
     groups: Object.assign(Object.fromEntries(LH_WORDS.map((g) => [g.id, true])), { more: true }), extra: '', words: {},
@@ -119,9 +120,16 @@ function openLanguageHelper(f) {
     if (!t || !ACUTE[t.s]) return w; // long vowels (ā, aa) already stand out, so they keep their own spelling
     t.s = ACUTE[t.s]; return toks.map((x) => x.s).join('');
   };
+  /** the noun classes the new words will use: the conlang's own, or a fresh set for the choice made here */
+  const gcfg = () => { if (st.genderChoice === 'keep') return Object.assign({}, fm0.genders, { markNouns: st.markNouns, agree: st.agreeAdj }); return WW_CLASS_SETS[st.genderChoice] ? { classes: wwDefaultClasses(st.genderChoice, effPh()), markNouns: st.markNouns, agree: st.agreeAdj } : null; };
+  /** class endings and shared roots for newly coined nouns (king / queen share a stem) */
+  const classify = (items, ex) => { const cfg = gcfg(); if (!cfg || !wwClasses(cfg).length) return; const ents = items.map((x) => ({ word: st.words[x.m], pos: x.pos, meaning: x.m }));
+    wwGenderize(cfg, ents, ex); ents.forEach((e, i) => { const m = items[i].m; st.words[m] = e.word; st.info[m] = { gender: e.gender, root: e.root }; }); };
   const coinWords = (force) => {
-    const ex = taken(); if (force) { for (const w of Object.values(st.words)) ex.delete(w); st.words = {}; }
-    for (const x of wantedWords()) { if (st.words[x.m]) continue; const w0 = genWord(phFor(x), ex); const w = w0 && accentWord(w0); if (w) { st.words[x.m] = w; ex.add(w); } }
+    const ex = taken(); if (force) { for (const w of Object.values(st.words)) ex.delete(w); st.words = {}; st.info = {}; }
+    const fresh = [];
+    for (const x of wantedWords()) { if (st.words[x.m]) continue; const w0 = genWord(phFor(x), ex); const w = w0 && accentWord(w0); if (w) { st.words[x.m] = w; ex.add(w); fresh.push(x); } }
+    classify(fresh, ex);
   };
   const affixType = () => st.affType || (st.order === 'VSO' || st.order === 'VOS' ? 'prefix' : 'suffix');
   const typeOf = (a) => a.type || affixType();
@@ -207,6 +215,7 @@ function openLanguageHelper(f) {
     ap(body, h('h3', { class: 'lh-qtitle' }, 'A few questions'));
     ap(body, q('What order do the main words go in?', 'Words alone can’t show this. Think of how “the fox eats the bread” would be said.', dv('wordOrder').map((v) => [v, v, LH_ORDER_HELP[v]]), st.order, (v) => { st.order = v; }));
     ap(body, q('How do words change?', fd.affixes.some((a) => a.type !== 'word') ? 'Your words add endings, so Agglutinative is picked for you. Change it if that’s not right.' : '', dv('morphology').map((v) => [v, v, LH_MORPH_HELP[v]]), st.morph, (v) => { st.morph = v; }));
+    ap(body, classesCard());
     if (!sx.acute) ap(body, q('Which syllable is stressed?', 'This sets the pronunciation guide for every word.', [['first', 'The first', 'TA-len'], ['penult', 'Second-to-last', 'ta-LEN-ra'], ['last', 'The last', 'ta-len-RA'], ['none', 'All even', 'ta-len-ra']], st.ph.stress || 'penult', (v) => { st.ph.stress = v; }));
     const howMade = (m, title, eg) => { if (fd.affixes.some((a) => a.m === m)) return null;
       return q(title, '', [['suffix', 'An ending', eg[0]], ['prefix', 'A beginning', eg[1]], ['word', 'A separate word', eg[2]], ['none', 'Not marked', 'context shows it']], st.ans[m] || '', (v) => { st.ans[m] = v; const a = st.affixes.find((x) => x.m === m); if (!a) return; a.on = v !== 'none'; a.type = v === 'word' ? 'word' : v === 'none' ? '' : v; if (m === 'plural' && (v === 'suffix' || v === 'prefix')) st.affType = v; }); };
@@ -260,12 +269,22 @@ function openLanguageHelper(f) {
       h('div', { class: 'cl-actions' }, h('button', { onclick: () => { sample(); draw(); } }, '🎲 New samples'))));
     ap(body, tip('Fewer sounds make a language feel more distinct. Around 10–15 consonants and 3–6 vowels is plenty. If a word looks unpronounceable, add the clumsy pair to “Never allow”.'));
   }
+  function classesCard() {
+    const opts = [...(wwClasses(fm0.genders).length ? [['keep', 'Keep this conlang’s classes', wwClasses(fm0.genders).map((c) => c.name).join(' / ')]] : []), ['', 'None', 'Nouns have no gender'], ...Object.keys(WW_CLASS_SETS).map((k) => [k, k, k === 'Animate / inanimate' ? 'Living things and objects' : k === 'Many classes' ? 'Four classes to name yourself' : ''])];
+    const tg = (k, label) => { const c = h('input', { type: 'checkbox', checked: st[k] }); c.addEventListener('change', () => { st[k] = c.checked; st.words = {}; st.info = {}; }); return h('label', { class: 'lh-check' }, c, label); };
+    const cfg = gcfg();
+    return h('div', { class: 'lh-card' }, h('h4', {}, 'Gender (noun classes)'), h('div', { class: 'cs-hint' }, 'Optional. Gendered nouns get their own ending, and pairs like king / queen grow from one root.'),
+      h('div', { class: 'lh-opts' }, ...opts.map(([v, l, d]) => h('button', { class: 'lh-opt' + (st.genderChoice === v ? ' is-on' : ''), onclick: () => { st.genderChoice = v; st.words = {}; st.info = {}; draw(); } }, h('b', {}, l), d ? h('small', {}, d) : null))),
+      cfg && wwClasses(cfg).length ? h('div', { class: 'cs-hint' }, 'Endings: ', wwClasses(cfg).map((c) => `${c.name} ${c.marker ? '-' + c.marker : '(none)'}`).join(' · ')) : null,
+      cfg && wwClasses(cfg).length ? tg('markNouns', 'Nouns end in their class ending') : null, cfg && wwClasses(cfg).length ? tg('agreeAdj', 'Describing words take the ending of their noun') : null);
+  }
   function stepGrammar(body) {
     ap(body, h('p', { class: 'lh-lead' }, 'Two choices shape every sentence: the order of the main words, and how words change. You can keep it simple; these mostly guide how you write lines of dialogue.'));
     const opts = (key, help, values) => h('div', { class: 'lh-opts' }, ...values.map((v) => h('button', { class: 'lh-opt' + (st[key] === v ? ' is-on' : ''), onclick: () => { st[key] = v; draw(); } }, h('b', {}, v), h('small', {}, help[v] || ''))));
     const dv = (k) => (T().language.domain.find((x) => x.key === k) || { values: [] }).values;
     ap(body, h('div', { class: 'lh-card' }, h('h4', {}, 'Word order'), opts('order', LH_ORDER_HELP, dv('wordOrder'))));
     ap(body, h('div', { class: 'lh-card' }, h('h4', {}, 'How words change'), opts('morph', LH_MORPH_HELP, dv('morphology'))));
+    ap(body, classesCard());
     ap(body, tip('Different from English is good, but not everywhere at once. One unusual choice (say, verb-first sentences) is memorable; five makes your readers work too hard.'));
   }
   function stepWords(body) {
@@ -278,7 +297,7 @@ function openLanguageHelper(f) {
     ap(body, h('div', { class: 'lh-card' }, h('h4', {}, 'Words from your story'), ta));
     const list = wantedWords();
     ap(body, h('div', { class: 'lh-card' }, h('h4', {}, `Preview · ${list.length} new words`, h('span', { class: 'cd-spacer' }), h('button', { class: 'lh-mini', onclick: () => { coinWords(true); draw(); } }, '🎲 Reroll all')),
-      list.length ? h('div', { class: 'lh-wordlist' }, ...list.map((x) => h('button', { class: 'lh-word', title: 'Tap for a different word', onclick: () => { const ex = taken(); ex.delete(st.words[x.m]); const w0 = genWord(phFor(x), ex); const w = w0 && accentWord(w0); if (w) st.words[x.m] = w; draw(); } }, h('b', {}, st.words[x.m] || '—'), h('small', {}, x.m))))
+      list.length ? h('div', { class: 'lh-wordlist' }, ...list.map((x) => h('button', { class: 'lh-word', title: 'Tap for a different word', onclick: () => { const ex = taken(); ex.delete(st.words[x.m]); const w0 = genWord(phFor(x), ex); const w = w0 && accentWord(w0); if (w) { st.words[x.m] = w; delete st.info[x.m]; classify([x], ex); } draw(); } }, h('b', {}, st.words[x.m] || '—'), h('small', {}, x.m + (st.info[x.m] && st.info[x.m].gender ? ` · ${st.info[x.m].gender}` : '')))))
         : h('div', { class: 'cs-hint' }, knownNow().size ? 'Every word you picked is already in the lexicon.' : 'Pick a group above or add your own words.'),
       knownNow().size ? h('div', { class: 'cs-hint cs-mt' }, st.mode === 'words' ? 'Meanings you already have a word for are skipped.' : 'Meanings already in your lexicon are skipped.') : null));
     ap(body, tip('Tap any word to roll a new one. Words for important things in your story (a god, the sea, a city) are worth rerolling until they feel right.'));
@@ -317,7 +336,8 @@ function openLanguageHelper(f) {
       if (st.doGrammar !== false) { if (st.order) x.wordOrder = st.order; if (st.morph) x.morphology = st.morph; }
       x.lexicon = arr(x.lexicon); x.affixes = arr(x.affixes);
       if (st.mode === 'words' && st.doMine !== false) { const have = new Set(x.lexicon.map((e) => String(e.word).toLowerCase())); for (const e of st.mine) if (!have.has(String(e.word).toLowerCase())) { x.lexicon.push({ word: e.word, pos: e.pos || lhGuessPos(e.meaning), meaning: e.meaning }); have.add(String(e.word).toLowerCase()); } }
-      if (st.doWords !== false) for (const y of words) x.lexicon.push({ word: st.words[y.m], pos: y.pos, meaning: y.m });
+      const cfg = gcfg(); if (cfg && wwClasses(cfg).length) { x.genders = { classes: wwClasses(cfg), markNouns: cfg.markNouns !== false, agree: cfg.agree !== false }; if (st.genderChoice !== 'keep') x.grammar = Object.assign({}, x.grammar || {}, { gender: st.genderChoice }); }
+      if (st.doWords !== false) for (const y of words) { const inf = st.info[y.m] || {}; const e = { word: st.words[y.m], pos: y.pos, meaning: y.m }; if (inf.gender) e.gender = inf.gender; if (inf.root) e.root = inf.root; x.lexicon.push(e); }
       if (st.doAffixes !== false) for (const a of aff) {
         const ty = typeOf(a);
         if (isol || ty === 'word') { if (!x.lexicon.some((e) => e.word === a.form)) x.lexicon.push({ word: a.form, pos: 'particle', meaning: a.m + ' marker' }); }

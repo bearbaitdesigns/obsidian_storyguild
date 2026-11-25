@@ -156,3 +156,71 @@ function phoneBoard(view, main, n, NV) {
   strip.addEventListener('scroll', () => { clearTimeout(t); t = setTimeout(() => { const w = strip.clientWidth || 1; const i = Math.round(strip.scrollLeft / w); if (i !== cur && i >= 0 && i < cols.length) mark(i); }, 90); });
   requestAnimationFrame(() => { if (strip.children[cur]) strip.scrollLeft = strip.children[cur].offsetLeft; mark(cur); });
 }
+
+/* ---------------------------------------------------------------------
+   Collapsible sections on phones
+   Tapping a section heading in a note sheet, an encyclopedia entry or a dashboard folds it away, so a long
+   note is quicker to scroll. Folded sections stay folded (per heading, on this device) until tapped again.
+   The sheets are built by Worldkeeper, so the headings are marked up here after they are drawn.
+   --------------------------------------------------------------------- */
+const COLLAPSE_KEY = 'storyguild-collapsed';
+/* sib: the heading's later siblings fold away · next: only the element right after the heading */
+const COLLAPSIBLE = [
+  { id: 'rules', sel: '.wk .mg-col > h4', mode: 'sib' },
+  { id: 'conlang', sel: '.wk .cl-card > h4', mode: 'sib' },
+  { id: 'gallery', sel: '.wk .cs-gallery > .cs-gallery-head', mode: 'sib' },
+  { id: 'card', sel: '.wk .wk-card > .card-h', mode: 'sib' },
+  { id: 'group', sel: '.wk .cs-group-title', mode: 'next', skip: '.enc-side' },
+  { id: 'linked', sel: '.wk .enc-links > .cs-tile-label', mode: 'sib' },
+  { id: 'fields', sel: '.wk .sg-fields-h', mode: 'next' },
+];
+let _collapsed = null;
+function collapsedSet() {
+  if (!_collapsed) { try { _collapsed = new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '[]')); } catch (e) { _collapsed = new Set(); } }
+  return _collapsed;
+}
+function saveCollapsed() { try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...collapsedSet()].slice(-400))); } catch (e) { /* private mode */ } }
+/** The heading's own words, without the count badge, so "Rules 2" and "Rules 3" are the same section. */
+function collapseKey(rule, hd) {
+  const own = [...hd.childNodes].filter((n) => !(n.nodeType === 1 && n.matches('.cs-tab-count, .wk-pill, button, .cd-spacer, .cs-hint, .sp'))).map((n) => n.textContent).join(' ');
+  return rule.id + ':' + own.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+function decorateCollapsibles(root) {
+  if (!document.body.classList.contains('sg-phone')) return;
+  // the field tiles under a sheet's banner get a heading of their own so they can fold too
+  for (const sc of root.querySelectorAll('.wk .cs-tiles-scroll')) {
+    if (sc.previousElementSibling && sc.previousElementSibling.classList.contains('sg-fields-h')) continue;
+    const n = sc.querySelectorAll('.cs-tile').length; if (!n) continue;
+    const hd = document.createElement('div'); hd.className = 'sg-fields-h';
+    hd.append(document.createTextNode('Fields'), Object.assign(document.createElement('span'), { className: 'cs-tab-count', textContent: String(n) }));
+    sc.before(hd);
+  }
+  const set = collapsedSet();
+  for (const rule of COLLAPSIBLE) for (const hd of root.querySelectorAll(rule.sel)) {
+    if (rule.skip && hd.closest(rule.skip)) continue;
+    if (!hd.classList.contains('sg-colh')) { hd.classList.add('sg-colh', rule.mode === 'next' ? 'sg-colh-next' : 'sg-colh-sib'); hd.setAttribute('role', 'button'); }
+    const key = collapseKey(rule, hd); hd.dataset.sgKey = key;
+    const on = set.has(key); hd.classList.toggle('is-collapsed', on); hd.setAttribute('aria-expanded', String(!on));
+  }
+}
+let _colObs = null; let _colRaf = 0; let _colClick = null;
+function startCollapsibles() {
+  if (_colObs) return;
+  _colObs = new MutationObserver(() => { if (_colRaf || !document.body.classList.contains('sg-phone')) return; _colRaf = requestAnimationFrame(() => { _colRaf = 0; decorateCollapsibles(document); }); });
+  _colObs.observe(document.body, { childList: true, subtree: true });
+  _colClick = (e) => {
+    if (!document.body.classList.contains('sg-phone') || !(e.target instanceof Element)) return;
+    const hd = e.target.closest('.sg-colh'); if (!hd || e.target.closest('button, a, input, select, textarea, .cs-x, .wk-link')) return;
+    const set = collapsedSet(); const key = hd.dataset.sgKey; if (!key) return;
+    if (set.has(key)) set.delete(key); else set.add(key); saveCollapsed();
+    for (const x of document.querySelectorAll('.sg-colh')) if (x.dataset.sgKey === key) { x.classList.toggle('is-collapsed', set.has(key)); x.setAttribute('aria-expanded', String(!set.has(key))); }
+  };
+  document.addEventListener('click', _colClick, true);
+  decorateCollapsibles(document);
+}
+function stopCollapsibles() {
+  if (_colObs) { _colObs.disconnect(); _colObs = null; } if (_colRaf) cancelAnimationFrame(_colRaf); _colRaf = 0;
+  if (_colClick) { document.removeEventListener('click', _colClick, true); _colClick = null; }
+  for (const x of document.querySelectorAll('.sg-fields-h')) x.remove();
+  for (const x of document.querySelectorAll('.sg-colh')) x.classList.remove('sg-colh', 'sg-colh-next', 'sg-colh-sib', 'is-collapsed');
+}

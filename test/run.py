@@ -397,6 +397,19 @@ async def main():
         assert any('subgraph' in x and 'Act I' in x for x in r['mm']) and any('|"because"|' in x for x in r['mm']) and r['savedPlots'] == 1 and r['beatsSame'] and r['svgEdges'] == 1
         await page.screenshot(path=f'{OUT}/15-draft-plot.png')
 
+        # Language helper: optional step-by-step guide on a language note
+        r = await ev("""async () => { const path = 'Story/Languages/Old Tide.md'; await app.vault.create(path, '---\\ntype: language\\n---\\n```worldkeeper\\n```\\n');
+          const box = document.createElement('div'); document.body.append(box); await app.codeblocks['worldkeeper']('', box, { sourcePath: path, addChild(c) { c.load(); }, getSectionInfo() { return null; } }); await new Promise(r => setTimeout(r, 300));
+          [...box.querySelectorAll('.cs-tab')].find(t => t.textContent.includes('Conlang')).click(); await new Promise(r => setTimeout(r, 300));
+          const intro = !!box.querySelector('.lh-intro'); box.querySelector('.lh-open').click(); await new Promise(r => setTimeout(r, 100));
+          const W = (ms) => new Promise(r => setTimeout(r, ms)); const btn = (t) => [...document.querySelectorAll('.lh-foot button')].find(b => b.textContent.includes(t));
+          const blocked = btn('Next').disabled; [...document.querySelectorAll('.lh-feel')].find(b => b.textContent.includes('Harsh')).click(); await W(50);
+          const samples = document.querySelectorAll('.lh-sample').length; for (let i = 0; i < 4; i++) { btn('Next').click(); await W(50); }
+          const sentence = (document.querySelector('.lh-sentence') || {}).textContent; btn('Add to my language').click(); await W(500);
+          const fm = app.metadataCache.getFileCache(app.vault.getAbstractFileByPath(path)).frontmatter; box.remove();
+          return { intro, blocked, samples, sentence, order: fm.wordOrder, morph: fm.morphology, cons: fm.phonology && fm.phonology.consonants, words: (fm.lexicon || []).length, affixes: (fm.affixes || []).map(a => a.affix + ' ' + a.meaning), I: ((fm.lexicon || []).find(e => e.meaning === 'I') || {}).word }; }""")
+        print('12. language helper:', json.dumps(r, ensure_ascii=False))
+        assert r['intro'] and r['blocked'] and r['samples'] >= 5 and r['order'] == 'SOV' and r['morph'] == 'Agglutinative' and r['words'] >= 40 and len(r['affixes']) == 4 and r['sentence'] and r['I']
         # Unload cleanly
         r = await ev("""async () => { SGP.unload(); await new Promise(r => setTimeout(r, 300)); return { views: Object.keys(app.viewRegistry), blocks: Object.keys(app.codeblocks), cmds: Object.keys(app.commands.commands).length, saved: JSON.parse(app.vault.adapter.data.get('.obsidian/plugins/storyguild/data.json')).manuscript.projects.length }; }""")
         print('9. unload:', r)

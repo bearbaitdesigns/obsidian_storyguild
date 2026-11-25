@@ -52,11 +52,11 @@
       out[key] = v === '' ? null : v.startsWith('[') && v.endsWith(']') && !v.startsWith('[[') ? v.slice(1, -1).split(',').map((x) => sc(x.trim())).filter((x) => x !== '') : sc(v);
     }
     return out;
-    function sc(v) { if (/^".*"$|^'.*'$/.test(v)) return v.slice(1, -1); if (/^-?\d+(\.\d+)?$/.test(v)) return Number(v); if (v === 'true') return true; if (v === 'false') return false; if (v === 'null' || v === '~') return null; return v; }
+    function sc(v) { if (/^\{.*\}$/.test(v)) { try { return JSON.parse(v); } catch (e) {} } if (/^".*"$|^'.*'$/.test(v)) return v.slice(1, -1); if (/^-?\d+(\.\d+)?$/.test(v)) return Number(v); if (v === 'true') return true; if (v === 'false') return false; if (v === 'null' || v === '~') return null; return v; }
   }
   function stringifyYaml(o) {
     const q = (v) => (typeof v === 'string' && (/^[\[{>|*&!%@`#'"]|: | #|^\s|\s$|^$|^(true|false|null|-?\d+(\.\d+)?)$/.test(v)) ? JSON.stringify(v) : String(v));
-    return Object.entries(o).map(([k, v]) => Array.isArray(v) ? `${k}:\n${v.map((x) => `  - ${q(x)}`).join('\n')}` : v == null ? `${k}:` : typeof v === 'object' ? `${k}: ${JSON.stringify(v)}` : `${k}: ${q(v)}`).join('\n') + '\n';
+    return Object.entries(o).map(([k, v]) => Array.isArray(v) ? `${k}:\n${v.map((x) => `  - ${x && typeof x === 'object' ? JSON.stringify(x) : q(x)}`).join('\n')}` : v == null ? `${k}:` : typeof v === 'object' ? `${k}: ${JSON.stringify(v)}` : `${k}: ${q(v)}`).join('\n') + '\n';
   }
   const splitFm = (t) => { const m = String(t).match(/^---\n([\s\S]*?)\n---\n?/); return m ? { fm: parseYaml(m[1]), body: t.slice(m[0].length), raw: m[1] } : { fm: null, body: t }; };
 

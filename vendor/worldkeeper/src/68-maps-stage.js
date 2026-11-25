@@ -92,6 +92,8 @@ async function renderViewer(el, map, { height = 420, focus = null, comp = null, 
   if (toolbar) ap(wrap, h('div', { class: 'wkm-vbar' }, h('button', { title: 'Zoom in', onclick: () => st.zoomBy(1.4) }, '+'), h('button', { title: 'Zoom out', onclick: () => st.zoomBy(1 / 1.4) }, '−'), h('button', { title: 'Fit', onclick: () => st.fit() }, '⤢'),
     h('button', { class: 'is-open', title: 'Open in the map editor', onclick: () => P.openMap(map, focus) }, '✎ Edit map')));
   requestAnimationFrame(() => {
+    // a narrow pane (a phone) shows the whole map without a tall empty band above and below it
+    const w = wrap.clientWidth; if (w && img.H) { const fitH = Math.round(w * img.H / MAP_W) + 56; if (fitH < height) wrap.style.height = Math.max(180, fitH) + 'px'; }
     st.fit();
     if (focus) { const hits = M.hitsFor(d, map, focus); if (hits.length) { const c = hits.flatMap((x) => x.pts || [[x.x, x.y]]); st.focusBox(Math.min(...c.map((p) => p[0])), Math.min(...c.map((p) => p[1])), Math.max(...c.map((p) => p[0])), Math.max(...c.map((p) => p[1])), 2.2); st.flash(hits.map((x) => x.id)); } }
   });

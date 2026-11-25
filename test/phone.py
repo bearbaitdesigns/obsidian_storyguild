@@ -75,6 +75,13 @@ async def main():
             await shot(name)
             await ev(f"async () => {{ const b = document.querySelector('.sg-sheet-test .cs-hero .wk-pencil'); b && b.click(); await {WAIT % 300}; }}")
             await shot(name + '-tools')
+        # sections fold away on a phone, and stay folded when the sheet is drawn again
+        r = await ev(f"""async () => {{ const w = document.querySelector('.sg-sheet-test'); await {WAIT % 100}; const hd = w.querySelector('.sg-fields-h'); if (!hd) return 'no fields heading';
+          const shown = () => [...w.querySelectorAll('.cs-tile')].filter(t => t.offsetParent).length; const before = shown(); hd.click(); await {WAIT % 50};
+          const folded = shown(); const kept = JSON.parse(localStorage.getItem('storyguild-collapsed') || '[]'); hd.click(); await {WAIT % 50};
+          return {{ before, folded, kept, after: shown(), heads: w.querySelectorAll('.sg-colh').length }}; }}""")
+        print('fold:', r)
+        assert isinstance(r, dict) and r['before'] > 0 and r['folded'] == 0 and 'fields:fields' in r['kept'] and r['after'] == r['before'] and r['heads'] >= 2
         await ev("() => document.querySelectorAll('.sg-sheet-test').forEach(e => e.remove())")
         await ev(f"""async () => {{ await app.vault.create('Worldkeeper/Encyclopedia/Lantern Law.md', '---\\ntype: entry\\ncategory: Law & custom\\ntags: [guild]\\nlinks: []\\nseeAlso: []\\n---\\n```worldkeeper-entry\\n```\\n\\n## Origins\\n\\nEvery lantern on the harbour wall was lit by a keeper.\\n\\n## The Nine Lanterns\\n\\nEight still burn.\\n');
           await app.vault.create('Worldkeeper/Encyclopedia/Saltglass.md', '---\\ntype: entry\\ncategory: Materials\\n---\\n```worldkeeper-entry\\n```\\n\\nGlass that remembers the sea.\\n');

@@ -42,7 +42,10 @@ function renderConlang(f, fm) {
     h('div', { class: 'cs-stat' }, h('b', {}, fm.wordOrder || '—'), h('span', {}, 'Word order')),
     h('div', { class: 'cs-stat' }, h('b', {}, fm.morphology || '—'), h('span', {}, 'Morphology'))));
   const sub = [['phon', '🔊 Sounds & generator'], ['lex', '📖 Lexicon'], ['gram', '🧩 Grammar'], ['tr', '🔁 Translator']];
-  ap(wrap, h('div', { class: 'cs-subnav' }, ...sub.map(([k, l]) => h('button', { class: st.tab === k ? 'is-on' : '', onclick: () => { st.tab = k; rerender(); } }, l))));
+  if (!lex.length && !(ph.consonants && ph.vowels)) ap(wrap, h('div', { class: 'cv-callout lh-intro' }, h('div', {}, h('b', {}, 'Building a language from scratch?'), h('div', { class: 'cs-hint' }, 'The language helper walks you through it: how it sounds, its grammar, a starter vocabulary and word endings. Optional; nothing is saved until the last step.')),
+    h('button', { class: 'mod-cta', onclick: () => openLanguageHelper(f) }, '🧭 Start the helper')));
+  ap(wrap, h('div', { class: 'cs-subnav' }, ...sub.map(([k, l]) => h('button', { class: st.tab === k ? 'is-on' : '', onclick: () => { st.tab = k; rerender(); } }, l)),
+    h('button', { class: 'lh-open', title: 'Step-by-step guide to building this language', onclick: () => openLanguageHelper(f) }, '🧭 Language helper')));
   const addWord = (word, meaning = '', pos = 'noun') => W((x) => { x.lexicon.push({ word, pos, meaning }); });
 
   if (st.tab === 'phon') {

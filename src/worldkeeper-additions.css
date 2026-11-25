@@ -120,7 +120,7 @@
 .wk .lh-check { display: flex; gap: 8px; align-items: center; }
 .wk .lh-sentence { font-size: 1.3em; font-family: var(--font-monospace); color: var(--text-accent); }
 /* phones: the helper fills the screen */
-.sg-phone .wk.wk-modal-bg:has(.lh) { padding: 0; align-items: stretch; }
+.sg-phone .wk.wk-modal-bg:has(.lh) { padding: var(--sg-sat, 0px) 0 var(--sg-sab, 0px); align-items: stretch; box-sizing: border-box; }
 .sg-phone .wk .wk-suggest.lh { width: 100vw; max-width: 100vw; max-height: none; height: 100%; border-radius: 0; }
 .sg-phone .wk .lh-feels, .sg-phone .wk .lh-opts, .sg-phone .wk .lh-groups { grid-template-columns: minmax(0, 1fr); }
 .sg-phone .wk .lh-affrow { grid-template-columns: auto minmax(0, 1fr) 72px; }
@@ -128,3 +128,47 @@
 .sg-phone .wk .lh-foot { flex-wrap: wrap; }
 .sg-phone .wk .cs-subnav .lh-open { margin-left: 0; }
 .wk .lh-check input, .wk .lh-group input, .wk .lh-affrow input[type=checkbox] { flex: none; }
+
+/* ================= Lexicon by type, pronunciation ================= */
+.wk .cl-lexgroup { margin-bottom: 16px; }
+.wk .cl-lexgroup .cs-group-title { margin-bottom: 4px; }
+.wk .cl-lexgroup .cl-table th:nth-child(1) { width: 22%; } .wk .cl-lexgroup .cl-table th:nth-child(2) { width: 26%; } .wk .cl-lexgroup .cl-table th:nth-child(4) { width: 14%; } .wk .cl-lexgroup .cl-table th:nth-child(5) { width: 28px; }
+.wk .cl-saycell { white-space: nowrap; }
+.wk .cl-saycell { display: flex; align-items: center; gap: 2px; }
+.wk input.cl-say { font-family: var(--font-interface); font-size: .9em; letter-spacing: .02em; }
+.wk input.cl-say::placeholder { color: var(--text-muted); opacity: .85; }
+.wk .cl-hear { flex: none; padding: 2px 6px; background: transparent; box-shadow: none; border: 0; font-size: .9em; cursor: pointer; opacity: .75; }
+.wk .cl-hear:hover { opacity: 1; }
+.wk .cl-keygrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 14px; }
+.wk .cl-keyrow { display: grid; grid-template-columns: 38px 76px minmax(0, 1fr); gap: 8px; align-items: center; }
+.wk .cl-keyrow b { font-family: var(--font-monospace); color: var(--cs-accent); text-align: center; background: var(--background-modifier-hover); border-radius: 6px; padding: 2px 0; }
+.wk .cl-keyrow input.cl-say { width: 100%; font-family: var(--font-interface); }
+.wk .cl-keyrow small { color: var(--text-faint); font-size: .8em; }
+.wk .cl-saykey .cl-inline { display: flex; align-items: center; gap: 10px; }
+.wk .cl-saykey .cl-inline label { margin: 0; }
+.wk .cl-sayex { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: .9em; color: var(--text-muted); }
+.wk .cl-sayex b { font-family: var(--font-monospace); color: var(--text-normal); }
+.wk .cl-sayline { margin-top: 10px; font-size: .95em; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.wk .lh-sample { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.25; }
+.wk .lh-sample small { font-family: var(--font-interface); font-size: .72em; color: var(--text-muted); }
+.sg-phone .wk .cl-saycell { display: flex; }
+.sg-phone .wk .cl-keyrow { grid-template-columns: 38px 90px minmax(0, 1fr); }
+.sg-phone .wk .cl-keygrid { grid-template-columns: minmax(0, 1fr); }
+/* phone: each lexicon word is a compact two-row card (word · say it / meaning · type) */
+.sg-phone .wk .cl-lexgroup .cl-table tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2px 8px; align-items: center; }
+.sg-phone .wk .cl-lexgroup .cl-table td:last-child:has(.cs-x) { position: absolute; }
+.wk .cl-saycell input.cl-say { flex: 1; min-width: 0; width: 100%; }
+.sg-phone .wk .cl-lexgroup .cl-table tr { padding-right: 40px; }
+/* special letters palette (accents, apostrophes, hyphens) */
+.wk .cl-chars { margin: 0 0 10px; }
+.wk .cl-chars-toggle { font-size: .82em; border-radius: 999px; padding: 3px 12px; }
+.wk .cl-chars-sets { display: none; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--cs-line, var(--background-modifier-border)); border-radius: 12px; background: var(--cs-tile-bg, var(--background-secondary)); flex-direction: column; gap: 6px; }
+.wk .cl-chars.is-open .cl-chars-sets { display: flex; }
+.wk .cl-chars.is-open .cl-chars-toggle { background: var(--interactive-accent); color: var(--text-on-accent); }
+.wk .cl-chars-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.wk .cl-chars-row > .cs-hint { width: 110px; flex: none; font-size: .78em; }
+.wk .cl-char { min-width: 34px; height: 32px; padding: 0 6px; font-size: 1.05em; font-family: var(--font-text, serif); border-radius: 7px; }
+.sg-phone .wk .cl-chars-row > .cs-hint { width: 100%; }
+.sg-phone .wk .cl-char { min-width: 40px; min-height: 40px; }
+.wk .cl-keyrow input.cl-say { min-width: 0; box-sizing: border-box; }
+.wk .cl-keyrow { grid-template-columns: 38px 84px minmax(0, 1fr); }

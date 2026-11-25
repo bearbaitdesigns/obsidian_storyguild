@@ -269,7 +269,7 @@
 .sg-phone :where(.ds-root, .wk, .sg-pw-phone, .ds-modal, .pw-toolbar) button { height: auto; min-height: 38px; white-space: normal; line-height: 1.25; padding-top: 6px; padding-bottom: 6px; max-width: 100%; }
 .sg-phone :where(.ds-root, .wk, .sg-pw-phone, .ds-modal) :is(input, select, textarea) { max-width: 100%; min-width: 0; box-sizing: border-box; }
 .sg-phone :where(.ds-root, .wk, .ds-modal) select { text-overflow: ellipsis; }
-.sg-phone .ds-root { padding: 10px 12px 90px !important; }
+.sg-phone .ds-root { padding: 10px 12px calc(90px + var(--sg-sab, 0px)) !important; }
 .sg-phone .ds-root button, .sg-phone .ds-root select.dropdown, .sg-phone .ds-root input:not([type=checkbox]):not([type=range]) { min-height: 40px; }
 .sg-phone .ds-root input[type=checkbox] { width: 22px; height: 22px; }
 .sg-phone .ds-root h2 { margin: 14px 0 6px; }
@@ -581,3 +581,21 @@
 .ds-map-opt { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 3px 0; }
 .ds-map-thumb { width: 56px; height: 38px; border-radius: 4px; background: var(--background-secondary) center / cover no-repeat; flex: none; box-shadow: inset 0 0 0 1px var(--background-modifier-border); }
 .ds-maps-order { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+
+/* ================= Phone: keep clear of the status bar and the Android navigation buttons =================
+   Obsidian sets --safe-area-inset-top/bottom on phones (env() is the fallback). Its own dialogs only allow for the
+   top inset, so our dialogs, sheets and full-screen panels add the bottom one themselves. */
+body.sg-phone { --sg-sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)); --sg-sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)); }
+.sg-phone .modal-container .modal:is(.sg-sheet, .ds-lib-modal, .sg-diagram-modal, .sg-diagram-editor, .pw-modal),
+.sg-phone .modal-container .modal:has(> .modal-content:is(.ds-modal, .pw-root, .pw-linking)) {
+  padding-bottom: calc(var(--sg-sab) + 16px) !important; max-height: calc(100dvh - var(--sg-sat)); box-sizing: border-box; }
+.sg-phone .sg-diagram-editor { height: calc(100dvh - var(--sg-sat)); }
+.sg-phone .wk.wk-modal-bg, .sg-phone .wkm-modal-bg { padding-bottom: var(--sg-sab); box-sizing: border-box; }
+.sg-phone .wk.wk-modal-bg > *, .sg-phone .wkm-modal-bg > * { max-height: calc(100% - 12vh - 8px); overflow: auto; }
+.sg-phone .wk.wk-modal-bg:has(.lh) > .lh { max-height: none; height: 100%; overflow: hidden; }
+.sg-phone .wk .cs-lb-close { top: calc(16px + var(--sg-sat)); }
+.sg-phone .wk .cs-lb { height: 100dvh; padding: var(--sg-sat) 0 var(--sg-sab); box-sizing: border-box; }
+.sg-phone .wkm-popover.is-sheet { padding-bottom: calc(var(--sg-sab) + 10px); }
+.sg-phone .ds-pubbar { bottom: calc(8px + var(--sg-sab)); }
+/* our own screens: room at the end so the last buttons can scroll clear of Obsidian's bar and the system buttons */
+.sg-phone .workspace-leaf-content:is([data-type^="storyguild"], [data-type^="worldkeeper"], [data-type^="plot-weaver"]):not([data-type="worldkeeper-map-editor"]) > .view-content { padding-bottom: calc(var(--sg-sab) + 80px); }

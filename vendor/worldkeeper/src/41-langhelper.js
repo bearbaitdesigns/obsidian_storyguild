@@ -71,9 +71,18 @@ function openLanguageHelper(f) {
     for (const m of st.extra.split(/[\n,]+/).map((x) => x.trim().toLowerCase()).filter(Boolean)) out.push({ m, pos: 'noun', short: false, story: true });
     const seen = new Set(); return out.filter((x) => { const k = x.m.toLowerCase(); if (known.has(k) || seen.has(k)) return false; seen.add(k); return true; });
   };
+  /* write the stressed vowel with an acute accent, the way Spanish or Greek mark it */
+  const ACUTE = { a: 'á', e: 'é', i: 'í', o: 'ó', u: 'ú', y: 'ý' };
+  const accentWord = (w) => {
+    if (!st.ph.acute || /[áéíóúý-]/.test(w)) return w;
+    const syl = pronounce(st.ph, w).split('-'); const at = syl.findIndex((x) => /[A-Z]/.test(x) && x === x.toUpperCase()); if (at < 0) return w;
+    const toks = sayTokens(st.ph, w); const vi = toks.map((t, i) => (t.k === 'V' ? i : -1)).filter((i) => i >= 0); const t = toks[vi[at]];
+    if (!t || !ACUTE[t.s]) return w; // long vowels (ā, aa) already stand out, so they keep their own spelling
+    t.s = ACUTE[t.s]; return toks.map((x) => x.s).join('');
+  };
   const coinWords = (force) => {
     const ex = taken(); if (force) { for (const w of Object.values(st.words)) ex.delete(w); st.words = {}; }
-    for (const x of wantedWords()) { if (st.words[x.m]) continue; const w = genWord(phFor(x), ex); if (w) { st.words[x.m] = w; ex.add(w); } }
+    for (const x of wantedWords()) { if (st.words[x.m]) continue; const w0 = genWord(phFor(x), ex); const w = w0 && accentWord(w0); if (w) { st.words[x.m] = w; ex.add(w); } }
   };
   const affixType = () => (st.order === 'VSO' || st.order === 'VOS' ? 'prefix' : 'suffix');
   const coinAffixes = (force) => {
@@ -111,7 +120,16 @@ function openLanguageHelper(f) {
       fld('consonants', 'Consonants', 'space-separated; digraphs like th or sh count as one sound'), fld('vowels', 'Vowels', 'add ae, ia… for diphthongs'),
       fld('patterns', 'Syllable shapes', 'C = consonant, V = vowel; repeat a shape to make it more common'), fld('forbidden', 'Never allow', 'letter pairs that look wrong'),
       h('div', { class: 'lh-fld cl-inline' }, h('span', {}, 'Syllables per word'), num('minSyl'), h('span', {}, 'to'), num('maxSyl'))));
-    ap(body, h('div', { class: 'lh-card' }, h('h4', {}, 'Sample words'), h('div', { class: 'cl-gen' }, ...st.samples.map((w) => h('span', { class: 'lh-sample' }, w))),
+    const sp = (x) => String(x || '').split(/\s+/).filter(Boolean);
+    const flag = (label, on, set) => { const c = h('input', { type: 'checkbox', checked: on }); c.addEventListener('change', () => { set(c.checked); st.words = {}; sample(); draw(); }); return h('label', { class: 'lh-check' }, c, label); };
+    const MAC = { a: 'ā', e: 'ē', i: 'ī', o: 'ō', u: 'ū' }; const hasMac = sp(st.ph.vowels).some((v) => Object.values(MAC).includes(v));
+    const hasApos = /'/.test(st.ph.patterns || ''); const hasAcute = !!st.ph.acute;
+    ap(body, h('div', { class: 'lh-card' }, h('h4', {}, 'Accents & marks (optional)'),
+      flag('Long vowels written with a line on top (ā ē ī ō ū)', hasMac, (on) => { const v = sp(st.ph.vowels).filter((x) => !Object.values(MAC).includes(x)); st.ph.vowels = (on ? [...v, ...v.filter((x) => MAC[x]).map((x) => MAC[x])] : v).join(' '); }),
+      flag('Apostrophes for a catch in the voice (ka\u2019el)', hasApos, (on) => { const p = sp(st.ph.patterns).filter((x) => !/'/.test(x)); st.ph.patterns = (on ? [...p, "CV'V"] : p).join(' '); }),
+      flag('Show the stressed vowel with an accent (talássa)', hasAcute, (on) => { st.ph.acute = on; }),
+      h('div', { class: 'cs-hint' }, 'Hyphens are for compound words; type them into your own words (sea-lantern) or add - to a syllable shape.')));
+    ap(body, h('div', { class: 'lh-card' }, h('h4', {}, 'Sample words'), h('div', { class: 'cl-gen' }, ...st.samples.map((w) => h('span', { class: 'lh-sample' }, w, h('small', {}, pronounce(st.ph, w))))),
       h('div', { class: 'cl-actions' }, h('button', { onclick: () => { sample(); draw(); } }, '🎲 New samples'))));
     ap(body, tip('Fewer sounds make a language feel more distinct. Around 10–15 consonants and 3–6 vowels is plenty. If a word looks unpronounceable, add the clumsy pair to “Never allow”.'));
   }
@@ -132,7 +150,7 @@ function openLanguageHelper(f) {
     ap(body, h('div', { class: 'lh-card' }, h('h4', {}, 'Words from your story'), ta));
     const list = wantedWords();
     ap(body, h('div', { class: 'lh-card' }, h('h4', {}, `Preview · ${list.length} new words`, h('span', { class: 'cd-spacer' }), h('button', { class: 'lh-mini', onclick: () => { coinWords(true); draw(); } }, '🎲 Reroll all')),
-      list.length ? h('div', { class: 'lh-wordlist' }, ...list.map((x) => h('button', { class: 'lh-word', title: 'Tap for a different word', onclick: () => { const ex = taken(); ex.delete(st.words[x.m]); const w = genWord(phFor(x), ex); if (w) st.words[x.m] = w; draw(); } }, h('b', {}, st.words[x.m] || '—'), h('small', {}, x.m))))
+      list.length ? h('div', { class: 'lh-wordlist' }, ...list.map((x) => h('button', { class: 'lh-word', title: 'Tap for a different word', onclick: () => { const ex = taken(); ex.delete(st.words[x.m]); const w0 = genWord(phFor(x), ex); const w = w0 && accentWord(w0); if (w) st.words[x.m] = w; draw(); } }, h('b', {}, st.words[x.m] || '—'), h('small', {}, x.m))))
         : h('div', { class: 'cs-hint' }, known.size ? 'Every word you picked is already in the lexicon.' : 'Pick a group above or add your own words.'),
       known.size ? h('div', { class: 'cs-hint cs-mt' }, 'Meanings already in your lexicon are skipped.') : null));
     ap(body, tip('Tap any word to roll a new one. Words for important things in your story (a god, the sea, a city) are worth rerolling until they feel right.'));
@@ -165,7 +183,7 @@ function openLanguageHelper(f) {
   async function apply() {
     const words = wantedWords().filter((x) => st.words[x.m]); const aff = st.affixes.filter((a) => a.on && a.form); const isol = st.morph === 'Isolating';
     await S.write(f, (x) => {
-      if (st.doSounds !== false) x.phonology = { consonants: st.ph.consonants, vowels: st.ph.vowels, patterns: st.ph.patterns, forbidden: st.ph.forbidden || '', minSyl: +st.ph.minSyl || 1, maxSyl: +st.ph.maxSyl || 2 };
+      if (st.doSounds !== false) x.phonology = Object.assign({}, x.phonology || {}, { consonants: st.ph.consonants, vowels: st.ph.vowels, patterns: st.ph.patterns, forbidden: st.ph.forbidden || '', minSyl: +st.ph.minSyl || 1, maxSyl: +st.ph.maxSyl || 2 });
       if (st.doGrammar !== false) { if (st.order) x.wordOrder = st.order; if (st.morph) x.morphology = st.morph; }
       x.lexicon = arr(x.lexicon); x.affixes = arr(x.affixes);
       if (st.doWords !== false) for (const y of words) x.lexicon.push({ word: st.words[y.m], pos: y.pos, meaning: y.m });

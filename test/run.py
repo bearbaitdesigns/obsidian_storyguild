@@ -410,6 +410,30 @@ async def main():
           return { intro, blocked, samples, sentence, order: fm.wordOrder, morph: fm.morphology, cons: fm.phonology && fm.phonology.consonants, words: (fm.lexicon || []).length, affixes: (fm.affixes || []).map(a => a.affix + ' ' + a.meaning), I: ((fm.lexicon || []).find(e => e.meaning === 'I') || {}).word }; }""")
         print('12. language helper:', json.dumps(r, ensure_ascii=False))
         assert r['intro'] and r['blocked'] and r['samples'] >= 5 and r['order'] == 'SOV' and r['morph'] == 'Agglutinative' and r['words'] >= 40 and len(r['affixes']) == 4 and r['sentence'] and r['I']
+        # Lexicon grouped by type, alphabetical, with pronunciations
+        r = await ev("""async () => { const path = 'Story/Languages/Old Tide.md'; const f = app.vault.getAbstractFileByPath(path);
+          await app.fileManager.processFrontMatter(f, (fm) => { fm.phonology = Object.assign({}, fm.phonology, { consonants: 't l s k r m n th sh', vowels: 'a e i o u ae', say: { ae: 'ay' } });
+            fm.lexicon = [{ word: 'talassa', pos: 'noun', meaning: 'sea' }, { word: 'amra', pos: 'noun', meaning: 'home' }, { word: 'mir', pos: 'verb', meaning: 'remember' }, { word: 'aethor', pos: 'noun', meaning: 'lantern' }, { word: 'kelon', pos: 'noun', meaning: 'salt', say: 'KEL-un' }, { word: 'brask', meaning: 'odd' }]; });
+          const box = document.createElement('div'); document.body.append(box); await app.codeblocks['worldkeeper']('', box, { sourcePath: path, addChild(c) { c.load(); }, getSectionInfo() { return null; } }); await new Promise(r => setTimeout(r, 300));
+          [...box.querySelectorAll('.cs-tab')].find(t => t.textContent.includes('Conlang')).click(); await new Promise(r => setTimeout(r, 200));
+          [...box.querySelectorAll('.cs-subnav button')].find(b => b.textContent.includes('Lexicon')).click(); await new Promise(r => setTimeout(r, 300));
+          const groups = [...box.querySelectorAll('.cl-lexgroup')].map(g => [g.querySelector('.cs-group-title').firstChild.textContent, [...g.querySelectorAll('tbody tr')].map(tr => tr.querySelector('input.w').value + '=' + (tr.querySelector('.cl-say').value || tr.querySelector('.cl-say').placeholder))]);
+          box.remove(); return groups; }""")
+        print('13. lexicon:', json.dumps(r, ensure_ascii=False))
+        assert [g[0] for g in r] == ['Nouns', 'Verbs', 'No type yet'] and r[0][1] == ['aethor=AY-thohr', 'amra=AHM-rah', 'kelon=KEL-un', 'talassa=tah-LAHS-sah'] and r[1][1] == ['mir=meer']
+        # Accents, apostrophes and hyphens in a language
+        r = await ev("""async () => { const path = 'Story/Languages/Marks.md'; await app.vault.create(path, '---\\ntype: language\\n---\\n```worldkeeper\\n```\\n');
+          await app.fileManager.processFrontMatter(app.vault.getAbstractFileByPath(path), (fm) => { fm.phonology = { consonants: 't l s k r m n š ñ', vowels: 'a e i o u ā', patterns: "CV'V CV'V", minSyl: 2, maxSyl: 2 };
+            fm.lexicon = [{ word: "ka'el", pos: 'noun', meaning: 'oath' }, { word: 'talássa', pos: 'noun', meaning: 'sea' }, { word: 'tide-mir', pos: 'noun', meaning: 'memory' }, { word: 'šāñe', pos: 'noun', meaning: 'swim' }]; });
+          const box = document.createElement('div'); document.body.append(box); await app.codeblocks['worldkeeper']('', box, { sourcePath: path, addChild(c) { c.load(); }, getSectionInfo() { return null; } }); await new Promise(r => setTimeout(r, 300));
+          [...box.querySelectorAll('.cs-tab')].find(t => t.textContent.includes('Conlang')).click(); await new Promise(r => setTimeout(r, 300));
+          const gen = [...box.querySelectorAll('.cl-gen button')].map(b => b.textContent); const pal = !!box.querySelector('.cl-chars');
+          [...box.querySelectorAll('.cs-subnav button')].find(b => b.textContent.includes('Lexicon')).click(); await new Promise(r => setTimeout(r, 300));
+          const say = Object.fromEntries([...box.querySelectorAll('.cl-lexgroup tbody tr')].map(tr => [tr.querySelector('input.w').value, tr.querySelector('.cl-say').placeholder]));
+          const s = box.querySelector('.cl-tools input[type=search]'); s.value = 'talassa'; s.dispatchEvent(new Event('input')); const found = [...box.querySelectorAll('.cl-lexgroup input.w')].map(i => i.value);
+          box.remove(); return { gen, pal, say, found }; }""")
+        print('14. marks:', json.dumps(r, ensure_ascii=False))
+        assert r['pal'] and r['gen'] and all("'" in g for g in r['gen']) and r['say']["ka'el"] == 'KAH-’ehl' and r['say']['talássa'] == 'tah-LAHS-sah' and ' · ' in r['say']['tide-mir'] and r['say']['šāñe'] == 'SHAAH-nyeh' and r['found'] == ['talássa']
         # Unload cleanly
         r = await ev("""async () => { SGP.unload(); await new Promise(r => setTimeout(r, 300)); return { views: Object.keys(app.viewRegistry), blocks: Object.keys(app.codeblocks), cmds: Object.keys(app.commands.commands).length, saved: JSON.parse(app.vault.adapter.data.get('.obsidian/plugins/storyguild/data.json')).manuscript.projects.length }; }""")
         print('9. unload:', r)

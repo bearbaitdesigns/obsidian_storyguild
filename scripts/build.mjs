@@ -54,8 +54,8 @@ wk = patch(wk, 'wk:ms-readers', `    if (MS_READERS.has(m.kind)) {
 // Books & series button.
 wk = patch(wk, 'wk:hero-sections', `daysLeft != null ? h('span', {}, \`\${daysLeft} days left\`) : null)),`,
   `daysLeft != null ? h('span', {}, \`\${daysLeft} days left\`) : null), HOST.sectionPills()),`);
-wk = patch(wk, 'wk:hero-corner', `h('small', {}, 'of goal'))), h('div', { class: 'hd-pills' }, enc, atlas, wayfinder)));`,
-  `h('small', {}, 'of goal'))), HOST.sidePills(enc, atlas, wayfinder)));`);
+wk = patch(wk, 'wk:hero-corner', `h('small', {}, 'of goal'))), h('div', { class: 'hd-pills' }, enc, atlas, wayfinder, wordwright)));`,
+  `h('small', {}, 'of goal'))), HOST.sidePills(enc, atlas, wayfinder, wordwright)));`);
 wk = patch(wk, 'wk:hero-books', `pencilToggle(), changeBanner, renameTab);`, `pencilToggle(), changeBanner, renameTab, HOST.booksButton());`);
 // Gods and demons (individuals) get their own sheet templates, grouped with Characters
 // under Story. Existing characters with role Deity / Demon keep working everywhere.
@@ -104,11 +104,11 @@ wk = patch(wk, 'wk:enc-phone-mode', `this.body.replaceChildren(h('div', { class:
 wk = patch(wk, 'wk:enc-phone-show', `  show(f) { this.cur = f ? f.path : this.cur; this.run && this.run(); }`, `  show(f) { this.cur = f ? f.path : this.cur; if (f) this.phoneEntry = true; this.run && this.run(); }`);
 // Encyclopedia: Mermaid diagrams and canvases.
 wk = patch(wk, 'wk:enc-link-canvas', `const items = S.files().filter((x) => S.managed(x)).sort(byName).map((x) => ({ label: x.basename, sub: typeIcon(x) + ' ' + typeLabel(x), value: x.path }));`,
-  `const items = [...S.files().filter((x) => S.managed(x)), ...HOST.canvasFiles()].sort(byName).map((x) => ({ label: x.basename, sub: x.extension === 'canvas' ? '🧩 Canvas' : typeIcon(x) + ' ' + typeLabel(x), value: x.path }));`);
+  `const items = [...S.files().filter((x) => S.managed(x) || isConlang(x)), ...HOST.canvasFiles()].sort(byName).map((x) => ({ label: x.basename, sub: x.extension === 'canvas' ? '🧩 Canvas' : typeIcon(x) + ' ' + typeLabel(x), value: x.path }));`);
 wk = patch(wk, 'wk:enc-canvas-chip', `lks.forEach((l) => ap(body, chip(l.name, f.path, { file: l.file, label: (l.file ? typeIcon(l.file) + ' ' : '') + display(l.name),`,
   `lks.forEach((l) => ap(body, chip(l.name, f.path, { file: l.file, label: l.file && l.file.extension === 'canvas' ? '🧩 ' + l.file.basename : (l.file ? typeIcon(l.file) + ' ' : '') + display(l.name),`);
 wk = patch(wk, 'wk:enc-suggest-canvas', `suggest({ items: S.files().filter((x) => S.managed(x) || S.isEntry(x)).sort(byName).map((x) => ({ label: x.basename, sub: typeLabel(x), value: x.basename })), placeholder: 'Link a note…'`,
-  `suggest({ items: [...S.files().filter((x) => S.managed(x) || S.isEntry(x)), ...HOST.canvasFiles()].sort(byName).map((x) => ({ label: x.basename, sub: x.extension === 'canvas' ? 'Canvas' : typeLabel(x), value: x.extension === 'canvas' ? x.name : x.basename })), placeholder: 'Link a note or canvas…'`, 2); // entry editor and sheet text tabs
+  `suggest({ items: [...S.files().filter((x) => S.managed(x) || S.isEntry(x) || isConlang(x)), ...HOST.canvasFiles()].sort(byName).map((x) => ({ label: x.basename, sub: x.extension === 'canvas' ? 'Canvas' : typeLabel(x), value: x.extension === 'canvas' ? x.name : x.basename })), placeholder: 'Link a note or canvas…'`, 2); // entry editor and sheet text tabs
 wk = patch(wk, 'wk:enc-editor-tools', `return h('div', { class: 'enc-editor' }, h('div', { class: 'cs-section-actions' }, h('span', { class: 'cs-hint' }, 'Saves as you type · Esc to finish · links you type are suggested under “Mentioned but not linked”'), doneBtn), ta);`,
   `return h('div', { class: 'enc-editor' }, h('div', { class: 'cs-section-actions' }, h('span', { class: 'cs-hint' }, 'Saves as you type · Esc to finish · links you type are suggested under “Mentioned but not linked”'), HOST.encTools(ta, f), doneBtn), ta, HOST.encPreview(ta, f));`);
 wk = patch(wk, 'wk:enc-enhance', `md.addEventListener('dblclick', (e) => { if (!e.target.closest('a')) { this.editing = cur.path; this.run(); } });`,
@@ -117,7 +117,7 @@ wk = patch(wk, 'wk:enc-toc-fold', `h('div', { class: 'enc-toc-title' }, 'Content
 
 // Expose a few helpers to the host.
 wk += `
-WorldkeeperPlugin.storyguild = { readTodos, writeTodos, pwLoad, mergeSettings, DEFAULT_SETTINGS, MS_STANDARD, S, wayfinder: { M, loadMapImage, exportCanvas, mapFolder } };
+WorldkeeperPlugin.storyguild = { readTodos, writeTodos, pwLoad, mergeSettings, DEFAULT_SETTINGS, MS_STANDARD, S, wayfinder: { M, loadMapImage, exportCanvas, mapFolder }, wordwright: { WW, isConlang, translate: wwTranslate, translateAndSave: wwTranslateAndSave, guide: wwGuide, sections: WW_SECTIONS } };
 `;
 
 /* ------------------------------ Plot Weaver ------------------------------ */

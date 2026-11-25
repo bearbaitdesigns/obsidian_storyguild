@@ -184,10 +184,11 @@ async function renderHome(state) {
   const enc = h('button', { class: 'apill is-enc hd-enc', onclick: () => P.openEncyclopedia() }, h('span', {}, '📚'), 'Encyclopedia', h('b', {}, String(S.entries().length)));
   const atlas = h('button', { class: 'apill is-enc hd-enc', title: 'Open the Worldkeeper dashboards', onclick: () => P.openDashboards() }, h('span', {}, '🗺️'), 'World Atlas', h('b', {}, String(S.ix().type.size)));
   const wayfinder = h('button', { class: 'apill is-enc hd-enc', title: 'Open Wayfinder: your maps', onclick: () => P.openMaps() }, h('span', {}, '🧭'), 'Wayfinder', h('b', {}, String(M.all().length)));
+  const wordwright = h('button', { class: 'apill is-enc hd-enc', title: 'Open Wordwright: your conlangs', onclick: () => P.openWordwright() }, h('span', {}, '🔤'), 'Wordwright', h('b', {}, String(WW.all().length)));
   const hero = h('div', { class: 'hd-hero' + (bnSrc ? ' is-' + bStyle : ' is-empty'), style: bnSrc ? { '--img': `url("${bnSrc}")`, '--y': bY + '%' } : { '--cd-hue': String(hashHue(nv.title || 'x')) } }, h('div', { class: 'bg' }), tools,
     h('div', {}, nv.series ? h('div', { class: 'hd-series' }, nv.series) : null, h('h1', {}, nv.title || 'Untitled novel'),
       h('div', { class: 'sub' }, h('span', { class: 'cs-badge' }, nv.stage || 'Drafting'), dl ? h('span', {}, `Due ${dl.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`) : h('span', {}, 'No deadline set'), daysLeft != null ? h('span', {}, '·') : null, daysLeft != null ? h('span', {}, `${daysLeft} days left`) : null)),
-    h('div', { class: 'hd-side' }, h('div', { class: 'wk-ring', style: { '--p': String(pct) } }, h('div', {}, h('b', {}, pct + '%'), h('small', {}, 'of goal'))), h('div', { class: 'hd-pills' }, enc, atlas, wayfinder)));
+    h('div', { class: 'hd-side' }, h('div', { class: 'wk-ring', style: { '--p': String(pct) } }, h('div', {}, h('b', {}, pct + '%'), h('small', {}, 'of goal'))), h('div', { class: 'hd-pills' }, enc, atlas, wayfinder, wordwright)));
   dropImages(hero, null, ([img]) => setBanner(img));
   ap(root, hero);
 

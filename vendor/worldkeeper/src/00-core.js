@@ -140,7 +140,7 @@ const DEFAULT_TYPES = {
 };
 
 const DEFAULT_SETTINGS = {
-  root: 'World', folderMode: 'flat', encFolder: '{root}/Encyclopedia/{category}', entryType: 'entry', templatesFolder: 'Templates',
+  root: 'World', folderMode: 'flat', encFolder: '{root}/Encyclopedia/{category}', conlangFolder: '{root}/Conlangs', entryType: 'entry', templatesFolder: 'Templates',
   accentColor: '', showTitle: true, homeTitle: 'Worldkeeper home', whiteLinks: true, defaultBannerStyle: 'clear',
   imageKey: 'image', bannerKey: 'banner', galleryKey: 'gallery', detailsKey: 'details', relationshipKey: 'relationships',
   relationshipTypes: ['Ally', 'Rival', 'Enemy', 'Parent', 'Child', 'Sibling', 'Partner', 'Mentor', 'Student', 'Friend', 'Worshipper', 'Master', 'Servant'],

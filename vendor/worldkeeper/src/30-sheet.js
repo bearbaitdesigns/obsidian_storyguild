@@ -101,7 +101,7 @@ async function renderSheet(f, id, comp) {
   let act = P.tabState.get(f.path); if (!TB.find((x) => x.id === act)) act = TB[0].id;
   const count = (x) => x.lf ? names(fm[x.lf.key]).length : x.id === 'details' ? Object.keys(fm[s.detailsKey] || {}).length : x.mod === 'relationships' ? arr(fm[s.relationshipKey]).length
     : x.mod === 'linked' ? S.backlinks(f).length : x.mod === 'contains' ? S.descendants(f).length : x.mod === 'rules' ? arr(fm.rules).length : x.mod === 'spellbook' ? arr(fm.spells).length
-      : x.mod === 'conlang' ? arr(fm.lexicon).length : x.mod === 'gods' ? arr(fm.gods).length : x.mod === 'worship' ? worshipOf(f).length : x.mod === 'scenes' ? pwCards.length : x.mod === 'maps' ? mapsHere.length : typeof x.mod === 'object' ? S.refsOf(f, x.mod).length : 0;
+      : x.mod === 'conlang' ? (() => { const c = WW.conlangOf(f); return c ? arr(S.fm(c).lexicon).length : 0; })() : x.mod === 'gods' ? arr(fm.gods).length : x.mod === 'worship' ? worshipOf(f).length : x.mod === 'scenes' ? pwCards.length : x.mod === 'maps' ? mapsHere.length : typeof x.mod === 'object' ? S.refsOf(f, x.mod).length : 0;
   ap(root, h('div', { class: 'cs-tabs' }, ...TB.map((x) => { const c = count(x); return h('button', { class: 'cs-tab' + (x.id === act ? ' is-active' : ''), onclick: (e) => { P.tabState.set(f.path, x.id); wkRerender(e.currentTarget); } }, h('span', { class: 'cs-tab-icon' }, x.icon), h('span', {}, x.label), c ? h('span', { class: 'cs-tab-count' }, String(c)) : null); })));
   const panel = h('div', { class: 'cs-panel' }); const x = TB.find((y) => y.id === act);
   if (x.body) await renderTextTab(panel, f, x.body, comp);
@@ -114,7 +114,7 @@ async function renderSheet(f, id, comp) {
   } else if (x.mod === 'relationships') ap(panel, renderRelationships(f, fm));
   else if (x.mod === 'contains') ap(panel, renderContains(f));
   else if (x.mod === 'linked') ap(panel, renderLinked(f));
-  else if (x.mod === 'conlang') ap(panel, renderConlang(f, fm));
+  else if (x.mod === 'conlang') ap(panel, renderLanguageConlang(f, fm));
   else if (x.mod === 'rules') ap(panel, renderRules(f, fm));
   else if (x.mod === 'spellbook') ap(panel, renderSpellbook(f, fm));
   else if (x.mod === 'gods') ap(panel, renderGods(f, fm));

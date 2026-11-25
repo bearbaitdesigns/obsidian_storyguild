@@ -296,7 +296,7 @@ async def main():
           const pill = [...document.querySelectorAll('.hd-side-pills button')].map(b => b.textContent); const under = [...document.querySelectorAll('.hd-sections button')].map(b => b.textContent);
           return { headBtn, lib, cards, ed, cmds, pill, under }; }""".replace('HOST_WORLD()', 'SGP.sections.world'))
         print('7d. wayfinder in storyguild:', json.dumps(r, ensure_ascii=False))
-        assert r['headBtn'] is None and r['lib'] and 'Brineholt' in r['cards'] and r['ed'] == [2] and 'worldkeeper:open-wayfinder' in r['cmds'] and all(n in x for n, x in zip(['World Atlas', 'Encyclopedia', 'Wayfinder'], r['pill'])) and len(r['pill']) == 3 and 'Plot Weaver' in r['under'][0] and 'Draftsmith' in r['under'][1]
+        assert r['headBtn'] is None and r['lib'] and 'Brineholt' in r['cards'] and r['ed'] == [2] and 'worldkeeper:open-wayfinder' in r['cmds'] and all(n in x for n, x in zip(['World Atlas', 'Encyclopedia', 'Wayfinder', 'Wordwright'], r['pill'])) and len(r['pill']) == 4 and 'Plot Weaver' in r['under'][0] and 'Draftsmith' in r['under'][1]
         # Settings → Worldkeeper → Wayfinder → Pins: add a custom pin and change a built-in one
         r = await ev("""async () => { const tab = app.setting.tabs.find(t => t.constructor.name === 'WorldkeeperSettingTab'); tab.tab = 'maps'; tab.display();
           // Obsidian 1.15 can show Settings in its own window: put it in a separate document
@@ -397,43 +397,110 @@ async def main():
         assert any('subgraph' in x and 'Act I' in x for x in r['mm']) and any('|"because"|' in x for x in r['mm']) and r['savedPlots'] == 1 and r['beatsSame'] and r['svgEdges'] == 1
         await page.screenshot(path=f'{OUT}/15-draft-plot.png')
 
-        # Language helper: optional step-by-step guide on a language note
-        r = await ev("""async () => { const path = 'Story/Languages/Old Tide.md'; await app.vault.create(path, '---\\ntype: language\\n---\\n```worldkeeper\\n```\\n');
-          const box = document.createElement('div'); document.body.append(box); await app.codeblocks['worldkeeper']('', box, { sourcePath: path, addChild(c) { c.load(); }, getSectionInfo() { return null; } }); await new Promise(r => setTimeout(r, 300));
-          [...box.querySelectorAll('.cs-tab')].find(t => t.textContent.includes('Conlang')).click(); await new Promise(r => setTimeout(r, 300));
-          const intro = !!box.querySelector('.lh-intro'); box.querySelector('.lh-open').click(); await new Promise(r => setTimeout(r, 100));
-          const W = (ms) => new Promise(r => setTimeout(r, ms)); const btn = (t) => [...document.querySelectorAll('.lh-foot button')].find(b => b.textContent.includes(t));
-          const blocked = btn('Next').disabled; [...document.querySelectorAll('.lh-feel')].find(b => b.textContent.includes('Harsh')).click(); await W(50);
-          const samples = document.querySelectorAll('.lh-sample').length; for (let i = 0; i < 4; i++) { btn('Next').click(); await W(50); }
-          const sentence = (document.querySelector('.lh-sentence') || {}).textContent; btn('Add to my language').click(); await W(500);
-          const fm = app.metadataCache.getFileCache(app.vault.getAbstractFileByPath(path)).frontmatter; box.remove();
-          return { intro, blocked, samples, sentence, order: fm.wordOrder, morph: fm.morphology, cons: fm.phonology && fm.phonology.consonants, words: (fm.lexicon || []).length, affixes: (fm.affixes || []).map(a => a.affix + ' ' + a.meaning), I: ((fm.lexicon || []).find(e => e.meaning === 'I') || {}).word }; }""")
-        print('12. language helper:', json.dumps(r, ensure_ascii=False))
-        assert r['intro'] and r['blocked'] and r['samples'] >= 5 and r['order'] == 'SOV' and r['morph'] == 'Agglutinative' and r['words'] >= 40 and len(r['affixes']) == 4 and r['sentence'] and r['I']
-        # Lexicon grouped by type, alphabetical, with pronunciations
-        r = await ev("""async () => { const path = 'Story/Languages/Old Tide.md'; const f = app.vault.getAbstractFileByPath(path);
-          await app.fileManager.processFrontMatter(f, (fm) => { fm.phonology = Object.assign({}, fm.phonology, { consonants: 't l s k r m n th sh', vowels: 'a e i o u ae', say: { ae: 'ay' } });
-            fm.lexicon = [{ word: 'talassa', pos: 'noun', meaning: 'sea' }, { word: 'amra', pos: 'noun', meaning: 'home' }, { word: 'mir', pos: 'verb', meaning: 'remember' }, { word: 'aethor', pos: 'noun', meaning: 'lantern' }, { word: 'kelon', pos: 'noun', meaning: 'salt', say: 'KEL-un' }, { word: 'brask', meaning: 'odd' }]; });
-          const box = document.createElement('div'); document.body.append(box); await app.codeblocks['worldkeeper']('', box, { sourcePath: path, addChild(c) { c.load(); }, getSectionInfo() { return null; } }); await new Promise(r => setTimeout(r, 300));
-          [...box.querySelectorAll('.cs-tab')].find(t => t.textContent.includes('Conlang')).click(); await new Promise(r => setTimeout(r, 200));
-          [...box.querySelectorAll('.cs-subnav button')].find(b => b.textContent.includes('Lexicon')).click(); await new Promise(r => setTimeout(r, 300));
-          const groups = [...box.querySelectorAll('.cl-lexgroup')].map(g => [g.querySelector('.cs-group-title').firstChild.textContent, [...g.querySelectorAll('tbody tr')].map(tr => tr.querySelector('input.w').value + '=' + (tr.querySelector('.cl-say').value || tr.querySelector('.cl-say').placeholder))]);
-          box.remove(); return groups; }""")
-        print('13. lexicon:', json.dumps(r, ensure_ascii=False))
-        assert [g[0] for g in r] == ['Nouns', 'Verbs', 'No type yet'] and r[0][1] == ['aethor=AY-thohr', 'amra=AHM-rah', 'kelon=KEL-un', 'talassa=tah-LAHS-sah'] and r[1][1] == ['mir=meer']
-        # Accents, apostrophes and hyphens in a language
-        r = await ev("""async () => { const path = 'Story/Languages/Marks.md'; await app.vault.create(path, '---\\ntype: language\\n---\\n```worldkeeper\\n```\\n');
-          await app.fileManager.processFrontMatter(app.vault.getAbstractFileByPath(path), (fm) => { fm.phonology = { consonants: 't l s k r m n š ñ', vowels: 'a e i o u ā', patterns: "CV'V CV'V", minSyl: 2, maxSyl: 2 };
-            fm.lexicon = [{ word: "ka'el", pos: 'noun', meaning: 'oath' }, { word: 'talássa', pos: 'noun', meaning: 'sea' }, { word: 'tide-mir', pos: 'noun', meaning: 'memory' }, { word: 'šāñe', pos: 'noun', meaning: 'swim' }]; });
-          const box = document.createElement('div'); document.body.append(box); await app.codeblocks['worldkeeper']('', box, { sourcePath: path, addChild(c) { c.load(); }, getSectionInfo() { return null; } }); await new Promise(r => setTimeout(r, 300));
-          [...box.querySelectorAll('.cs-tab')].find(t => t.textContent.includes('Conlang')).click(); await new Promise(r => setTimeout(r, 300));
-          const gen = [...box.querySelectorAll('.cl-gen button')].map(b => b.textContent); const pal = !!box.querySelector('.cl-chars');
-          [...box.querySelectorAll('.cs-subnav button')].find(b => b.textContent.includes('Lexicon')).click(); await new Promise(r => setTimeout(r, 300));
-          const say = Object.fromEntries([...box.querySelectorAll('.cl-lexgroup tbody tr')].map(tr => [tr.querySelector('input.w').value, tr.querySelector('.cl-say').placeholder]));
-          const s = box.querySelector('.cl-tools input[type=search]'); s.value = 'talassa'; s.dispatchEvent(new Event('input')); const found = [...box.querySelectorAll('.cl-lexgroup input.w')].map(i => i.value);
-          box.remove(); return { gen, pal, say, found }; }""")
-        print('14. marks:', json.dumps(r, ensure_ascii=False))
-        assert r['pal'] and r['gen'] and all("'" in g for g in r['gen']) and r['say']["ka'el"] == 'KAH-’ehl' and r['say']['talássa'] == 'tah-LAHS-sah' and ' · ' in r['say']['tide-mir'] and r['say']['šāñe'] == 'SHAAH-nyeh' and r['found'] == ['talássa']
+        # ---- Wordwright: conlangs as their own notes ----
+        W_ = "new Promise(r => setTimeout(r, %d))"
+        RENDER = """async ([lang, path]) => { document.querySelectorAll('.ww-test').forEach(e => e.remove()); const box = document.createElement('div'); box.className = 'ww-test'; document.body.append(box);
+          await app.codeblocks[lang]('', box, { sourcePath: path, addChild(c) { c.load(); }, getSectionInfo() { return null; } }); await new Promise(r => setTimeout(r, 400)); return true; }"""
+        # 12. a Language note: its Conlang tab offers Wordwright; creating one links both ways and opens the helper
+        await ev("async () => { await app.vault.create('Story/Languages/Old Tide.md', '---\\ntype: language\\nstatus: Living\\n---\\n```worldkeeper\\n```\\n'); await new Promise(r => setTimeout(r, 300)); }")
+        await ev(RENDER, ['worldkeeper', 'Story/Languages/Old Tide.md'])
+        r = await ev("""async () => { const box = document.querySelector('.ww-test'); [...box.querySelectorAll('.cs-tab')].find(t => t.textContent.includes('Conlang')).click(); await new Promise(r => setTimeout(r, 300));
+          const offer = box.textContent.includes('Give Old Tide a constructed language'); [...box.querySelectorAll('button')].find(b => b.textContent.includes('Create a conlang')).click(); await new Promise(r => setTimeout(r, 1200));
+          const helper = !!document.querySelector('.lh'); const btn = (t) => [...document.querySelectorAll('.lh-foot button')].find(b => b.textContent.includes(t));
+          [...document.querySelectorAll('.lh-start')].find(b => b.textContent.includes('Build from scratch')).click(); await new Promise(r => setTimeout(r, 50)); btn('Next').click(); await new Promise(r => setTimeout(r, 50));
+          [...document.querySelectorAll('.lh-feel')].find(b => b.textContent.includes('Harsh')).click(); await new Promise(r => setTimeout(r, 50));
+          btn('Next').click(); await new Promise(r => setTimeout(r, 50)); btn('Next').click(); await new Promise(r => setTimeout(r, 80));
+          const preview = (document.querySelector('.lh-card h4:last-of-type') || {}).textContent; const more = !!document.querySelector('.lh-group-more input:checked');
+          for (let i = 0; i < 2; i++) { btn('Next').click(); await new Promise(r => setTimeout(r, 50)); } btn('Add to my language').click(); await new Promise(r => setTimeout(r, 800));
+          const c = app.vault.getMarkdownFiles().find(f => (app.metadataCache.getFileCache(f)?.frontmatter || {}).type === 'conlang'); const cf = app.metadataCache.getFileCache(c).frontmatter;
+          const lf = app.metadataCache.getFileCache(app.vault.getAbstractFileByPath('Story/Languages/Old Tide.md')).frontmatter;
+          return { offer, helper, more, preview, path: c.path, langLink: cf.language, back: lf.conlang, words: (cf.lexicon || []).length, order: [cf.wordOrder, lf.wordOrder], legacy: 'lexicon' in lf || 'phonology' in lf }; }""")
+        print('12. wordwright create:', json.dumps(r, ensure_ascii=False))
+        CONLANG = r['path']
+        assert r['offer'] and r['helper'] and r['more'] and r['langLink'] == '[[Old Tide]]' and r['back'] == '[[Old Tide (conlang)]]' and r['words'] >= 190 and r['order'] == ['SOV', 'SOV'] and not r['legacy'], r
+        # 12b. the helper can start from words you already have: it works out the rules, asks about the rest, then makes the words
+        await ev("async () => { await app.vault.create('World/Conlangs/Sindral (conlang).md', '---\\ntype: conlang\\nlexicon: []\\n---\\n```wordwright\\n```\\n'); await new Promise(r => setTimeout(r, 300)); }")
+        await ev(RENDER, ['wordwright', 'World/Conlangs/Sindral (conlang).md'])
+        r = await ev("""async () => { const W = (ms) => new Promise(r => setTimeout(r, ms)); const box = document.querySelector('.ww-test');
+          [...box.querySelectorAll('.ww-hero button')].find(b => b.textContent.includes('Language helper')).click(); await W(200);
+          const btn = (t) => [...document.querySelectorAll('.lh-foot button')].find(b => b.textContent.includes(t));
+          [...document.querySelectorAll('.lh-start')].find(b => b.textContent.includes('existing language')).click(); await W(50); btn('Next').click(); await W(80);
+          const ta = document.querySelector('.lh-mine'); ta.value = "tal = star\\ntalen = stars\\nmira = to remember\\nmiraso = remembered\\nlusa = sea\\nlusaen = seas\\nnai mira = not remember\\nka'el = oath\\nvenna = moon\\noris = fire\\nalun = river\\nselith = night\\nmora = mother\\ntirel = tree\\nsona = walk\\nsonaso = walked\\nnot a pair line";
+          ta.dispatchEvent(new Event('input')); await W(80); const readTxt = document.querySelector('.lh-mine-preview').textContent; btn('Next').click(); await W(100);
+          const found = Object.fromEntries([...document.querySelectorAll('.lh-found-row')].map(r => [r.querySelector('b').textContent, r.querySelector('span').textContent]));
+          const blocked = btn('Next').disabled; const qs = [...document.querySelectorAll('.lh-card h4')].map(h => h.textContent);
+          [...document.querySelectorAll('.lh-opt')].find(b => b.querySelector('b').textContent === 'VSO').click(); await W(50);
+          [...document.querySelectorAll('.lh-opt')].find(b => b.querySelector('b').textContent === 'The first').click(); await W(50);
+          btn('Next').click(); await W(80); const feel = (document.querySelector('.lh-feel.is-on') || {}).textContent;
+          btn('Next').click(); await W(120); const preview = [...document.querySelectorAll('.lh-card h4')].map(h => h.textContent).find(t => t.startsWith('Preview'));
+          btn('Next').click(); await W(80); const kept = [...document.querySelectorAll('.lh-affrow.is-found')].map(r => r.querySelector('.lh-affm').firstChild.textContent);
+          btn('Next').click(); await W(80); btn('Add to my language').click(); await W(800);
+          const fm = app.metadataCache.getFileCache(app.vault.getAbstractFileByPath('World/Conlangs/Sindral (conlang).md')).frontmatter;
+          return { readTxt, found, blocked, qs, feel, preview, kept, order: fm.wordOrder, morph: fm.morphology, stress: fm.phonology.stress, cons: fm.phonology.consonants, words: fm.lexicon.length, mine: fm.lexicon.filter(e => ['tal', 'miraso', "ka'el"].includes(e.word)).map(e => e.word + ':' + e.pos + ':' + e.meaning), affixes: fm.affixes.map(a => a.affix + ' ' + a.meaning), nai: fm.lexicon.filter(e => e.word === 'nai').map(e => e.meaning) }; }""")
+        print('12b. helper from words:', json.dumps(r, ensure_ascii=False))
+        assert '16 words read' in r['readTxt'] and '1 line not understood' in r['readTxt'] and 'stars' in r['found']['Endings'] and '-en' in r['found']['Endings'] and '-so' in r['found']['Endings'] and 'nai' in r['found']['Endings']
+        assert r['blocked'] and any('order' in q for q in r['qs']) and 'From your words' in r['feel'] and set(r['kept']) >= {'plural', 'past tense', 'negation (not)'}
+        assert r['order'] == 'VSO' and r['morph'] == 'Agglutinative' and r['stress'] == 'first' and r['words'] >= 190 and "tal:noun:star" in r['mine'] and 'miraso:verb:remembered' in r['mine'] and "ka'el:noun:oath" in r['mine']
+        assert '-en plural' in r['affixes'] and '-so past tense' in r['affixes'] and r['nai'] == ['negation (not) marker'], (r['affixes'], r['nai'])
+        # 13. the conlang note: grouped lexicon, grammar features, numbers, phrasebook, names, export, links
+        await ev(RENDER, ['wordwright', CONLANG])
+        r = await ev("""async () => { const box = document.querySelector('.ww-test'); const tab = async (t) => { [...box.querySelectorAll('.ww-subnav button')].find(b => b.textContent.includes(t)).click(); await new Promise(r => setTimeout(r, 400)); };
+          const out = { title: box.querySelector('.ww-title').textContent, lang: box.querySelector('.ww-hero-sub').textContent, tabs: [...box.querySelectorAll('.ww-subnav button')].map(b => b.textContent.replace(/^\\W+/, '')) };
+          await tab('Lexicon'); out.groups = [...box.querySelectorAll('.cl-lexgroup .cs-group-title')].map(g => g.firstChild.textContent);
+          const before = box.querySelectorAll('.cl-lexgroup tbody tr').length; [...box.querySelectorAll('.cl-tools button')].find(b => b.textContent.includes('Add 100')).click(); await new Promise(r => setTimeout(r, 900));
+          out.added = box.querySelectorAll('.cl-lexgroup tbody tr').length - before; out.addNotice = __notices.slice(-1)[0];
+          await tab('Grammar'); out.features = box.querySelectorAll('.ww-feat').length; out.pron = box.querySelectorAll('.ww-ptable tbody tr').length;
+          const sel = box.querySelector('.ww-feat select'); sel.value = sel.options[2].value; sel.dispatchEvent(new Event('change')); await new Promise(r => setTimeout(r, 500));
+          await tab('Numbers'); const coin = [...box.querySelectorAll('button')].find(b => /number word/.test(b.textContent)); if (coin) { coin.click(); await new Promise(r => setTimeout(r, 600)); } out.numex = [...box.querySelectorAll('.ww-numex')].map(x => x.textContent);
+          await tab('Phrasebook'); [...box.querySelectorAll('button')].find(b => b.textContent.includes('Start a phrasebook')).click(); await new Promise(r => setTimeout(r, 600)); out.phrases = box.querySelectorAll('.ww-phrases tbody tr').length;
+          await tab('Names'); out.names = box.querySelectorAll('.cl-gen button').length; box.querySelector('.cl-gen button').click(); await new Promise(r => setTimeout(r, 600));
+          await tab('Links'); out.linksCard = box.textContent.includes('Spoken as');
+          return out; }""")
+        print('13. conlang note:', json.dumps(r, ensure_ascii=False))
+        cf = await ev("(p) => app.metadataCache.getFileCache(app.vault.getAbstractFileByPath(p)).frontmatter", CONLANG)
+        assert r['title'] == 'Old Tide' and 'Old Tide' in r['lang'] and len(r['tabs']) == 10 and r['groups'][:2] == ['Nouns', 'Verbs'] and (r['added'] > 0 or 'Every starter meaning' in r['addNotice']) and r['features'] == 10 and r['pron'] == 3
+        assert all('-' in x or '=' in x for x in r['numex']) and r['phrases'] == 16 and r['names'] > 0 and r['linksCard'] and cf['grammar']['gender'] and len(cf['phrases']) == 16 and len(cf['names']) == 1, cf.get('grammar')
+        # 14. the Language note's tab: summary and a quick translate (coining on request)
+        await ev(RENDER, ['worldkeeper', 'Story/Languages/Old Tide.md'])
+        r = await ev("""async () => { const box = document.querySelector('.ww-test'); [...box.querySelectorAll('.cs-tab')].find(t => t.textContent.includes('Conlang')).click(); await new Promise(r => setTimeout(r, 300));
+          const card = box.querySelector('.ww-lang-name').textContent; const ta = box.querySelector('.ww-quick-in'); ta.value = 'the sun and the moon remember Ilsa'; ta.dispatchEvent(new Event('input'));
+          [...box.querySelectorAll('.ww-quick button')].find(b => b.textContent === 'Translate').click(); await new Promise(r => setTimeout(r, 300));
+          const first = box.querySelector('.ww-quick-text').textContent; const toks = [...box.querySelectorAll('.ww-quick .cl-tok small')].map(x => x.textContent);
+          ta.value = 'the zorblat sings'; ta.dispatchEvent(new Event('input')); box.querySelector('.ww-quick input[type=checkbox]').click(); window.__memA = JSON.stringify(SGP.sections.world.mem('Story/Languages/Old Tide.md', 'quick-tr', {})); window.__nq = box.querySelectorAll('.ww-quick').length; [...box.querySelectorAll('.ww-quick button')].find(b => b.textContent === 'Translate').click(); await new Promise(r => setTimeout(r, 900));
+          return { card, first, toks, coinedNotice: __notices.slice(-1)[0], after: (box.querySelector('.ww-quick-text') || {}).textContent, checked: box.querySelector('.ww-quick input[type=checkbox]').checked, errs: __errors.slice(-2), memA: window.__memA, nq: window.__nq }; }""")
+        print('14. language tab:', json.dumps(r, ensure_ascii=False))
+        assert r['card'] == 'Old Tide (conlang)' and 'Ilsa' in r['first'] and 'name' in r['toks'] and 'sun' in r['toks'] and 'new word' in r['coinedNotice'] and 'zorblat' in r['coinedNotice']
+        # 15. Draftsmith: translate a selection; missing words are coined with a notice
+        r = await ev("""async (p) => { const c = app.vault.getAbstractFileByPath(p); const ed = { sel: 'The sea remembers the glimmerfang.', getSelection() { return this.sel; }, replaceSelection(t) { this.out = t; } };
+          const res = await SGP.api.translateSelection(ed, c); return { out: ed.out, coined: res.coined.map(e => e.meaning), notice: __notices.slice(-1)[0], menu: typeof SGP.api.conlangs === 'function' && SGP.api.conlangs().length }; }""", CONLANG)
+        print('15. draftsmith translate:', json.dumps(r, ensure_ascii=False))
+        assert r['out'] and r['out'].endswith('.') and r['out'][0].isupper() and 'glimmerfang' in r['coined'] and 'glimmerfang' in r['notice'] and r['menu'] == 2
+        # 16. language guide: Word and PDF from the conlang, and as an appendix in a published book
+        r = await ev("""async (p) => { const c = app.vault.getAbstractFileByPath(p); const a = await SGP.api.exportGuide(c, 'pdf'); const b = await SGP.api.exportGuide(c, 'docx');
+          const bk = SGP.data.manuscript.projects[0]; Object.assign(bk.compile, { langGuides: [p], format: 'md', manuscriptFormat: false });
+          const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view; v.setTab('compile'); await new Promise(r => setTimeout(r, 200));
+          const cardTxt = [...document.querySelectorAll('.ds-card')].map(x => x.textContent).find(t => t.startsWith('Language guides')) || '';
+          [...document.querySelectorAll('.ds-root button')].find(b => b.textContent.startsWith('Publish ')).click(); await new Promise(r => setTimeout(r, 900));
+          const md = app.vault.text.get(bk.lastCompiled[0].path) || ''; bk.compile.langGuides = []; bk.compile.format = 'pdf';
+          return { pdf: a, docx: b, pdfSize: (app.vault.bin.get(a) || []).length, docxSize: (app.vault.bin.get(b) || []).length, cardTxt: cardTxt.slice(0, 60), appendix: md.includes('Old Tide: A Language Guide'), dict: md.includes('Dictionary') }; }""", CONLANG)
+        print('16. guide export:', json.dumps(r, ensure_ascii=False))
+        assert r['pdf'].endswith('Old Tide - Language Guide.pdf') and r['docx'].endswith('.docx') and r['pdfSize'] > 2000 and r['docxSize'] > 2000 and 'Old Tide' in r['cardTxt'] and r['appendix'] and r['dict']
+        pdfb = await ev("(p) => Array.from(app.vault.bin.get(p)).map(c => String.fromCharCode(c)).join('')", r['pdf'])
+        assert 'A Language Guide' in pdfb and 'Dictionary' in pdfb
+        # 17. old conlang data on a Language note moves into its own conlang note
+        r = await ev("""async () => { await app.vault.create('Story/Languages/Deep Speech.md', '---\\ntype: language\\n---\\n```worldkeeper\\n```\\n'); await new Promise(r => setTimeout(r, 200));
+          const f = app.vault.getAbstractFileByPath('Story/Languages/Deep Speech.md'); await app.fileManager.processFrontMatter(f, (fm) => { fm.phonology = { consonants: 'k r th', vowels: 'a u' }; fm.lexicon = [{ word: 'kru', pos: 'noun', meaning: 'deep' }]; fm.affixes = []; });
+          await new Promise(r => setTimeout(r, 300)); const moved = await SGP.sections.world.wordwrightMigrate(); await new Promise(r => setTimeout(r, 300));
+          const lf = app.metadataCache.getFileCache(f).frontmatter; const c = app.metadataCache.getFirstLinkpathDest('Deep Speech (conlang)', ''); const cf = c ? app.metadataCache.getFileCache(c).frontmatter : {};
+          return { moved, link: lf.conlang, stripped: !('lexicon' in lf) && !('phonology' in lf), words: (cf.lexicon || []).map(e => e.word), back: cf.language }; }""")
+        print('17. migration:', json.dumps(r, ensure_ascii=False))
+        assert r['moved'] == ['Deep Speech'] and r['link'] == '[[Deep Speech (conlang)]]' and r['stripped'] and r['words'] == ['kru'] and r['back'] == '[[Deep Speech]]'
+        # 18. Wordwright library view and the encyclopedia can link a conlang
+        r = await ev("""async () => { app.commands.executeCommandById('worldkeeper:open-wordwright'); await new Promise(r => setTimeout(r, 600));
+          const cards = [...document.querySelectorAll('.ww-card-name')].map(x => x.textContent); return { cards, cmds: Object.keys(app.commands.commands).filter(k => /conlang|wordwright|translate/.test(k)) }; }""")
+        print('18. library:', json.dumps(r, ensure_ascii=False))
+        assert set(r['cards']) == {'Old Tide', 'Deep Speech', 'Sindral'} and 'storyguild:translate-selection' in r['cmds'] and 'worldkeeper:open-wordwright' in r['cmds']
+        await ev("() => document.querySelectorAll('.ww-test').forEach(e => e.remove())")
         # Unload cleanly
         r = await ev("""async () => { SGP.unload(); await new Promise(r => setTimeout(r, 300)); return { views: Object.keys(app.viewRegistry), blocks: Object.keys(app.codeblocks), cmds: Object.keys(app.commands.commands).length, saved: JSON.parse(app.vault.adapter.data.get('.obsidian/plugins/storyguild/data.json')).manuscript.projects.length }; }""")
         print('9. unload:', r)

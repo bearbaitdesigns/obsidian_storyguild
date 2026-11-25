@@ -173,5 +173,5 @@ function sectionPills() {
   return wrap;
 }
 /** right side of the Home banner, beside the goal ring: World Atlas, Encyclopedia, Wayfinder (top to bottom) */
-function sidePills(enc, atlas, wayfinder) { const col = el('div', { class: 'hd-side-pills' }); put(col, atlas, enc, wayfinder); return col; }
+function sidePills(enc, atlas, wayfinder, wordwright) { const col = el('div', { class: 'hd-side-pills' }); put(col, atlas, enc, wayfinder, wordwright); return col; }
 function booksButton() { return el('button', { title: 'Switch book, start a new book or manage series', onclick: () => openLibrary() }, '📚 Books & series'); }

@@ -134,11 +134,11 @@ function renderConlang(f, fm) {
     h('div', { class: 'cs-stat' }, h('b', {}, String(affixes.length)), h('span', {}, 'Affixes')),
     h('div', { class: 'cs-stat' }, h('b', {}, fm.wordOrder || '—'), h('span', {}, 'Word order')),
     h('div', { class: 'cs-stat' }, h('b', {}, fm.morphology || '—'), h('span', {}, 'Morphology'))));
-  const sub = [['phon', '🔊 Sounds & generator'], ['lex', '📖 Lexicon'], ['gram', '🧩 Grammar'], ['tr', '🔁 Translator']];
-  if (!lex.length && !(ph.consonants && ph.vowels)) ap(wrap, h('div', { class: 'cv-callout lh-intro' }, h('div', {}, h('b', {}, 'Building a language from scratch?'), h('div', { class: 'cs-hint' }, 'The language helper walks you through it: how it sounds, its grammar, a starter vocabulary and word endings. Optional; nothing is saved until the last step.')),
+  const sub = [['phon', '🔊 Sounds'], ['lex', '📖 Lexicon'], ['gram', '🧩 Grammar'], ['num', '🔢 Numbers'], ['phrase', '💬 Phrasebook'], ['names', '🏷️ Names'], ['write', '✒️ Writing'], ['tr', '🔁 Translator'], ['export', '⇪ Export'], ['links', '🔗 Links']];
+  if (!sub.some(([k]) => k === st.tab)) st.tab = 'phon';
+  if (!lex.length && !(ph.consonants && ph.vowels)) ap(wrap, h('div', { class: 'cv-callout lh-intro' }, h('div', {}, h('b', {}, 'Building a language from scratch?'), h('div', { class: 'cs-hint' }, 'The language helper walks you through it: how it sounds, its grammar, a starter vocabulary of 200 words and word endings. It can also start from words you already have. Optional; nothing is saved until the last step.')),
     h('button', { class: 'mod-cta', onclick: () => openLanguageHelper(f) }, '🧭 Start the helper')));
-  ap(wrap, h('div', { class: 'cs-subnav' }, ...sub.map(([k, l]) => h('button', { class: st.tab === k ? 'is-on' : '', onclick: () => { st.tab = k; rerender(); } }, l)),
-    h('button', { class: 'lh-open', title: 'Step-by-step guide to building this language', onclick: () => openLanguageHelper(f) }, '🧭 Language helper')));
+  ap(wrap, h('div', { class: 'cs-subnav ww-subnav' }, ...sub.map(([k, l]) => h('button', { class: st.tab === k ? 'is-on' : '', onclick: () => { st.tab = k; rerender(); } }, l))));
   const addWord = (word, meaning = '', pos = 'noun') => W((x) => { x.lexicon.push({ word, pos, meaning }); });
 
   if (st.tab === 'phon' || st.tab === 'lex') ap(wrap, charPalette(wrap, st));
@@ -179,6 +179,7 @@ function renderConlang(f, fm) {
     search.addEventListener('input', () => { st.q = search.value; groupsEl.replaceChildren(...build()); });
     ap(wrap, h('div', { class: 'cl-tools' }, search,
       h('button', { onclick: () => addWord(genWord(ph, existing) || '', '') }, '+ Add word'),
+      ph.consonants && ph.vowels ? h('button', { title: 'Coin words for up to 100 everyday meanings the lexicon doesn’t have yet', onclick: () => { const more = wwCoinMore(fm, 100); if (!more.length) { toast('Every starter meaning already has a word.'); return; } W((x) => { x.lexicon.push(...more); }); toast(`Added ${more.length} words`); } }, '🎲 Add 100 words') : null,
       h('button', { onclick: () => { const md = '| Word | Say it | Type | Meaning |\n|---|---|---|---|\n' + sorted(lex.map((e, i) => [e, i])).map(([e]) => `| ${e.word} | ${sayOf(ph, e)} | ${e.pos} | ${e.meaning} |`).join('\n'); navigator.clipboard.writeText(md).then(() => toast('Lexicon copied as a Markdown table')); } }, '⧉ Copy as table')));
     function sorted(rows) { return rows.slice().sort((x, y) => String(x[0].word).localeCompare(String(y[0].word), undefined, { sensitivity: 'base' })); }
     function build() {
@@ -207,13 +208,32 @@ function renderConlang(f, fm) {
     ap(wrap, groupsEl);
     if (lex.length) ap(wrap, h('div', { class: 'cs-hint cs-mt' }, 'Grey pronunciations come from the pronunciation key on the Sounds tab; type over one to set it for that word only. Capitals mark the stressed syllable.'));
   } else if (st.tab === 'gram') {
-    const typ = h('div', { class: 'cl-card' }, h('h4', {}, 'Typology'), h('div', { class: 'cs-hint cs-mb' }, 'Same fields as the tiles above.'));
+    const typ = h('div', { class: 'cl-card' }, h('h4', {}, 'Typology'), h('div', { class: 'cs-hint cs-mb' }, 'Also shown on the linked Language note.'));
     for (const k of ['wordOrder', 'morphology', 'script']) {
       const d = T().language.domain.find((x) => x.key === k); if (!d) continue;
       const sel = h('select', { class: 'dropdown' }, h('option', { value: '' }, '—'), ...d.values.map((v) => h('option', { selected: fm[k] === v }, v)));
-      sel.addEventListener('change', () => S.write(f, (x) => { x[k] = sel.value || null; }));
-      ap(typ, h('div', { class: 'cl-row' }, h('label', {}, d.label), sel));
+      sel.addEventListener('change', async () => { await S.write(f, (x) => { x[k] = sel.value || null; }); await WW.syncTypology(f); });
+      ap(typ, h('div', { class: 'cl-row' }, h('label', {}, d.label), sel, h('div', { class: 'cs-hint' }, (k === 'wordOrder' ? LH_ORDER_HELP : k === 'morphology' ? LH_MORPH_HELP : {})[fm[k]] || '')));
     }
+    const g = fm.grammar || {}; const notes = g.notes || {};
+    const feat = h('div', { class: 'cl-card cs-mt' }, h('h4', {}, 'Grammar features'), h('div', { class: 'cs-hint cs-mb' }, 'The usual building blocks of a grammar. Pick what fits and jot down examples; it all goes into the exported language guide.'));
+    for (const x of WW_GRAMMAR) {
+      const sel = h('select', { class: 'dropdown' }, h('option', { value: '' }, '—'), ...x.opts.map((v) => h('option', { selected: g[x.k] === v }, v)));
+      sel.addEventListener('change', () => S.write(f, (y) => { y.grammar = Object.assign({}, y.grammar || {}, { [x.k]: sel.value || null }); }));
+      const nt = h('input', { type: 'text', class: 'ww-note', value: notes[x.k] || '', placeholder: 'Notes or an example…' });
+      nt.addEventListener('change', () => S.write(f, (y) => { const gg = Object.assign({}, y.grammar || {}); gg.notes = Object.assign({}, gg.notes || {}, { [x.k]: nt.value.trim() }); y.grammar = gg; }));
+      ap(feat, h('div', { class: 'ww-feat' }, h('div', { class: 'ww-feat-h' }, h('b', {}, x.label), h('small', { class: 'cs-hint' }, x.help)), sel, nt));
+    }
+    const gen = h('textarea', { class: 'cl-in', placeholder: 'Anything else about the grammar: word classes, verb forms, irregular words…' }, notes.general || '');
+    gen.addEventListener('change', () => S.write(f, (y) => { const gg = Object.assign({}, y.grammar || {}); gg.notes = Object.assign({}, gg.notes || {}, { general: gen.value }); y.grammar = gg; }));
+    ap(feat, h('div', { class: 'cl-row' }, h('label', {}, 'Other notes'), gen));
+    // pronouns
+    const short = Object.assign({}, ph, { minSyl: 1, maxSyl: 1 });
+    const cell = (m) => { const e = wwFind(lex, m); return e ? h('td', {}, h('b', { class: 'ww-w' }, e.word), h('small', { class: 'cs-hint' }, ' ' + sayOf(ph, e))) : h('td', {}, h('span', { class: 'cs-hint' }, '—')); };
+    const missingPr = WW_PRONOUNS.flatMap(([, a, b]) => [a, b]).filter((m) => !wwFind(lex, m));
+    const pro = h('div', { class: 'cl-card' }, h('h4', {}, 'Pronouns'), h('table', { class: 'ww-ptable' }, h('thead', {}, h('tr', {}, h('th', {}), h('th', {}, 'One'), h('th', {}, 'More than one'))),
+      h('tbody', {}, ...WW_PRONOUNS.map(([p, a, b]) => h('tr', {}, h('th', {}, p, h('small', { class: 'cs-hint' }, ` ${a} / ${b}`)), cell(a), cell(b))))),
+      missingPr.length && ph.consonants && ph.vowels ? h('button', { class: 'cs-mt', onclick: () => W((x) => { const ex = new Set(x.lexicon.map((e) => e.word)); for (const m of missingPr) { const w = genWord(short, ex); if (w) { ex.add(w); x.lexicon.push({ word: w, pos: 'pron', meaning: m }); } } }) }, `🎲 Coin ${missingPr.length} missing pronoun${missingPr.length === 1 ? '' : 's'}`) : null);
     const at = h('table', { class: 'cl-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Affix'), h('th', {}, 'Type'), h('th', {}, 'Meaning'), h('th', {}))));
     affixes.forEach((a, i) => {
       const ai = h('input', { class: 'w', value: a.affix || '' }); ai.addEventListener('change', () => W((x) => { x.affixes[i].affix = ai.value; }));
@@ -221,25 +241,92 @@ function renderConlang(f, fm) {
       const mi = h('input', { value: a.meaning || '' }); mi.addEventListener('change', () => W((x) => { x.affixes[i].meaning = mi.value; }));
       ap(at, h('tr', {}, h('td', {}, ai), h('td', {}, ty), h('td', {}, mi), h('td', {}, h('span', { class: 'cs-x is-visible', onclick: () => W((x) => { x.affixes.splice(i, 1); }) }, '✕'))));
     });
-    ap(wrap, h('div', { class: 'cl-grid' }, typ, h('div', { class: 'cl-card' }, h('h4', {}, 'Affixes'), at,
+    ap(wrap, h('div', { class: 'cl-grid' }, typ, pro), feat, h('div', { class: 'cl-card cs-mt' }, h('h4', {}, 'Word endings (affixes)'), at,
       h('button', { class: 'cs-mt', onclick: () => W((x) => { x.affixes.push({ affix: '-', type: 'suffix', meaning: '' }); }) }, '+ Add affix'),
-      h('div', { class: 'cs-hint cs-mt' }, 'The translator uses affixes whose meaning includes “plural” or “past”.'))));
-  } else {
-    const toks = st.input.match(/[A-Za-z']+|[^A-Za-z']+/g) || []; const SKIP = ['the', 'a', 'an'];
-    const out = h('div', { class: 'cl-out' }); const unknown = []; const sayLine = [];
-    for (const tk of toks) {
-      if (!/[A-Za-z]/.test(tk)) continue; if (st.skip && SKIP.includes(tk.toLowerCase())) continue;
-      const r = lookup(fm, tk);
-      if (r) { ap(out, h('span', { class: 'cl-tok' }, h('b', {}, r.out), h('small', {}, r.gloss))); const e = lex.find((x) => x.word === r.out); sayLine.push(e ? sayOf(ph, e) : pronounce(ph, r.out)); }
-      else { unknown.push(tk.toLowerCase()); ap(out, h('span', { class: 'cl-tok is-unk', title: 'Not in the lexicon. Click to coin a word.' }, h('b', { onclick: () => { const w = genWord(ph, existing); if (w) { addWord(w, tk.toLowerCase()); toast(`Coined “${w}” = ${tk.toLowerCase()}`); } else toast('Set up consonants, vowels and syllable shapes first'); } }, tk), h('small', {}, '?'))); }
+      h('div', { class: 'cs-hint cs-mt' }, 'The translator uses endings whose meaning includes “plural” or “past”; names use “place of” and “one who”.')));
+  } else if (st.tab === 'num') {
+    const base = +fm.numberBase || 10; const list = WW_BASES[base] || WW_BASES[10];
+    const bs = h('select', { class: 'dropdown' }, ...[[10, 'Tens (base 10), like English'], [12, 'Dozens (base 12)'], [20, 'Twenties (base 20)'], [5, 'Fives (base 5, counting on one hand)']].map(([v, l]) => h('option', { value: v, selected: base === v }, l)));
+    bs.addEventListener('change', () => S.write(f, (x) => { x.numberBase = +bs.value; }));
+    const miss = list.filter((m) => !wwFind(lex, m)); const short = Object.assign({}, ph, { minSyl: 1, maxSyl: Math.max(1, +ph.minSyl || 1) });
+    const rows = list.map((m, i) => { const e = wwFind(lex, m); return h('tr', {}, h('td', {}, String(i < base ? i + 1 : WW_NUMVAL[m] || '')), h('td', {}, m), h('td', {}, e ? h('b', { class: 'ww-w' }, e.word) : h('span', { class: 'cs-hint' }, '—')), h('td', { class: 'cs-hint' }, e ? sayOf(ph, e) : '')); });
+    const ex = [base + 1, base * 2 + 3, base * base + base + 1, 2 * base * base + 7].map((n) => [n, wwNumber(fm, n)]);
+    ap(wrap, h('div', { class: 'cl-card' }, h('h4', {}, 'Counting'), h('div', { class: 'cl-row' }, h('label', {}, 'Counts in'), bs),
+      h('div', { class: 'cs-hint cs-mb' }, 'Bigger numbers are built from these words: how many of the base, then the base word, then the rest. Many real languages count in twenties or dozens.'),
+      h('table', { class: 'ww-ptable' }, h('thead', {}, h('tr', {}, h('th', {}, '#'), h('th', {}, 'English'), h('th', {}, 'Word'), h('th', {}, 'Say it'))), h('tbody', {}, ...rows)),
+      miss.length && ph.consonants && ph.vowels ? h('button', { class: 'mod-cta cs-mt', onclick: () => W((x) => { const exs = new Set(x.lexicon.map((e) => e.word)); for (const m of miss) { const w = genWord(short, exs); if (w) { exs.add(w); x.lexicon.push({ word: w, pos: 'num', meaning: m }); } } }) }, `🎲 Coin ${miss.length} number word${miss.length === 1 ? '' : 's'}`) : null),
+      h('div', { class: 'cl-card cs-mt' }, h('h4', {}, 'Examples'), ...ex.map(([n, w]) => h('div', { class: 'ww-numex' }, h('b', {}, String(n)), ' = ', w ? h('span', { class: 'ww-w' }, w) : h('span', { class: 'cs-hint' }, 'coin the number words first')))));
+  } else if (st.tab === 'phrase') {
+    const phr = arr(fm.phrases);
+    const seed = () => W((x) => { x.phrases = WW_PHRASES.map((en) => ({ en, cl: '' })); });
+    if (!phr.length) ap(wrap, h('div', { class: 'cv-callout' }, h('div', {}, h('b', {}, 'A phrasebook'), h('div', { class: 'cs-hint' }, 'Greetings, thanks, “where is…?”: the lines your characters reach for first. Start with sixteen common phrases and change any of them.')), h('button', { class: 'mod-cta', onclick: seed }, '💬 Start a phrasebook')));
+    else {
+      const allMissing = new Set(); const rowsEl = phr.map((x, i) => {
+        const auto = wwTranslate(fm, x.en || ''); if (!x.cl) auto.missing.forEach((m) => allMissing.add(m));
+        const en = h('input', { type: 'text', value: x.en || '', placeholder: 'English' }); en.addEventListener('change', () => W((y) => { y.phrases = arr(y.phrases); y.phrases[i] = Object.assign({}, y.phrases[i], { en: en.value }); }));
+        const cl = h('input', { type: 'text', class: 'ww-w', value: x.cl || '', placeholder: auto.text || 'translation' }); cl.addEventListener('change', () => W((y) => { y.phrases = arr(y.phrases); y.phrases[i] = Object.assign({}, y.phrases[i], { cl: cl.value.trim() }); }));
+        const said = (x.cl || auto.text).split(/\s+/).filter((w) => w && !/^\[|\]$/.test(w) && !/^…$/.test(w)).map((w) => pronounce(ph, w.replace(/[^\p{L}'’ʼ-]/gu, ''))).filter(Boolean).join(' ');
+        return h('tr', {}, h('td', {}, en), h('td', {}, cl), h('td', { class: 'cl-saycell' }, h('span', { class: 'cs-hint' }, said), canSpeak() && said ? h('button', { class: 'cl-hear', onclick: () => speakSay(said) }, '🔊') : null), h('td', {}, h('span', { class: 'cs-x is-visible', onclick: () => W((y) => { y.phrases = arr(y.phrases); y.phrases.splice(i, 1); }) }, '✕')));
+      });
+      ap(wrap, h('div', { class: 'cl-tools' }, h('button', { onclick: () => W((y) => { y.phrases = [...arr(y.phrases), { en: '', cl: '' }]; }) }, '+ Add phrase'),
+        allMissing.size ? h('button', { class: 'mod-cta', onclick: async () => { const txt = phr.filter((x) => !x.cl).map((x) => x.en).join('. '); await wwTranslateAndSave(f, txt, { coin: true }); } }, `🎲 Coin ${allMissing.size} missing word${allMissing.size === 1 ? '' : 's'}`) : null,
+        h('span', { class: 'cs-hint' }, 'Grey text is the automatic translation; type over it to set your own. [Brackets] mark words not in the lexicon.')),
+        h('table', { class: 'cl-table ww-phrases' }, h('thead', {}, h('tr', {}, h('th', {}, 'English'), h('th', {}, f.basename.replace(/\s*\(conlang\)$/i, '')), h('th', {}, 'Say it'), h('th', {}))), h('tbody', {}, ...rowsEl)));
     }
+  } else if (st.tab === 'names') {
+    const saved = arr(fm.names); st.names = st.names || {};
+    const kinds = [['given', 'Given names', 'Built from the sounds alone.'], ['family', 'Family names', 'Pairs of words from the lexicon, or “one who…”.'], ['place', 'Place names', 'Pairs of words from the lexicon, or “place of…”.']];
+    for (const [k, title, hint] of kinds) {
+      if (!st.names[k]) st.names[k] = wwNames(fm, k);
+      const list = st.names[k];
+      ap(wrap, h('div', { class: 'cl-card cs-mt' }, h('h4', {}, title, h('span', { class: 'cd-spacer' }), h('button', { class: 'ww-mini', onclick: () => { st.names[k] = wwNames(fm, k); rerender(); } }, '🎲 More')), h('div', { class: 'cs-hint cs-mb' }, hint + ' Tap one to keep it.'),
+        list.length ? h('div', { class: 'cl-gen' }, ...list.map((x) => h('button', { title: x.meaning ? `“${x.meaning}” · ${pronounce(ph, x.name)}` : pronounce(ph, x.name), onclick: () => { st.names[k] = list.filter((y) => y !== x); W((y) => { y.names = [...arr(y.names), x]; }); } }, x.name, x.meaning ? h('small', {}, ' ' + x.meaning) : null)))
+          : h('div', { class: 'cs-hint' }, k === 'given' ? 'Add consonants and vowels on the Sounds tab first.' : 'Add some nouns to the lexicon first.')));
+    }
+    if (saved.length) ap(wrap, h('div', { class: 'cl-card cs-mt' }, h('h4', {}, `Kept names · ${saved.length}`), h('div', { class: 'ww-kept' }, ...saved.map((x, i) => h('span', { class: 'cs-chip is-plain' }, h('b', {}, x.name), x.meaning ? ` · ${x.meaning}` : '', h('small', { class: 'cs-hint' }, ` (${x.kind})`), h('span', { class: 'cs-x is-visible', onclick: () => W((y) => { y.names = arr(y.names).filter((_, j) => j !== i); }) }, '✕'))))));
+  } else if (st.tab === 'write') {
+    const wr = fm.writing || {}; const d = T().language.domain.find((x) => x.key === 'script');
+    const scr = h('select', { class: 'dropdown' }, h('option', { value: '' }, '—'), ...(d ? d.values : []).map((v) => h('option', { selected: fm.script === v }, v))); scr.addEventListener('change', async () => { await S.write(f, (x) => { x.script = scr.value || null; }); await WW.syncTypology(f); });
+    const dir = h('select', { class: 'dropdown' }, h('option', { value: '' }, '—'), ...['Left to right', 'Right to left', 'Top to bottom', 'Alternating lines'].map((v) => h('option', { selected: wr.direction === v }, v))); dir.addEventListener('change', () => S.write(f, (x) => { x.writing = Object.assign({}, x.writing || {}, { direction: dir.value || null }); }));
+    const area = (k, ph2) => { const t = h('textarea', { class: 'cl-in', placeholder: ph2 }, wr[k] || ''); t.addEventListener('change', () => S.write(f, (x) => { x.writing = Object.assign({}, x.writing || {}, { [k]: t.value }); })); return t; };
+    const SCRIPT_HELP = { Alphabet: 'A letter for each consonant and vowel.', Abjad: 'Letters for consonants; vowels are left out or shown with small marks.', Abugida: 'Each sign is a consonant with a vowel; marks change the vowel.', Syllabary: 'A sign for each syllable (ka, ki, ko…).', Logographic: 'A sign for each word or idea.', None: 'Spoken only.' };
+    ap(wrap, h('div', { class: 'cl-card' }, h('h4', {}, 'Writing system'), h('div', { class: 'cl-row' }, h('label', {}, 'Script'), scr, h('div', { class: 'cs-hint' }, SCRIPT_HELP[fm.script] || '')), h('div', { class: 'cl-row' }, h('label', {}, 'Direction'), dir),
+      h('div', { class: 'cl-row' }, h('label', {}, 'Romanization: how it is spelled in our letters'), area('romanization', 'e.g. “x” is the throaty sound in loch; long vowels have a line on top (ā)…')),
+      h('div', { class: 'cl-row' }, h('label', {}, 'Notes'), area('notes', 'Where the script came from, who can read it, what it is written on…'))));
+  } else if (st.tab === 'tr') {
+    const r = wwTranslate(fm, st.input, { drop: st.skip });
+    const out = h('div', { class: 'cl-out' }, ...r.tokens.map((t) => h('span', { class: 'cl-tok' + (t.unknown ? ' is-unk' : ''), title: t.unknown ? 'Not in the lexicon. Click to coin a word.' : '' },
+      h('b', { onclick: t.unknown ? async () => { await wwTranslateAndSave(f, t.src, { coin: true }); } : null }, t.out || t.src), h('small', {}, t.gloss))));
     const ta = h('textarea', { class: 'cl-in' }, st.input); ta.addEventListener('input', () => { st.input = ta.value; });
     const skip = h('input', { type: 'checkbox', checked: st.skip }); skip.addEventListener('change', () => { st.skip = skip.checked; rerender(); });
-    const uniq = [...new Set(unknown)];
+    const sayLine = r.tokens.filter((t) => t.out && !t.name).map((t) => pronounce(ph, t.out));
     ap(wrap, h('div', { class: 'cl-card' }, h('h4', {}, 'English'), ta,
       h('div', { class: 'cl-actions' }, h('button', { class: 'mod-cta', onclick: rerender }, 'Translate'), h('label', { class: 'cs-hint cl-inline' }, skip, 'Drop articles (the, a, an)'),
-        uniq.length ? h('button', { onclick: () => W((x) => { const ex = new Set(x.lexicon.map((e) => e.word)); for (const u of uniq) { const w = genWord(ph, ex); if (w) { ex.add(w); x.lexicon.push({ word: w, pos: 'noun', meaning: u }); } } toast(`Coined ${uniq.length} words. Check their part of speech in the lexicon`); }) }, `🎲 Coin ${uniq.length} missing`) : null)),
-      h('div', { class: 'cl-card cs-mt' }, h('h4', {}, `${f.basename} · word-by-word gloss`), out, sayLine.length ? h('div', { class: 'cl-sayline' }, h('span', { class: 'cs-hint' }, 'Say it: '), sayLine.join(' '), canSpeak() ? h('button', { class: 'cl-hear', title: 'Hear an approximation', onclick: () => speakSay(sayLine.join(' ')) }, '🔊') : null) : null, h('div', { class: 'cs-hint cs-mt' }, `Glossed in the original order. Rearrange for ${fm.wordOrder || 'your'} word order when writing.`)));
+        r.missing.length ? h('button', { onclick: () => wwTranslateAndSave(f, st.input, { coin: true, drop: st.skip }) }, `🎲 Coin ${r.missing.length} missing`) : null)),
+      h('div', { class: 'cl-card cs-mt' }, h('h4', {}, 'Translation'), h('div', { class: 'ww-quick-text' }, r.text), out,
+        sayLine.length ? h('div', { class: 'cl-sayline' }, h('span', { class: 'cs-hint' }, 'Say it: '), sayLine.join(' '), canSpeak() ? h('button', { class: 'cl-hear', title: 'Hear an approximation', onclick: () => speakSay(sayLine.join(' ')) }, '🔊') : null) : null,
+        h('div', { class: 'cs-hint cs-mt' }, `Words stay in English order. Rearrange them for ${fm.wordOrder || 'your'} word order when you write. Names (capitalised words inside a sentence) are kept as they are.`)));
+  } else if (st.tab === 'export') {
+    st.sections = st.sections || Object.fromEntries(WW_SECTIONS.map(([k]) => [k, true]));
+    const checks = WW_SECTIONS.map(([k, l]) => { const c = h('input', { type: 'checkbox', checked: st.sections[k] }); c.addEventListener('change', () => { st.sections[k] = c.checked; }); return h('label', { class: 'lh-check' }, c, l); });
+    const chosen = () => WW_SECTIONS.map(([k]) => k).filter((k) => st.sections[k]);
+    const go = async (fmt) => {
+      if (fmt === 'md') { const path = normalizePath(`${WW.folder()}/Exports/${f.basename.replace(/\s*\(conlang\)$/i, '')} - Language Guide.md`); await S.ensureFolder(path.split('/').slice(0, -1).join('/')); const ex = app().vault.getAbstractFileByPath(path); const md = wwGuideMarkdown(f, chosen()); if (ex instanceof TFile) await app().vault.modify(ex, md); else await app().vault.create(path, md); toast(`Saved ${path}`); return; }
+      if (typeof HOST !== 'undefined' && HOST.exportGuide) await HOST.exportGuide(f, fmt, chosen()); else toast('Word and PDF export come from Draftsmith; turn on the Draftsmith section.');
+    };
+    ap(wrap, h('div', { class: 'cl-card' }, h('h4', {}, 'Language guide'), h('div', { class: 'cs-hint cs-mb' }, 'A shareable guide to the language: how to say it, the grammar, a dictionary both ways, the phrasebook and names. Saved next to the conlang in an Exports folder.'),
+      h('div', { class: 'ww-checks' }, ...checks),
+      h('div', { class: 'cl-actions cs-mt' }, h('button', { class: 'mod-cta', onclick: () => go('docx') }, 'Word (.docx)'), h('button', { class: 'mod-cta', onclick: () => go('pdf') }, 'PDF'), h('button', { onclick: () => go('md') }, 'Markdown')),
+      h('div', { class: 'cs-hint cs-mt' }, 'To put the guide at the back of a book, tick it under Draftsmith → Publish → Language guides. PDF uses the book fonts, which can’t show every special letter (ā, ŋ, č…); those are written plainly there. Word keeps them all.')));
+  } else if (st.tab === 'links') {
+    const lang = WW.languageOf(f); const links = S.links(f, 'links');
+    const add = h('button', { class: 'cs-add', title: 'Link a note', onclick: () => suggest({ items: S.files().filter((x) => x.path !== f.path).sort(byName).map((x) => ({ label: x.basename, sub: typeLabel(x), value: x.path })), placeholder: 'Link a note (encyclopedia entry, character, place…)', source: 'Notes',
+      onPick: (v) => { const t = app().vault.getAbstractFileByPath(v); if (t) W((x) => { x.links = [...names(x.links).map((n) => `[[${n}]]`), S.link(t, f.path)]; }); } }) }, '+');
+    const back = WW.backlinks(f).filter((x) => !lang || x.path !== lang.path);
+    ap(wrap, h('div', { class: 'cl-card' }, h('h4', {}, 'Spoken as'), lang ? h('div', { class: 'cs-tile-body' }, chip(lang.basename, f.path, { file: lang })) : h('div', { class: 'cs-hint' }, 'Link a Language note from the top of this page. Notes that mention the language link to the Language note, not here.')),
+      h('div', { class: 'cl-card cs-mt' }, h('h4', {}, 'Linked to'), h('div', { class: 'cs-hint cs-mb' }, 'Encyclopedia entries, characters, places or any note about this language: its history, its speakers, its texts.'),
+        h('div', { class: 'cs-tile-body' }, ...links.map((l, i) => chip(l.name, f.path, { file: l.file, onX: () => W((x) => { x.links = names(x.links).filter((_, j) => j !== i).map((n) => `[[${n}]]`); }) })), add)),
+      h('div', { class: 'cl-card cs-mt' }, h('h4', {}, `Linked here · ${back.length}`), back.length ? h('div', { class: 'cs-tile-body' }, ...back.map((x) => chip(x.basename, f.path, { file: x }))) : h('div', { class: 'cs-hint' }, 'Nothing links to this conlang yet.')));
   }
   return wrap;
 }

@@ -166,7 +166,7 @@ function templateFm(id) {
   t.links.filter((l) => l.placement !== 'header').forEach((l) => { fm[l.key] = []; });
   fm[s.imageKey] = null; fm[s.bannerKey] = null; fm[s.galleryKey] = [];
   if (mods.includes('relationships')) fm[s.relationshipKey] = [];
-  if (mods.includes('conlang')) { fm.phonology = { consonants: '', vowels: '', patterns: 'CV CVC', forbidden: '', minSyl: 1, maxSyl: 2 }; fm.lexicon = []; fm.affixes = []; }
+  // a Language's conlang lives in its own Wordwright note (see 74-wordwright.js)
   if (mods.includes('rules')) { fm.hardness = 50; fm.rules = []; }
   if (mods.includes('spellbook')) fm.spells = [];
   if (mods.includes('gods')) fm.gods = [];

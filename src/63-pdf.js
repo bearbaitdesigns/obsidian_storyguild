@@ -12,6 +12,8 @@ const PDF_WIDTHS = {
 };
 const WIN_EXTRA = { '€': 0x80, '‚': 0x82, 'ƒ': 0x83, '„': 0x84, '…': 0x85, '†': 0x86, '‡': 0x87, 'ˆ': 0x88, '‰': 0x89, 'Š': 0x8a, '‹': 0x8b, 'Œ': 0x8c, 'Ž': 0x8e, '‘': 0x91, '’': 0x92, '“': 0x93, '”': 0x94, '•': 0x95, '–': 0x96, '—': 0x97, '˜': 0x98, '™': 0x99, 'š': 0x9a, '›': 0x9b, 'œ': 0x9c, 'ž': 0x9e, 'Ÿ': 0x9f };
 /** Unicode → a "binary string" of Windows-1252 codes. */
+/** letters the PDF fonts don't have, written plainly (accents dropped by toWin otherwise) */
+const PDF_PLAIN = { 'ŋ': 'ng', 'Ŋ': 'Ng', 'ł': 'l', 'Ł': 'L', 'ʼ': "'", 'ʔ': "'", 'ʃ': 'sh', 'ʒ': 'zh', 'ħ': 'h', 'đ': 'd', 'Đ': 'D', 'ı': 'i' };
 function toWin(s) {
   let o = ''; for (const ch of String(s).normalize('NFC')) {
     const c = ch.codePointAt(0);
@@ -19,7 +21,7 @@ function toWin(s) {
     else if ((c >= 32 && c < 127) || (c >= 0xa0 && c <= 0xff)) o += String.fromCharCode(c);
     else if (WIN_EXTRA[ch]) o += String.fromCharCode(WIN_EXTRA[ch]);
     else if (c === 0x2011 || c === 0x2010) o += '-'; else if (c === 0x2032) o += "'"; else if (c === 0x2033) o += '"';
-    else o += '?';
+    else { const plain = PDF_PLAIN[ch] || ch.normalize('NFD').replace(/\p{M}/gu, ''); o += plain && [...plain].every((x) => { const k = x.codePointAt(0); return (k >= 32 && k < 127) || (k >= 0xa0 && k <= 0xff); }) ? plain : '?'; }
   }
   return o;
 }

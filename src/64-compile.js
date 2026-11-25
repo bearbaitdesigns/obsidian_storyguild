@@ -37,6 +37,7 @@ async function gatherBook(p) {
     if (String(p.acknowledgments || '').trim()) back.push({ title: 'Acknowledgments', blocks: plainBlocks(p.acknowledgments) });
     if (String(p.bio || '').trim()) back.push({ title: 'About the Author', blocks: plainBlocks(p.bio) });
   }
+  for (const g of languageGuideBack(p)) back.push(g);
   let questions = null;
   if (o.includeQuestions) {
     const r = roundsForPublish(p).find((x) => x.id === o.questionsRound) || roundsForPublish(p).slice(-1)[0];

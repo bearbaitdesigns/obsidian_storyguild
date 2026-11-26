@@ -44,7 +44,8 @@ function parseInline(s, smart) {
 }
 const BREAK_RE = /^\s*(\*\s*\*\s*\*|(?:\*\s*){3,}|-{3,}|_{3,}|#|~+|⁂|❧|§)\s*$/;
 function mdToBlocks(md, title, opts = {}) {
-  let b = splitFrontmatter(md).body;
+  let b = splitFrontmatter(md).body; const gblocks = [];
+  b = b.replace(/^\s*```glyphs[^\n]*\n([\s\S]*?)```/gm, (m0, src) => { gblocks.push(src); return `\n\u2063GLYPHBLOCK${gblocks.length - 1}\u2063\n`; });
   b = b.replace(/%%[\s\S]*?%%/g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/```[\s\S]*?```/g, '').replace(/^\s*```[^\n]*\n[\s\S]*$/m, '')
     .replace(/!\[\[[^\]]*\]\]/g, '').replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/(^|\s)#[A-Za-z][\w/-]*/g, '$1').replace(/<[^>]+>/g, '');
@@ -53,6 +54,7 @@ function mdToBlocks(md, title, opts = {}) {
     if (/^\s*>\s*\[![^\]]*\]/.test(line)) continue; // callout header
     line = line.replace(/^\s*>\s?/, '');
     if (!line.trim()) continue;
+    { const gm = line.match(/\u2063GLYPHBLOCK(\d+)\u2063/); if (gm) { out.push({ t: 'glyphs', src: gblocks[+gm[1]] }); afterBreak = true; continue; } }
     if (BREAK_RE.test(line)) { if (out.length && out[out.length - 1].t !== 'break') out.push({ t: 'break' }); afterBreak = true; continue; }
     line = line.replace(/^\s*[-*+]\s+\[.\]\s+/, '').replace(/^\s*(?:[-*+]|\d+[.)])\s+(?=\S)/, '');
     const h = line.match(/^\s*(#{1,6})\s+(.*)$/);

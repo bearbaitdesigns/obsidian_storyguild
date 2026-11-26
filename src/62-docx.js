@@ -5,11 +5,14 @@
    ===================================================================== */
 const PAGE_TWIPS = { '6x9': [8640, 12960, 1080], '5x8': [7200, 11520, 1008], '5.5x8.5': [7920, 12240, 1080], letter: [12240, 15840, 1440], a4: [11906, 16838, 1440] };
 const wrun = (text, rpr = '') => `<w:r>${rpr ? `<w:rPr>${rpr}</w:rPr>` : ''}<w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
-const wruns = (runs) => runs.map((r) => wrun(r.text, (r.b ? '<w:b/>' : '') + (r.i ? '<w:i/>' : ''))).join('');
+let DOCX_GLYPHS = {};
+const wruns = (runs) => runs.map((r) => glyphSplit(r.text).map((sg) => { const g = sg.slot != null ? DOCX_GLYPHS[sg.slot] : null; return wrun(sg.t, (g ? `<w:rFonts w:ascii="${esc(g.family)}" w:hAnsi="${esc(g.family)}" w:cs="${esc(g.family)}" w:eastAsia="${esc(g.family)}"/>` : '') + (r.b ? '<w:b/>' : '') + (r.i ? '<w:i/>' : '')); }).join('')).join('');
 const wp = (style, inner, extra = '') => `<w:p><w:pPr>${style ? `<w:pStyle w:val="${style}"/>` : ''}${extra}</w:pPr>${inner}</w:p>`;
 const pageBreak = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
 
 function buildDocx(book) {
+  DOCX_GLYPHS = book.glyphFonts || {}; const usedFonts = new Set();
+  for (const c of [...book.chapters, ...book.back]) for (const b of c.blocks) for (const r of b.runs || []) for (const sg of glyphSplit(r.text)) if (sg.slot != null && DOCX_GLYPHS[sg.slot]) usedFonts.add(sg.slot);
   const m = book.meta; const o = book.opts; const msf = !!o.manuscriptFormat;
   const [pw, ph, mar] = msf ? PAGE_TWIPS.letter : PAGE_TWIPS[o.pageSize] || PAGE_TWIPS['6x9'];
   const font = msf ? 'Courier New' : o.font === 'Garamond' ? 'Garamond' : o.font === 'Georgia' ? 'Georgia' : 'Times New Roman';
@@ -49,7 +52,11 @@ function buildDocx(book) {
     q.items.forEach((it, i) => body.push(wp('Question', wrun(`${i + 1}. ${it.text}`))));
   }
   const tocAt = body.length;
-  const blocks = (bl) => bl.map((b) => b.t === 'break' ? wp('SceneBreak', wrun(o.sceneBreak || '#')) : b.t === 'h' ? wp('Sub', wrun(b.text)) : wp(b.first ? 'NoInd' : '', wruns(b.runs))).join('');
+  let gImg = 0;
+  const imgPara = (b) => { const bw = Math.min(pw - 2 * mar, b.w * 8), bh = ph - 2 * mar - 1400; const box = fitInside(b.w, b.h, bw, bh); const cx = Math.round(box.w * 635), cy = Math.round(box.h * 635); gImg++; const rid = `rIdGImg${gImg}`;
+    mapParts.push({ name: `word/media/glyphs${gImg}.jpeg`, rid, bytes: b.bytes });
+    return `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="120" w:after="120" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${500 + gImg}" name="Glyphs ${gImg}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${500 + gImg}" name="glyphs${gImg}.jpeg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`; };
+  const blocks = (bl) => bl.filter((b) => b.t !== 'glyphs').map((b) => b.t === 'img' ? imgPara(b) : b.t === 'break' ? wp('SceneBreak', wrun(o.sceneBreak || '#')) : b.t === 'h' ? wp('Sub', wrun(b.text)) : wp(b.first ? 'NoInd' : '', wruns(b.runs))).join('');
   // Maps from Wayfinder: a heading (listed in the contents) and the map fitted to the page
   const mapParts = [];
   const mapPages = () => (book.maps || []).forEach((mp, i) => {
@@ -109,19 +116,31 @@ ${style('Question', 'Reader Question', '<w:keepNext/><w:ind w:firstLine="0"/><w:
 </w:styles>`;
   const rels = [header ? '<Relationship Id="rIdHdr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>' : '', '<Relationship Id="rIdFtr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>', titlePg ? '<Relationship Id="rIdHdr1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/><Relationship Id="rIdFtr1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer2.xml"/>' : '',
     coverPart ? `<Relationship Id="rIdCover" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/cover.${coverPart.ext}"/>` : '',
-    ...mapParts.map((mp) => `<Relationship Id="${mp.rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${mp.name.replace('word/', '')}"/>`), '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>', '<Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>'].join('');
+    ...mapParts.map((mp) => `<Relationship Id="${mp.rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${mp.name.replace('word/', '')}"/>`), (usedFonts.size ? '<Relationship Id="rIdFontTable" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>' : '') + '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>', '<Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>'].join('');
   const files = [
     { name: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${[...new Set([coverPart ? coverPart.ext : null, mapParts.length ? 'jpeg' : null].filter(Boolean))].map((x) => `<Default Extension="${x}" ContentType="image/${x}"/>`).join('')}
-<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>${usedFonts.size ? '<Default Extension="odttf" ContentType="application/vnd.openxmlformats-officedocument.obfuscatedFont"/><Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/>' : ''}<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
 ${header ? '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' : ''}<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>${titlePg ? '<Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>' : ''}
 <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>` },
     { name: '_rels/.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>' },
     { name: 'word/_rels/document.xml.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels}</Relationships>` },
     { name: 'word/document.xml', data: doc }, { name: 'word/styles.xml', data: styles },
-    { name: 'word/settings.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${o.toc && !msf ? '<w:updateFields w:val="true"/>' : ''}<w:defaultTabStop w:val="720"/><w:compat/></w:settings>` },
+    { name: 'word/settings.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${usedFonts.size ? '<w:embedTrueTypeFonts/>' : ''}${o.toc && !msf ? '<w:updateFields w:val="true"/>' : ''}<w:defaultTabStop w:val="720"/><w:compat/></w:settings>` },
     { name: 'docProps/core.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${esc(m.title)}</dc:title><dc:creator>${esc(m.author)}</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString().replace(/\.\d+Z$/, 'Z')}</dcterms:created></cp:coreProperties>` },
   ];
+  if (usedFonts.size) { // glyph fonts travel inside the file (obfuscated, as Word embeds fonts)
+    const fx = []; const fr = []; let n = 0;
+    for (const slot of usedFonts) {
+      n++; const g = DOCX_GLYPHS[slot]; const hex = [...crypto.getRandomValues(new Uint8Array(16))].map((x) => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+      const guid = `{${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}}`; const key = []; for (let i = 0; i < 16; i++) key.push(parseInt(hex.substr(30 - i * 2, 2), 16));
+      const data = new Uint8Array(g.bytes); for (let i = 0; i < 32; i++) data[i] ^= key[i % 16];
+      files.push({ name: `word/fonts/font${n}.odttf`, data }); fr.push(`<Relationship Id="rIdF${n}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/font" Target="fonts/font${n}.odttf"/>`);
+      fx.push(`<w:font w:name="${esc(g.family)}"><w:charset w:val="00"/><w:family w:val="auto"/><w:pitch w:val="variable"/><w:embedRegular r:id="rIdF${n}" w:fontKey="${guid}"/></w:font>`);
+    }
+    files.push({ name: 'word/fontTable.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${fx.join('')}</w:fonts>` });
+    files.push({ name: 'word/_rels/fontTable.xml.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${fr.join('')}</Relationships>` });
+  }
   if (header) files.push({ name: 'word/header1.xml', data: header });
   files.push({ name: 'word/footer1.xml', data: footer });
   if (coverPart) files.push({ name: coverPart.name, data: coverPart.bytes });

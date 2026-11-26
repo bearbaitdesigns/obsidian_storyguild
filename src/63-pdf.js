@@ -79,7 +79,8 @@ function buildPdf(book) {
   const FAM = msf ? ['F5', 'F6', 'F7', 'F8'] : ['F1', 'F2', 'F3', 'F4'];
   const fontOf = (r) => FAM[(r.i ? 1 : 0) + (r.b ? 2 : 0)];
   const WT = { F1: 'Times-Roman', F2: 'Times-Italic', F3: 'Times-Bold', F4: 'Times-BoldItalic' };
-  const width = (bin, f, size) => { if (!WT[f]) return bin.length * 0.6 * size; const t = PDF_WIDTHS[WT[f]]; let w = 0; for (let i = 0; i < bin.length; i++) w += t[bin.charCodeAt(i)] || 500; return (w / 1000) * size; };
+  const GF = book.glyphFonts || {}; const usedG = new Set(); const imgs = [];
+  const width = (bin, f, size) => { if (f[0] === 'G') { const g = GF[f.slice(1)]; let w = 0; for (let i = 0; i + 1 < bin.length; i += 2) w += g.adv[(bin.charCodeAt(i) << 8) | bin.charCodeAt(i + 1)] || 500; return (w / 1000) * size; } if (!WT[f]) return bin.length * 0.6 * size; const t = PDF_WIDTHS[WT[f]]; let w = 0; for (let i = 0; i < bin.length; i++) w += t[bin.charCodeAt(i)] || 500; return (w / 1000) * size; };
 
   const pages = []; let cur = null; let y = 0;
   const newPage = (kind = 'body') => { cur = { ops: [], kind, num: null }; pages.push(cur); y = top; return cur; };
@@ -92,11 +93,15 @@ function buildPdf(book) {
   /** Lay out one paragraph of runs, justified (book) or ragged (manuscript). */
   function para(runs, first, opts = {}) {
     const words = []; let curW = null;
-    for (const r of runs) { const f = opts.font || fontOf(r); const parts = toWin(r.text).split(' ');
-      parts.forEach((p, i) => { if (i > 0) { if (curW) words.push(curW); curW = null; } if (p) { if (!curW) curW = []; curW.push({ s: p, f }); } }); }
+    for (const r of runs) { const f0r = opts.font || fontOf(r);
+      for (const seg of glyphSplit(r.text)) {
+        const g = seg.slot != null ? GF[seg.slot] : null; const f = g ? 'G' + seg.slot : f0r;
+        const parts = g ? [[...seg.t].map((ch) => { const id = g.gid.get(ch.codePointAt(0)) || 0; return String.fromCharCode(id >> 8, id & 255); }).join('')] : toWin(seg.t).split(' ');
+        if (g) usedG.add(seg.slot);
+        parts.forEach((p, i) => { if (i > 0) { if (curW) words.push(curW); curW = null; } if (p) { if (!curW) curW = []; curW.push({ s: p, f }); } }); } }
     if (curW) words.push(curW);
     if (!words.length) return;
-    const size = opts.size || fs; const sp = (f) => width(' ', f, size);
+    const size = opts.size || fs; const sp = (f) => width(' ', f[0] === 'G' ? FAM[0] : f, size);
     const ww = (w) => w.reduce((a, p) => a + width(p.s, p.f, size), 0);
     let i = 0; let lineNo = 0;
     while (i < words.length) {
@@ -110,7 +115,9 @@ function buildPdf(book) {
       // group consecutive same-font pieces into one string; spaces stretch through Tw
       let ops = `BT ${just.toFixed(3)} Tw ${x0.toFixed(2)} ${(y - fs).toFixed(2)} Td`; let f0 = null; let buf = '';
       const flush = () => { if (buf) ops += ` /${f0} ${size} Tf ${pdfStr(buf)} Tj`; buf = ''; };
-      line.forEach((w, wi) => { w.forEach((p, pi) => { const pre = wi > 0 && pi === 0 ? ' ' : ''; if (p.f !== f0) { if (pre) buf += pre; flush(); f0 = p.f; buf = p.s; } else buf += pre + p.s; }); });
+      line.forEach((w, wi) => { w.forEach((p, pi) => {
+        if (wi > 0 && pi === 0) { if (f0 && f0[0] !== 'G') buf += ' '; else { flush(); f0 = p.f[0] === 'G' ? FAM[0] : p.f; buf = ' '; } }
+        if (p.f !== f0) { flush(); f0 = p.f; buf = p.s; } else buf += p.s; }); });
       flush(); cur.ops.push(ops + ' ET');
       y -= lead; lineNo++;
     }
@@ -125,7 +132,9 @@ function buildPdf(book) {
     for (const b of bl) {
       if (b.t === 'break') { ensure(lead * 3); y -= lead * 0.3; center(o.sceneBreak || '* * *', FAM[0], fs, y - fs); y -= lead * 1.3; }
       else if (b.t === 'h') { ensure(lead * 3); y -= lead * 0.5; para([{ text: b.text, b: true }], true, { center: true, noIndent: true }); y -= lead * 0.2; }
-      else para(b.runs, b.first);
+      else if (b.t === 'img') { const im = pdfImage(b); if (!im) continue; const box = fitInside(im.w, im.h, Math.min(W, im.w * 0.5), (top - bottom) * 0.75); ensure(box.h + lead); y -= lead * 0.4; imgs.push(im);
+        cur.ops.push(`q ${box.w.toFixed(2)} 0 0 ${box.h.toFixed(2)} ${(left + (W - box.w) / 2).toFixed(2)} ${(y - box.h).toFixed(2)} cm /I${imgs.length} Do Q`); y -= box.h + lead * 0.6; }
+      else if (b.runs) para(b.runs, b.first);
     }
   }
 
@@ -221,7 +230,14 @@ function buildPdf(book) {
   for (const [k, n] of Object.entries(FONTS)) fontIds[k] = add(`<< /Type /Font /Subtype /Type1 /BaseFont /${n} /Encoding /WinAnsiEncoding >>`);
   const imgId = coverImg ? add({ dict: `<< /Type /XObject /Subtype /Image ${coverImg.dict} /Length ${coverImg.bytes.length} >>`, bytes: coverImg.bytes }) : null;
   const mapIds = mapImgs.map(({ img }) => add({ dict: `<< /Type /XObject /Subtype /Image ${img.dict} /Length ${img.bytes.length} >>`, bytes: img.bytes }));
-  const xo = [imgId ? `/Im1 ${imgId} 0 R` : '', ...mapIds.map((id, i) => `/M${i + 1} ${id} 0 R`)].filter(Boolean).join(' ');
+  const inlineIds = imgs.map((img) => add({ dict: `<< /Type /XObject /Subtype /Image ${img.dict} /Length ${img.bytes.length} >>`, bytes: img.bytes }));
+  for (const slot of usedG) { // glyph fonts, embedded whole as TrueType, written by glyph number
+    const g = GF[slot]; const nm = `SGGlyphs${slot}`; const ff = add({ dict: `<< /Length ${g.bytes.length} /Length1 ${g.bytes.length} >>`, bytes: g.bytes });
+    const fd = add(`<< /Type /FontDescriptor /FontName /${nm} /Flags 4 /FontBBox [-50 -350 1100 1050] /ItalicAngle 0 /Ascent 1050 /Descent -350 /CapHeight 700 /StemV 80 /FontFile2 ${ff} 0 R >>`);
+    const cid = add(`<< /Type /Font /Subtype /CIDFontType2 /BaseFont /${nm} /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor ${fd} 0 R /DW 500 /W [0 [${g.adv.join(' ')}]] /CIDToGIDMap /Identity >>`);
+    fontIds['G' + slot] = add(`<< /Type /Font /Subtype /Type0 /BaseFont /${nm} /Encoding /Identity-H /DescendantFonts [${cid} 0 R] >>`);
+  }
+  const xo = [imgId ? `/Im1 ${imgId} 0 R` : '', ...mapIds.map((id, i) => `/M${i + 1} ${id} 0 R`), ...inlineIds.map((id, i) => `/I${i + 1} ${id} 0 R`)].filter(Boolean).join(' ');
   const res = `<< /Font << ${Object.entries(fontIds).map(([k, id]) => `/${k} ${id} 0 R`).join(' ')} >>${xo ? ` /XObject << ${xo} >>` : ''} >>`;
   const resId = add(res);
   const pageIds = [];

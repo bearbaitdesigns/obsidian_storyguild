@@ -71,8 +71,8 @@ function openName(name, src, e) { app().workspace.openLinkText(name, src || '', 
 function hover(el, linktext, src, parent) {
   el.addEventListener('mouseover', (e) => app().workspace.trigger('hover-link', { event: e, source: HOVER, hoverParent: parent || el, targetEl: el, linktext, sourcePath: src || '' }));
 }
-const typeLabel = (f) => { const id = S.typeIdOf(f); return id ? T()[id].label : S.isEntry(f) ? 'Encyclopedia' : isConlang(f) ? 'Conlang (Wordwright)' : String(arr(S.fm(f).type)[0] ?? 'note'); };
-const typeIcon = (f) => { const id = S.typeIdOf(f); return id ? T()[id].icon : S.isEntry(f) ? '📚' : isConlang(f) ? '🔤' : '📄'; };
+const typeLabel = (f) => { const id = S.typeIdOf(f); return id ? T()[id].label : S.isEntry(f) ? 'Encyclopedia' : isConlang(f) ? 'Conlang (Wordwright)' : isGlyphs(f) ? 'Glyph set (Wordwright)' : String(arr(S.fm(f).type)[0] ?? 'note'); };
+const typeIcon = (f) => { const id = S.typeIdOf(f); return id ? T()[id].icon : S.isEntry(f) ? '📚' : isConlang(f) ? '🔤' : isGlyphs(f) ? '✒️' : '📄'; };
 
 /* ---------- images ---------- */
 const IMG_RE = /^(png|jpe?g|gif|webp|avif|bmp|svg)$/i;

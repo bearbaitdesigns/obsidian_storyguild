@@ -599,3 +599,7 @@ body.sg-phone { --sg-sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0p
 .sg-phone .ds-pubbar { bottom: calc(8px + var(--sg-sab)); }
 /* our own screens: room at the end so the last buttons can scroll clear of Obsidian's bar and the system buttons */
 .sg-phone .workspace-leaf-content:is([data-type^="storyguild"], [data-type^="worldkeeper"], [data-type^="plot-weaver"]):not([data-type="worldkeeper-map-editor"]) > .view-content { padding-bottom: calc(var(--sg-sab) + 80px); }
+.ds-glyph-q { width: 100%; margin-bottom: 10px; }
+.ds-glyph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; max-height: 50vh; overflow-y: auto; }
+.ds-glyph-cell { display: flex; flex-direction: column; align-items: center; height: auto; padding: 6px 2px; gap: 2px; font-size: .8em; }
+.ds-glyph-cell svg { color: var(--text-normal); }

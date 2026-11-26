@@ -350,7 +350,9 @@ function wwGuide(c, sections = WW_SECTIONS.map(([k]) => k)) {
     for (const [k, t] of kinds) { const l = ns.filter((x) => x.kind === k); if (!l.length) continue; L.push(H_(t)); for (const x of l) L.push(P_([B_(x.name), x.meaning ? T_(` — ${x.meaning}`) : T_('')])); }
     add('names', 'Names', L); }
   { const L = []; const wr = fm.writing || {};
-    if (fm.script) L.push(P_([B_('Script: '), T_(fm.script)])); if (wr.direction) L.push(P_([B_('Direction: '), T_(wr.direction)]));
+    if (fm.script) L.push(P_([B_('Script: '), T_(fm.script + ((GL_TYPES.find(([k]) => k === fm.script) || [])[1] ? ` — ${GL_TYPES.find(([k]) => k === fm.script)[1].toLowerCase()}` : ''))]));
+    { const gset = GLS.setsFor(c).find((x) => S.fm(x).kind !== 'symbols'); if (gset) { const gs = glStyle(S.fm(gset).style); L.push(P_([B_('Letterforms: '), T_(`${gs.name.toLowerCase()} (${glName(gset)}) — ${gs.blurb.toLowerCase()} The full sign chart is at the end of this guide.`)])); } }
+    if (wr.direction) L.push(P_([B_('Direction: '), T_(wr.direction)]));
     if (wr.romanization) { L.push(H_('Romanization')); L.push(P_(wr.romanization)); } if (wr.notes) { L.push(H_('Notes')); L.push(P_(wr.notes)); }
     add('writing', 'Writing', L); }
   return out;
@@ -442,9 +444,9 @@ class WordwrightView extends ItemView {
   async onOpen() { this.body = this.contentEl.createDiv({ cls: 'wk ww-lib' }); this.run = liveRender(this, this.body, () => this.render()); this.run(); }
   render() {
     const all = WW.all();
-    const head = h('div', { class: 'cd-top ww-lib-top' }, h('div', { class: 'cd-h1' }, '🔤 Wordwright'), h('span', { class: 'cd-count' }, `${all.length} conlang${all.length === 1 ? '' : 's'}`), h('span', { class: 'cd-spacer' }),
-      h('button', { class: 'mod-cta', onclick: () => newConlangFlow() }, '+ New conlang'));
-    const intro = h('div', { class: 'cs-hint ww-lib-intro' }, 'Build the languages of your world: sounds and pronunciation, a dictionary, grammar, numbers, a phrasebook and names. Each conlang links to its Language note in Worldkeeper, and Draftsmith can translate text into it.');
+    const head = h('div', { class: 'cd-top ww-lib-top' }, h('div', { class: 'cd-h1' }, '🔤 Wordwright'), h('span', { class: 'cd-count' }, `${all.length} conlang${all.length === 1 ? '' : 's'} · ${GLS.all().length} glyph set${GLS.all().length === 1 ? '' : 's'}`), h('span', { class: 'cd-spacer' }),
+      h('button', { class: 'mod-cta', onclick: () => newConlangFlow() }, '+ New conlang'), h('button', { class: 'mod-cta gl-new', onclick: () => newGlyphFlow() }, '+ New glyph set'));
+    const intro = h('div', { class: 'cs-hint ww-lib-intro' }, 'Build the languages of your world: sounds and pronunciation, a dictionary, grammar, numbers, a phrasebook and names. Each conlang links to its Language note in Worldkeeper, and Draftsmith can translate text into it. Glyph sets give them scripts, or give magic its runes and sigils; their signs paste into Draftsmith as text.');
     const cards = all.map((c) => { const fm = S.fm(c); const lang = WW.languageOf(c); const lex = arr(fm.lexicon); const ph = Object.assign({}, WW_PH, fm.phonology || {});
       return h('div', { class: 'ww-card', onclick: (e) => { if (!e.target.closest('button, a')) openFile(c, e); } },
         h('div', { class: 'ww-card-name' }, c.basename.replace(/\s*\(conlang\)$/i, '')),
@@ -452,7 +454,9 @@ class WordwrightView extends ItemView {
         h('div', { class: 'ww-card-stats' }, `${lex.length} words · ${arr(fm.affixes).length} endings${fm.wordOrder ? ' · ' + fm.wordOrder : ''}`),
         lex.length ? h('div', { class: 'ww-card-words' }, ...lex.slice(0, 5).map((e) => h('span', { title: `${e.meaning} · ${sayOf(ph, e)}` }, e.word))) : null,
         h('div', { class: 'ww-card-actions' }, h('button', { onclick: (e) => openFile(c, e) }, 'Open'), h('button', { onclick: () => openLanguageHelper(c) }, '🧭 Helper'))); });
-    this.body.replaceChildren(h('div', { class: 'wk-view' }, head, intro, all.length ? h('div', { class: 'ww-grid' }, ...cards) : h('div', { class: 'cs-empty' }, 'No conlangs yet. Start one with “+ New conlang”, or from a Language note’s Conlang tab.')));
+    const gcards = glLibraryCards();
+    this.body.replaceChildren(h('div', { class: 'wk-view' }, head, intro, h('div', { class: 'cs-group-title ww-lib-sec' }, '🔤 Conlangs'), all.length ? h('div', { class: 'ww-grid' }, ...cards) : h('div', { class: 'cs-empty' }, 'No conlangs yet. Start one with “+ New conlang”, or from a Language note’s Conlang tab.'),
+      h('div', { class: 'cs-group-title ww-lib-sec' }, '✒️ Glyph sets'), gcards.length ? h('div', { class: 'ww-grid' }, ...gcards) : h('div', { class: 'cs-empty' }, 'No glyph sets yet. “+ New glyph set” makes a script for a conlang, or runes and sigils for magic.')));
   }
 }
 function newConlangFlow() {
@@ -468,13 +472,23 @@ function installWordwright(plugin) {
   plugin.registerMarkdownCodeBlockProcessor(WW_BLOCK, (src, el, ctx) => {
     const f = app().vault.getAbstractFileByPath(ctx.sourcePath); if (!(f instanceof TFile)) return;
     const child = new MarkdownRenderChild(el); ctx.addChild(child);
-    const run = liveRender(child, el, () => el.replaceChildren(h('div', { class: 'wk ww' }, renderConlangNote(f)))); run();
+    const run = liveRender(child, el, () => el.replaceChildren(h('div', { class: 'wk ww' }, isGlyphs(f) ? renderGlyphNote(f) : renderConlangNote(f)))); run();
+  });
+  plugin.registerMarkdownCodeBlockProcessor('glyphs', (src, el, ctx) => {
+    const f = app().vault.getAbstractFileByPath(ctx.sourcePath); const child = new MarkdownRenderChild(el); ctx.addChild(child);
+    const run = liveRender(child, el, () => el.replaceChildren(h('div', { class: 'wk ww' }, renderGlyphsBlock(src, f)))); run();
   });
   plugin.addRibbonIcon('languages', 'Wordwright (conlangs)', () => plugin.openWordwright());
   plugin.addCommand({ id: 'open-wordwright', name: 'Open Wordwright (conlangs)', callback: () => plugin.openWordwright() });
   plugin.addCommand({ id: 'new-conlang', name: 'New conlang…', callback: () => newConlangFlow() });
+  plugin.addCommand({ id: 'new-glyph-set', name: 'New glyph set…', callback: () => newGlyphFlow() });
+  plugin.addCommand({ id: 'export-glyph-font', name: 'Export this glyph set’s font', checkCallback: (chk) => { const f = app().workspace.getActiveFile(); if (!isGlyphs(f)) return false; if (!chk) glExportFont(f); return true; } });
   plugin.addCommand({ id: 'language-helper', name: 'Language helper for this conlang', checkCallback: (chk) => { const f = app().workspace.getActiveFile(); if (!isConlang(f)) return false; if (!chk) openLanguageHelper(f); return true; } });
   app().workspace.onLayoutReady(() => setTimeout(() => wwMigrate().catch((e) => console.error('[Wordwright]', e)), 1200));
+  app().workspace.onLayoutReady(() => setTimeout(() => GLF.refresh(), 600));
+  plugin.registerEvent(app().metadataCache.on('changed', (f) => { if (isGlyphs(f) || (isConlang(f) && GLS.all().length)) GLF.soon(); }));
+  if (app().workspace.on) plugin.registerEvent(app().workspace.on('css-change', () => GLF.css()));
+  plugin.register(() => { for (const v of GLF.faces.values()) document.fonts.delete(v.face); GLF.faces.clear(); for (const v of ['--font-text', '--font-interface', '--font-monospace', '--sg-glyph-fonts']) document.body.style.removeProperty(v); });
 }
 const WORDWRIGHT_METHODS = {
   wordwrightMigrate() { return wwMigrate(); },

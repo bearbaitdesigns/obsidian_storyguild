@@ -117,7 +117,7 @@ wk = patch(wk, 'wk:enc-toc-fold', `h('div', { class: 'enc-toc-title' }, 'Content
 
 // Expose a few helpers to the host.
 wk += `
-WorldkeeperPlugin.storyguild = { readTodos, writeTodos, pwLoad, mergeSettings, DEFAULT_SETTINGS, MS_STANDARD, S, wayfinder: { M, loadMapImage, exportCanvas, mapFolder }, wordwright: { WW, isConlang, translate: wwTranslate, translateAndSave: wwTranslateAndSave, guide: wwGuide, sections: WW_SECTIONS } };
+WorldkeeperPlugin.storyguild = { readTodos, writeTodos, pwLoad, mergeSettings, DEFAULT_SETTINGS, MS_STANDARD, S, wayfinder: { M, loadMapImage, exportCanvas, mapFolder }, wordwright: { WW, isConlang, translate: wwTranslate, translateAndSave: wwTranslateAndSave, guide: wwGuide, sections: WW_SECTIONS, glyphImages: glImagesFor, sets: GLS, setsFor: (n) => GLS.setsFor(n), encode: async (gf, t) => { if (await glEnsureCodes(gf, t)) await GLF.refresh(); return glEncode(glSetOf(gf), t); }, glyphName: glName, symbolsOf: (gf) => glSpec(gf).symbols, codeOf: (gf, key) => glEnsureCodes(gf).then(() => glCp(glSpec(gf), key)), newGlyphSet: () => newGlyphFlow(), fonts: GLF, blockImage: glBlockImage, pictures: (gf) => arr(S.fm(gf).pictures), traceFile: glTraceFile, splitSheet: glSplitSheet, uploadMany: glUploadMany, uploadSheet: glUploadSheet, autoPicture: (gf, t) => glAutoPicture(glSetOf(gf), t), fontBytes: (gf) => glFontBytes(glSetOf(gf), 'Test Glyphs'), signList: (gf) => { const set = glSetOf(gf); return set.inv.flatMap((g) => g.signs).filter((x) => !x.key.startsWith('m:')).map((x) => ({ key: x.key, label: x.label.split('  ')[0], meaning: x.meaning || (x.label.split('  ')[1] || ''), el: (px) => glSignSvg(set, x.key, px) })); } } };
 `;
 
 /* ------------------------------ Plot Weaver ------------------------------ */

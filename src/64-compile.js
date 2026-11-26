@@ -24,7 +24,7 @@ async function gatherBook(p) {
   for (let i = 0; i < chs.length; i++) {
     const c = chs[i]; const md = await app().vault.cachedRead(c.file); if (!isIdea(c)) words += countWords(md);
     const heading = c.kind === 'chapter' ? chapterHeading(o.heading, ++num, titleFromName(c.title)) : isIdea(c) ? titleFromName(c.title) : sectionHeading(c);
-    chapters.push({ title: c.title, kind: c.kind, heading, blocks: mdToBlocks(md, c.title, { smart }) });
+    chapters.push({ title: c.title, kind: c.kind, heading, blocks: await resolveGlyphBlocks(mdToBlocks(md, c.title, { smart }), c.file) });
   }
   let cover = null;
   if (p.cover && o.includeCover !== false && !(o.manuscriptFormat && o.format !== 'epub')) {
@@ -55,8 +55,9 @@ async function gatherBook(p) {
   ].map((x) => x.trim()).filter(Boolean);
   // Printed at the foot of every page (PDF, Word) or the end of every section (EPUB).
   const footer = [o.footerCopyright !== false ? fill(p.shortCopyright || DEFAULT_LEGAL.shortCopyright) : '', o.footerAi !== false ? fill(p.aiNotice || DEFAULT_LEGAL.aiNotice) : ''].map((x) => x.trim()).filter(Boolean);
+  const glyphFonts = await bookGlyphFonts([...chapters, ...back]);
   return {
-    opts: o, words, cover, chapters, back, questions, maps, mapsPlace: o.mapsPlace === 'back' ? 'back' : 'front', warnings: p._mapWarnings.length ? p._mapWarnings.slice() : undefined, dedication: o.frontMatter && !o.manuscriptFormat ? String(p.dedication || '').trim() : '',
+    opts: o, words, cover, chapters, back, questions, maps, glyphFonts, mapsPlace: o.mapsPlace === 'back' ? 'back' : 'front', warnings: p._mapWarnings.length ? p._mapWarnings.slice() : undefined, dedication: o.frontMatter && !o.manuscriptFormat ? String(p.dedication || '').trim() : '',
     meta: {
       title: p.title, subtitle: p.subtitle, author, legalName: p.author || author, contact: o.contact || '', shortTitle: o.shortTitle || '',
       seriesLine: p.series ? `${p.series}${p.seriesNo ? `, Book ${p.seriesNo}` : ''}` : '', language: p.language || 'en', publisher: p.publisher, isbn: o.format === 'epub' ? p.isbnEbook : p.isbnPrint || p.isbnEbook,
@@ -68,7 +69,7 @@ async function gatherBook(p) {
 
 function bookMarkdown(book) {
   const L = [`# ${book.meta.title}`, book.meta.subtitle ? `*${book.meta.subtitle}*` : '', '', `by ${book.meta.author}`, '', ...book.meta.copyLines.map((x) => `> ${x}`), ...book.meta.footer.map((x) => `> *${x}*`), ''];
-  const md = (bl) => bl.map((b) => b.t === 'break' ? `\n${book.opts.sceneBreak}\n` : b.t === 'h' ? `\n### ${b.text}\n` : b.runs.map((r) => (r.b && r.i ? `***${r.text}***` : r.b ? `**${r.text}**` : r.i ? `*${r.text}*` : r.text)).join('') + '\n').join('\n');
+  const md = (bl) => bl.map((b) => b.t === 'break' ? `\n${book.opts.sceneBreak}\n` : b.t === 'h' ? `\n### ${b.text}\n` : b.t === 'img' || b.t === 'glyphs' ? (b.src != null ? `\n\`\`\`glyphs\n${b.src}\`\`\`\n` : '') : b.runs.map((r) => (r.b && r.i ? `***${r.text}***` : r.b ? `**${r.text}**` : r.i ? `*${r.text}*` : r.text)).join('') + '\n').join('\n');
   if (book.dedication) L.push(`*${book.dedication}*`, '');
   if (book.questions) { L.push(`## ${book.questions.title}`, '', book.questions.intro, ''); book.questions.items.forEach((q, i) => L.push(`${i + 1}. ${q.text}`)); L.push(''); }
   const mapsMd = () => { for (const mp of book.maps || []) L.push(`## ${mp.title}`, '', `![[${mp.path.replace(/\.md$/, '')}]]`, ''); };

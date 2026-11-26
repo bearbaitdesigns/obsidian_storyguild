@@ -115,7 +115,7 @@ function previewPage(p, sel) {
     put(b, el('div', { class: 'ds-pp-h', style: { 'margin-top': msf ? '28%' : '16%' } }, headings[0]));
     const holder = el('div', { class: 'ds-pp-text' }); put(b, holder);
     app().vault.cachedRead(first.file).then((md) => {
-      for (const bl of mdToBlocks(md, first.title, { smart }).slice(0, 14)) put(holder, bl.t === 'break' ? el('div', { class: 'ds-pp-brk' }, o.sceneBreak || '* * *') : bl.t === 'h' ? el('b', {}, bl.text) : el('p', { class: bl.first ? 'is-first' : '' }, bl.runs.map((r) => (r.i ? el('em', {}, r.text) : r.b ? el('b', {}, r.text) : r.text))));
+      for (const bl of mdToBlocks(md, first.title, { smart }).slice(0, 14)) put(holder, bl.t === 'break' ? el('div', { class: 'ds-pp-brk' }, o.sceneBreak || '* * *') : bl.t === 'h' ? el('b', {}, bl.text) : bl.t === 'glyphs' ? el('div', { class: 'ds-pp-brk' }, '✒️ glyphs') : el('p', { class: bl.first ? 'is-first' : '' }, bl.runs.map((r) => (r.i ? el('em', {}, r.text) : r.b ? el('b', {}, r.text) : r.text))));
       if (epub) put(holder, ...footer.map((l) => el('p', { class: 'ds-pp-legal-in' }, l)));
     });
   });

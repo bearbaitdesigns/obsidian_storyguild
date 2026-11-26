@@ -542,6 +542,50 @@ async def main():
           out.pref = await tr('I see the sea.'); return out; }""")
         print('15d. synonyms:', json.dumps(r, ensure_ascii=False))
         assert r['a'] == 'Mi nai sor sel.' and r['b'] == 'Tavel, mi nai sor mor.' and r['before'] == 'Mi sor sel' and r['after'] == 'Mi sor mor' and r['syn'] == '= sel' and r['pref'] == 'Mi sor mor.', r
+        # 15e. glyph sets: a script for a conlang and a symbol set for magic; fonts so glyphs paste as text
+        r = await ev("""async () => { const W = (ms) => new Promise(r => setTimeout(r, ms)); const a = WorldkeeperModule.storyguild.wordwright; const c = app.vault.getAbstractFileByPath('World/Conlangs/Order Test (conlang).md');
+          const g = await a.sets.create('Order Test script', { conlang: c, open: false }); await W(300);
+          const m = await app.vault.create('World/Magic/Glyph Test Magic.md', '---\\ntype: magic\\n---\\n```worldkeeper\\n```\\n'); await W(200);
+          const y = await a.sets.create('Ash sigils', { kind: 'symbols', link: m, open: false }); await W(300);
+          await a.fonts.refresh(); const t = await a.encode(g, 'Mi sor sel.'); const sym = await a.codeOf(y, 'Y:fire');
+          const fams = [...document.fonts].filter(f => /Storyguild Glyphs/.test(f.family)).map(f => f.status);
+          return { fm: app.metadataCache.getFileCache(g).frontmatter.conlang, script: app.metadataCache.getFileCache(g).frontmatter.script, cps: [...t].filter(ch => ch !== ' ').every(ch => ch.codePointAt(0) >= 0xF0000), n: [...t].length, sym: sym >= 0xF0400, fams,
+            magic: a.setsFor(m).map(x => x.basename), lang: a.setsFor(c).map(x => x.basename), css: getComputedStyle(document.body).getPropertyValue('--font-text').includes('Storyguild Glyphs') }; }""")
+        print('15e. glyph sets:', json.dumps(r, ensure_ascii=False))
+        assert r['fm'] == '[[Order Test (conlang)]]' and r['cps'] and r['n'] >= 8 and r['sym'] and r['fams'] == ['loaded', 'loaded'] and r['magic'] == ['Ash sigils (glyphs)'] and r['lang'] == ['Order Test script (glyphs)'] and r['css'], r
+        # 15f. glyphs in a published book: pasted glyph text keeps its font (PDF, EPUB, Word) and glyph blocks become pictures
+        r = await ev("""async () => { const W = (ms) => new Promise(r => setTimeout(r, ms)); const a = WorldkeeperModule.storyguild.wordwright;
+          const g = a.sets.all().find(x => x.basename.startsWith('Order Test script')); const y = a.sets.all().find(x => x.basename.startsWith('Ash sigils'));
+          const t = await a.encode(g, 'Mi sor sel.'); const sig = String.fromCodePoint(await a.codeOf(y, 'Y:ward'));
+          const f = app.vault.getMarkdownFiles().find(x => x.basename === 'Low Water'); const body = await app.vault.read(f);
+          await app.vault.modify(f, body + '\\n\\nThe herald read aloud: “' + t + '” and the seal bore ' + sig + ' in red wax.\\n\\n```glyphs\\nset: Order Test script\\ntext: Mi sor sel\\n```\\n'); await W(600);
+          const p = SGP.data.manuscript.projects[0]; const out = {}; const v = app.workspace.getLeavesOfType('storyguild-draftsmith')[0].view;
+          for (const fmt of ['pdf', 'epub', 'docx']) { Object.assign(p.compile, { format: fmt, includeQuestions: false, manuscriptFormat: false }); v.setTab('compile'); await W(200);
+            [...document.querySelectorAll('.ds-root button')].find(b => b.textContent.startsWith('Publish ')).click(); await W(1500);
+            const path = p.lastCompiled[0].path; const bytes = app.vault.bin.get(path); let s = ''; for (const x of bytes) s += String.fromCharCode(x); out[fmt] = { path, b64: btoa(s) }; }
+          await app.vault.modify(f, body); return out; }""")
+        info = {}
+        for fmt, v in r.items():
+            data = base64.b64decode(v['b64']); fn = os.path.join(OUT, 'glyphs_book.' + fmt); open(fn, 'wb').write(data); info[fmt] = len(data)
+            if fmt == 'pdf': info['pdfFont'] = b'/CIDFontType2' in data and b'/FontFile2' in data; info['pdfImg'] = b'/I1 ' in data
+            else:
+                import zipfile, io as _io; z = zipfile.ZipFile(_io.BytesIO(data)); names = z.namelist()
+                if fmt == 'epub': info['epubFont'] = any(n.endswith('.ttf') for n in names); info['epubImg'] = any('glyphs1.jpg' in n for n in names); info['epubSpan'] = any('class="g' in z.read(n).decode('utf8', 'ignore') for n in names if n.endswith('.xhtml'))
+                else: info['docxFont'] = any(n.endswith('.odttf') for n in names); info['docxImg'] = any('glyphs1.jpeg' in n for n in names); info['docxRun'] = 'Storyguild Glyphs' in z.read('word/document.xml').decode('utf8')
+        print('15f. publish glyphs:', json.dumps(info))
+        assert info['pdfFont'] and info['pdfImg'] and info['epubFont'] and info['epubImg'] and info['epubSpan'] and info['docxFont'] and info['docxImg'] and info['docxRun'], info
+        # 15g. own glyphs (uploaded images traced to outlines, holes kept) and constellation pictures (words joined into one figure)
+        r = await ev("""async () => { const W = (ms) => new Promise(r => setTimeout(r, ms)); const a = WorldkeeperModule.storyguild.wordwright;
+          const g = await a.sets.create('Skyreading', { kind: 'script', script: 'Logographic', open: false }); await app.fileManager.processFrontMatter(g, (x) => { x.style = 'constellation'; x.anyWord = true; x.join = true; }); await W(300);
+          const t = await a.encode(g, 'river remembers'); const pic = a.autoPicture(g, 'The river remembers every star');
+          const img = await a.blockImage('set: Skyreading\\ntext: The river remembers every star\\njoin: yes', null);
+          const c = document.createElement('canvas'); c.width = 200; c.height = 200; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 200, 200); x.strokeStyle = '#000'; x.lineWidth = 20; x.beginPath(); x.arc(100, 100, 60, 0, 7); x.stroke();
+          const blob = await new Promise(r => c.toBlob(r, 'image/png')); const tr = await a.traceFile(new File([blob], 'ring.png'));
+          const y = a.sets.all().find(z => z.basename.startsWith('Ash sigils')); await a.uploadMany(y, [new File([blob], 'Ward.png'), new File([blob], 'Moon Gate.png')]); await W(300);
+          const fm = app.metadataCache.getFileCache(y).frontmatter;
+          return { words: [...t].filter(ch => ch !== ' ').length, items: pic.items.length, links: pic.links.length, img: img && img.w > 100, rings: (tr[0].match(/M/g) || []).length, ward: !!(fm.custom || {})['Y:ward'], moon: fm.symbols.some(z => z.name === 'Moon Gate') }; }""")
+        print('15g. own glyphs & pictures:', json.dumps(r))
+        assert r['words'] == 2 and r['items'] == 5 and r['links'] >= 4 and r['img'] and r['rings'] == 2 and r['ward'] and r['moon'], r
         # 16. language guide: Word and PDF from the conlang, and as an appendix in a published book
         r = await ev("""async (p) => { const c = app.vault.getAbstractFileByPath(p); const a = await SGP.api.exportGuide(c, 'pdf'); const b = await SGP.api.exportGuide(c, 'docx');
           const bk = SGP.data.manuscript.projects[0]; Object.assign(bk.compile, { langGuides: [p], format: 'md', manuscriptFormat: false });
@@ -564,9 +608,9 @@ async def main():
         assert r['moved'] == ['Deep Speech'] and r['link'] == '[[Deep Speech (conlang)]]' and r['stripped'] and r['words'] == ['kru'] and r['back'] == '[[Deep Speech]]'
         # 18. Wordwright library view and the encyclopedia can link a conlang
         r = await ev("""async () => { app.commands.executeCommandById('worldkeeper:open-wordwright'); await new Promise(r => setTimeout(r, 600));
-          const cards = [...document.querySelectorAll('.ww-card-name')].map(x => x.textContent); return { cards, cmds: Object.keys(app.commands.commands).filter(k => /conlang|wordwright|translate/.test(k)) }; }""")
+          const cards = [...document.querySelectorAll('.ww-card:not(.gl-card) .ww-card-name')].map(x => x.textContent); const glyphCards = [...document.querySelectorAll('.gl-card .ww-card-name')].map(x => x.textContent); const newBtn = [...document.querySelectorAll('.ww-lib-top button')].map(b => b.textContent); return { cards, glyphCards, newBtn, cmds: Object.keys(app.commands.commands).filter(k => /conlang|wordwright|translate|glyph/.test(k)) }; }""")
         print('18. library:', json.dumps(r, ensure_ascii=False))
-        assert set(r['cards']) == {'Old Tide', 'Deep Speech', 'Sindral', 'Order Test'} and 'storyguild:translate-selection' in r['cmds'] and 'worldkeeper:open-wordwright' in r['cmds']
+        assert set(r['cards']) == {'Old Tide', 'Deep Speech', 'Sindral', 'Order Test'} and set(r['glyphCards']) == {'Order Test script', 'Ash sigils', 'Skyreading'} and r['newBtn'] == ['+ New conlang', '+ New glyph set'] and 'storyguild:insert-glyph' in r['cmds'] and 'storyguild:translate-selection' in r['cmds'] and 'worldkeeper:open-wordwright' in r['cmds']
         await ev("() => document.querySelectorAll('.ww-test').forEach(e => e.remove())")
         # Unload cleanly
         r = await ev("""async () => { SGP.unload(); await new Promise(r => setTimeout(r, 300)); return { views: Object.keys(app.viewRegistry), blocks: Object.keys(app.codeblocks), cmds: Object.keys(app.commands.commands).length, saved: JSON.parse(app.vault.adapter.data.get('.obsidian/plugins/storyguild/data.json')).manuscript.projects.length }; }""")

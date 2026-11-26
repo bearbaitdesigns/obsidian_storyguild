@@ -2,9 +2,9 @@
    Publish → EPUB 3 (with an EPUB 2 table of contents for older readers)
    ===================================================================== */
 const xe = (s) => esc(s);
-const runsHtml = (runs) => runs.map((r) => { let t = xe(r.text); if (r.b) t = `<strong>${t}</strong>`; if (r.i) t = `<em>${t}</em>`; return t; }).join('');
+const runsHtml = (runs) => runs.map((r) => { let t = glyphSplit(r.text).map((sg) => (sg.slot != null && EPUB_GLYPHS.has(sg.slot) ? `<span class="g${sg.slot}">${xe(sg.t)}</span>` : xe(sg.t))).join(''); if (r.b) t = `<strong>${t}</strong>`; if (r.i) t = `<em>${t}</em>`; return t; }).join('');
 function blocksHtml(blocks, brk) {
-  return blocks.map((b) => b.t === 'break' ? `<p class="brk">${xe(brk)}</p>` : b.t === 'h' ? `<h3>${xe(b.text)}</h3>` : `<p${b.first ? ' class="first"' : ''}>${runsHtml(b.runs)}</p>`).join('\n');
+  return blocks.filter((b) => b.t !== 'glyphs').map((b) => b.t === 'img' ? `<div class="gimg"><img src="${b._href}" alt="${xe(b.alt || '')}"/></div>` : b.t === 'break' ? `<p class="brk">${xe(brk)}</p>` : b.t === 'h' ? `<h3>${xe(b.text)}</h3>` : `<p${b.first ? ' class="first"' : ''}>${runsHtml(b.runs)}</p>`).join('\n');
 }
 const xhtml = (title, lang, body, cls = '') => `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
@@ -38,6 +38,7 @@ nav li{margin:.4em 0}
 .legal{margin-top:3em;font-size:.7em;color:#777;text-align:center}
 .legal p,p.legal{text-indent:0;text-align:center}`;
 
+let EPUB_GLYPHS = new Set();
 function buildEpub(book) {
   const m = book.meta; const lang = m.language || 'en'; const files = []; const items = []; const spine = []; const toc = [];
   const add = (id, href, type, data, props, inSpine = true, tocTitle = null) => { files.push({ name: 'OEBPS/' + href, data }); items.push({ id, href, type, props }); if (inSpine) spine.push(id); if (tocTitle) toc.push({ href, title: tocTitle }); };
@@ -60,6 +61,12 @@ function buildEpub(book) {
     const li = q.items.map((it) => `<li>${xe(it.text)}</li>`).join('\n');
     add('questions', 'questions.xhtml', 'application/xhtml+xml', xhtml(q.title, lang, `<h2>${xe(q.title)}</h2>${q.intro ? `<p class="noind">${xe(q.intro)}</p>` : ''}<ol class="q">${li}</ol>${legal}`), null, true, q.title);
   }
+  // glyphs: pictures drawn from glyph blocks, and the fonts of any glyph sets the text uses
+  let gi = 0; for (const c of [...book.chapters, ...book.back]) for (const b of c.blocks) if (b.t === 'img') { gi++; b._href = `images/glyphs${gi}.jpg`; add(`gimg${gi}`, b._href, 'image/jpeg', b.bytes, null, false); }
+  const usedSlots = new Set(); for (const c of [...book.chapters, ...book.back]) for (const b of c.blocks) for (const r of b.runs || []) for (const sg of glyphSplit(r.text)) if (sg.slot != null && (book.glyphFonts || {})[sg.slot]) usedSlots.add(sg.slot);
+  EPUB_GLYPHS = usedSlots; let glyphCss = '';
+  for (const slot of usedSlots) { const g = book.glyphFonts[slot]; add(`gfont${slot}`, `fonts/glyphs${slot}.ttf`, 'font/ttf', g.bytes, null, false); glyphCss += `\n@font-face{font-family:"${g.family}";src:url(fonts/glyphs${slot}.ttf)}\n.g${slot}{font-family:"${g.family}"}`; }
+  glyphCss += '\n.gimg{text-align:center;margin:1em 0;text-indent:0}.gimg img{max-width:80%;height:auto}';
   const tocPos = spine.length; // nav goes here when shown
   const firstChapter = book.chapters.length ? 'ch001.xhtml' : null;
   const mapPages = () => (book.maps || []).forEach((mp, i) => {
@@ -74,7 +81,7 @@ function buildEpub(book) {
 <nav epub:type="landmarks" hidden=""><ol>${book.cover ? '<li><a epub:type="cover" href="cover.xhtml">Cover</a></li>' : ''}${firstChapter ? `<li><a epub:type="bodymatter" href="${firstChapter}">Start</a></li>` : ''}</ol></nav>`;
   files.push({ name: 'OEBPS/nav.xhtml', data: xhtml('Contents', lang, navBody) }); items.push({ id: 'nav', href: 'nav.xhtml', type: 'application/xhtml+xml', props: 'nav' });
   if (book.opts.toc) spine.splice(tocPos, 0, 'nav');
-  files.push({ name: 'OEBPS/style.css', data: EPUB_CSS }); items.push({ id: 'css', href: 'style.css', type: 'text/css' });
+  files.push({ name: 'OEBPS/style.css', data: EPUB_CSS + glyphCss }); items.push({ id: 'css', href: 'style.css', type: 'text/css' });
   const ncx = `<?xml version="1.0" encoding="UTF-8"?>
 <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="${xe(uidv)}"/><meta name="dtb:depth" content="1"/><meta name="dtb:totalPageCount" content="0"/><meta name="dtb:maxPageNumber" content="0"/></head>
 <docTitle><text>${xe(m.title)}</text></docTitle><navMap>${toc.map((t, i) => `<navPoint id="np${i + 1}" playOrder="${i + 1}"><navLabel><text>${xe(t.title)}</text></navLabel><content src="${t.href}"/></navPoint>`).join('')}</navMap></ncx>`;

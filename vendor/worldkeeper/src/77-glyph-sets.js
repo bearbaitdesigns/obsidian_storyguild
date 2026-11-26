@@ -65,7 +65,7 @@ function glSpec(gf) {
     lexicon: cf ? arr(cf.lexicon) : [], affixes: cf ? arr(cf.affixes) : [], phrases: cf ? arr(cf.phrases) : [],
     script: sym ? 'Symbols' : g.script || 'Alphabet', symbols: arr(g.symbols),
     writing: { direction: g.direction || (cf && (cf.writing || {}).direction) || null },
-    glyphs: { style: g.style, seed: g.seed, level: g.level, featural: g.featural, pointed: g.pointed, rolls: g.rolls || {}, custom: g.custom || {}, anyWord: g.anyWord != null ? !!g.anyWord : !c, join: !!g.join },
+    glyphs: { style: g.style, seed: g.seed, level: g.level, featural: g.featural, pointed: g.pointed, rolls: g.rolls || {}, custom: g.custom || {}, anyWord: g.anyWord != null ? !!g.anyWord : !c, join: !!g.join, elements: g.elements || {}, joinAt: g.joinAt, joinLine: g.joinLine, joinOnce: g.joinOnce, joinBack: g.joinBack, joinStars: g.joinStars, joinStar: g.joinStar },
     pictures: arr(g.pictures),
     slot: g.slot, codes: g.codes || {},
   };
@@ -339,7 +339,20 @@ function renderGlyphEditor(f, spec, st, rerender) {
   { const cb = h('input', { type: 'checkbox', checked: !!g.join }); cb.addEventListener('change', () => G((y) => { y.join = cb.checked; })); opt.push(h('label', { class: 'lh-check', title: 'The words of a sentence join into one figure, like a constellation' }, cb, 'Join words into a picture')); }
   if (!sym) { const dir = h('select', { class: 'dropdown' }, ...['Left to right', 'Right to left', 'Top to bottom', 'Alternating lines'].map((v) => h('option', { selected: (spec.writing.direction || 'Left to right') === v }, v))); dir.addEventListener('change', () => G((y) => { y.direction = dir.value; })); opt.push(h('label', { class: 'cl-inline cs-hint' }, 'Direction ', dir)); }
   const nDrawn = Object.keys(g.custom || {}).length;
-  ap(wrap, h('div', { class: 'cl-card' }, h('h4', {}, 'The look'), styles,
+  // parts of the chosen look, each on or off
+  const E = glElems(set); const parts = GL_ELEMENTS[set.style.id] || [];
+  const partChips = parts.length ? h('div', { class: 'gl-parts' }, h('span', { class: 'cs-hint' }, `${set.style.name} parts`),
+    ...parts.map(([k, l]) => h('button', { class: 'gl-part' + (E(k) ? ' is-on' : ''), onclick: () => G((y) => { const cur = new Set(E.list(parts.map((x) => x[0]))); if (cur.has(k)) cur.delete(k); else cur.add(k); if (!cur.size) return; y.elements = Object.assign({}, y.elements || {}, { [set.style.id]: [...cur] }); y.rolls = {}; }) }, l))) : null;
+  // rules for joining words into a picture
+  const sel = (key, list, val) => { const el = h('select', { class: 'dropdown' }, ...list.map(([k, l]) => h('option', { value: k, selected: val === k }, l))); el.addEventListener('change', () => G((y) => { y[key] = el.value; })); return el; };
+  const tog = (key, label, val, tip) => { const cb = h('input', { type: 'checkbox', checked: val }); cb.addEventListener('change', () => G((y) => { y[key] = cb.checked; })); return h('label', { class: 'lh-check', title: tip || '' }, cb, label); };
+  const R = glJoinRules(set);
+  const joining = g.join ? h('div', { class: 'gl-join' }, h('div', { class: 'cs-group-title' }, 'Joining words'),
+    h('div', { class: 'gl-join-row' }, h('label', { class: 'cs-hint' }, 'Join at'), sel('joinAt', GL_JOIN_AT, R.at), h('label', { class: 'cs-hint' }, 'with a'), sel('joinLine', GL_LINE_KINDS, R.line)),
+    h('div', { class: 'gl-join-row' }, tog('joinOnce', 'Each point joins only once', R.once, 'A star used by one link cannot take another'), tog('joinBack', 'Link back to earlier words', R.back, 'Some words also join the word before last, so the picture closes up'),
+      tog('joinStars', 'Add a star across long gaps', R.stars), R.stars ? sel('joinStar', GL_STAR_KINDS, R.star) : null),
+    h('div', { class: 'cs-hint' }, 'If a word has no point that fits the rule, it joins at its closest point.')) : null;
+  ap(wrap, h('div', { class: 'cl-card' }, h('h4', {}, 'The look'), styles, partChips, joining,
     h('div', { class: 'gl-opts' }, h('span', { class: 'cs-hint' }, 'Detail'), level, ...opt,
       h('button', { onclick: () => G((y) => { y.seed = 1 + Math.floor(Math.random() * 99999); y.rolls = {}; }) }, '🎲 New set'),
       h('span', { class: 'cs-hint' }, nDrawn ? `Your ${nDrawn} drawn sign${nDrawn === 1 ? ' is' : 's are'} kept.` : 'Click a sign to re-roll it or draw your own.'))));
@@ -361,7 +374,7 @@ function renderGlyphEditor(f, spec, st, rerender) {
   // write and copy
   if (st.glText == null) st.glText = sym ? spec.symbols.slice(0, 4).map((y) => y.name).join(' ') : spec.phrases.map((p) => p.conlang || p.text).filter(Boolean)[0] || spec.lexicon.slice(0, 6).map((e) => e.word).join(' ') || 'The quick brown fox';
   const ta = h('textarea', { class: 'cl-in gl-in', placeholder: sym ? 'Symbol names, separated by spaces…' : 'Type to see it written…' }, st.glText);
-  const show = (t) => (g.join ? glPictureSvg(set, glAutoPicture(set, t), { size: 55 }) : glLayout(set, t, { size: 44 }));
+  const show = (t) => (g.join ? glPictureSvg(set, glAutoPicture(set, t), { size: 55 }) : glLayout(set, t, { size: sym || set.style.id === 'arcane' ? 96 : 44 }));
   const out = h('div', { class: 'gl-out' }, show(st.glText));
   ta.addEventListener('input', () => { st.glText = ta.value; out.replaceChildren(show(ta.value)); });
   ap(wrap, h('div', { class: 'cl-card' }, h('div', { class: 'gl-chart-head' }, h('h4', {}, 'Write and copy'), h('span', { class: 'cd-spacer' }),

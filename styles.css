@@ -3224,3 +3224,15 @@ body.wk-white-links a.internal-link:not(.is-unresolved), body.wk-white-links .cm
 .wk .gl-pic-card svg { max-width: 200px; height: auto; max-height: 110px; }
 .wk .gl-block .gl-pic, .wk .gl-out .gl-pic { max-width: 100%; height: auto; }
 .sg-phone .wk .gl-pic-canvas { height: 320px; }
+.wk .gl-parts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
+.wk .gl-part { height: auto; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--background-modifier-border); background: transparent; box-shadow: none; font-size: .85em; color: var(--text-muted); }
+.wk .gl-part.is-on { background: var(--cs-accent, var(--interactive-accent)); border-color: var(--cs-accent, var(--interactive-accent)); color: var(--text-on-accent); }
+.wk .gl-join { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--background-secondary); display: flex; flex-direction: column; gap: 8px; }
+.wk .gl-join-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.wk .gl-join-row .lh-check { margin: 0; }
+.wk .gl-pad { touch-action: none; user-select: none; }
+.wk .gl-pad .gl-pad-bg { fill: transparent; }
+.wk .gl-pad .gl-pad-box { fill: none; stroke: var(--background-modifier-border); stroke-width: .5; stroke-dasharray: 2 2; }
+.wk .gl-pad.is-free { cursor: crosshair; }
+.wk .gl-pad-modes { flex-wrap: wrap; }
+.sg-phone .wk .gl-editor > svg.gl-pad { width: 100%; max-width: 300px; height: auto; }

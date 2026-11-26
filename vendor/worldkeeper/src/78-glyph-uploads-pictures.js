@@ -122,14 +122,21 @@ async function glUploadSheet(f, file) {
 }
 
 /* ---------- pictures: words joined like a constellation ---------- */
+const GL_LINE_KINDS = [['line', 'Single line'], ['double', 'Double line'], ['triple', 'Triple line'], ['dashed', 'Dashed line']];
+const GL_STAR_KINDS = [['dot', 'Closed dot'], ['ring', 'Open dot'], ['bullseye', 'Dot in a circle'], ['star', 'Closed star'], ['openstar', 'Open star']];
+const GL_JOIN_AT = [['any', 'Any point (the closest)'], ['ends', 'End stars only (the tips of a word)'], ['reading', 'In reading order (last point → first point)'], ['dot', 'Only at closed dots'], ['ring', 'Only at open dots'], ['bullseye', 'Only at a dot in a circle'], ['star', 'Only at closed stars'], ['openstar', 'Only at open stars']];
+/** how this set joins words: where, with what line, and what else */
+function glJoinRules(set) { const g = set.g || {}; return { at: g.joinAt || 'any', line: g.joinLine || 'line', once: !!g.joinOnce, back: g.joinBack !== false, stars: g.joinStars !== false, star: g.joinStar || 'dot' }; }
 /** points a link can attach to: star centres, line ends */
 function glAnchors(strokes) {
+  const meta = strokes.filter((x) => x.n).map((x) => { const p = [glN(x.n.x), glN(x.n.y)]; p.t = x.n.t; p.deg = x.n.deg ?? 1; return p; });
+  if (meta.length) return meta;
   const pts = [];
   for (const x of strokes) for (const poly of glFlatten(x.d)) {
-    if (x.f) { const p = poly.pts; const c = p.reduce((a, q) => [a[0] + q[0] / p.length, a[1] + q[1] / p.length], [0, 0]); pts.push(c); }
-    else { pts.push(poly.pts[0], poly.pts[poly.pts.length - 1]); }
+    if (x.f) { const p = poly.pts; const c = p.reduce((a, q) => [a[0] + q[0] / p.length, a[1] + q[1] / p.length], [0, 0]); c.t = 'dot'; pts.push(c); }
+    else { const a = poly.pts[0], b = poly.pts[poly.pts.length - 1]; for (const e of poly.closed ? [] : [a, b]) { const q = [e[0], e[1]]; q.t = 'end'; pts.push(q); } }
   }
-  const out = []; for (const p of pts) if (!out.some((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < 5)) out.push([glN(p[0]), glN(p[1])]);
+  const out = []; for (const p of pts) { const hit = out.find((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < 5); if (hit) { hit.deg = (hit.deg || 1) + 1; continue; } const q = [glN(p[0]), glN(p[1])]; q.t = p.t; q.deg = 1; out.push(q); }
   return out;
 }
 /** one word as a block: its signs side by side, in the 0–100 high box */
@@ -157,20 +164,27 @@ function glAutoPicture(set, text, seed = 1) {
     items.push({ w, x: glN(pos[0] - blk.x0 + 10), y: glN(pos[1]), s: 1 }); boxes.push({ x: pos[0], y: pos[1], w: bw, h: bh });
   });
   // links: the closest points of each word and the next; long gaps get a star along the way
-  const links = []; const stars = [];
+  const links = []; const stars = []; const R = glJoinRules(set); const used = new Set();
   const anc = items.map((it) => glAnchors(glWordBlock(set, it.w).strokes));
-  for (let i = 1; i < items.length; i++) {
-    let best = null; anc[i - 1].forEach((p, a) => anc[i].forEach((q, b) => { const d = Math.hypot(items[i - 1].x + p[0] - items[i].x - q[0], items[i - 1].y + p[1] - items[i].y - q[1]); if (!best || d < best[2]) best = [a, b, d]; }));
-    if (!best) continue;
-    if (best[2] > 110) { const p = anc[i - 1][best[0]], q = anc[i][best[1]]; const mx = (items[i - 1].x + p[0] + items[i].x + q[0]) / 2 + (r() - 0.5) * 30, my = (items[i - 1].y + p[1] + items[i].y + q[1]) / 2 + (r() - 0.5) * 30;
-      stars.push({ x: glN(mx), y: glN(my) }); const si = stars.length - 1; links.push({ a: [i - 1, best[0]], b: [-1, si] }, { a: [-1, si], b: [i, best[1]] }); }
-    else links.push({ a: [i - 1, best[0]], b: [i, best[1]] });
-  }
+  /** the points of word i that may take a link, by the set's joining rules */
+  const allowed = (i, side) => {
+    let l = anc[i].map((p, k) => [p, k]);
+    if (R.at === 'ends') l = l.filter(([p]) => (p.deg || 1) <= 1);
+    else if (R.at === 'reading') { const xs = l.map(([p]) => p[0]); const want = side === 'out' ? Math.max(...xs) : Math.min(...xs); l = l.filter(([p]) => p[0] === want); }
+    else if (R.at !== 'any') l = l.filter(([p]) => p.t === R.at);
+    if (R.once) l = l.filter(([, k]) => !used.has(`${i},${k}`));
+    return l.length ? l : anc[i].map((p, k) => [p, k]);
+  };
+  const join = (i, j, maxD) => {
+    let best = null; for (const [p, a] of allowed(i, 'out')) for (const [q, b] of allowed(j, 'in')) { const d = Math.hypot(items[i].x + p[0] - items[j].x - q[0], items[i].y + p[1] - items[j].y - q[1]); if (!best || d < best[2]) best = [a, b, d]; }
+    if (!best || (maxD && best[2] > maxD)) return; used.add(`${i},${best[0]}`); used.add(`${j},${best[1]}`);
+    if (R.stars && best[2] > 110) { const p = anc[i][best[0]], q = anc[j][best[1]]; const mx = (items[i].x + p[0] + items[j].x + q[0]) / 2 + (r() - 0.5) * 30, my = (items[i].y + p[1] + items[j].y + q[1]) / 2 + (r() - 0.5) * 30;
+      stars.push({ x: glN(mx), y: glN(my), t: R.star }); const si = stars.length - 1; links.push({ a: [i, best[0]], b: [-1, si], k: R.line }, { a: [-1, si], b: [j, best[1]], k: R.line }); }
+    else links.push({ a: [i, best[0]], b: [j, best[1]], k: R.line });
+  };
+  for (let i = 1; i < items.length; i++) join(i - 1, i);
   // a few links back to earlier words close by, so it reads as one figure
-  for (let i = 2; i < items.length; i++) if (r() < 0.3) {
-    const j = i - 2; let best = null; anc[j].forEach((p, a) => anc[i].forEach((q, b) => { const d = Math.hypot(items[j].x + p[0] - items[i].x - q[0], items[j].y + p[1] - items[i].y - q[1]); if (!best || d < best[2]) best = [a, b, d]; }));
-    if (best && best[2] < 140) links.push({ a: [j, best[0]], b: [i, best[1]] });
-  }
+  if (R.back) for (let i = 2; i < items.length; i++) if (r() < 0.3) join(i - 2, i, 140);
   return { text, items, links, stars };
 }
 function glPicturePoint(set, pic, [i, k], cache) {
@@ -184,13 +198,17 @@ function glPictureSvg(set, pic, opts = {}) {
   let bb = [Infinity, Infinity, -Infinity, -Infinity]; const grow = (x, y) => { bb = [Math.min(bb[0], x), Math.min(bb[1], y), Math.max(bb[2], x), Math.max(bb[3], y)]; };
   const color = opts.color || 'currentColor'; const lw = Math.max(1.4, (set.style.w || 4) * 0.55);
   pic.links.forEach((l, li) => { const a = glPicturePoint(set, pic, l.a, cache), b = glPicturePoint(set, pic, l.b, cache); if (!a || !b) return;
-    g.append(s('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: color, 'stroke-width': lw, 'stroke-linecap': 'round', opacity: 0.85, class: opts.edit ? 'gl-pic-link' : null, 'data-link': opts.edit ? li : null })); });
+    const k = l.k || 'line'; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; const nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L; const offs = k === 'triple' ? [-3.4, 0, 3.4] : k === 'double' ? [-2.3, 2.3] : [0];
+    const gl = s('g', { class: opts.edit ? 'gl-pic-link' : null, 'data-link': opts.edit ? li : null });
+    if (opts.edit) gl.append(s('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: 'transparent', 'stroke-width': 10 }));
+    for (const o of offs) gl.append(s('line', { x1: a[0] + nx * o, y1: a[1] + ny * o, x2: b[0] + nx * o, y2: b[1] + ny * o, stroke: color, 'stroke-width': k === 'line' || k === 'dashed' ? lw : lw * 0.7, 'stroke-linecap': 'round', 'stroke-dasharray': k === 'dashed' ? '6 6' : null, opacity: 0.85 }));
+    g.append(gl); });
   pic.items.forEach((it, i) => { const blk = glWordBlock(set, it.w); const sc = it.s || 1;
     const gg = s('g', { transform: `translate(${it.x} ${it.y}) scale(${sc})`, class: opts.edit ? 'gl-pic-word' + (opts.sel === i ? ' is-sel' : '') : null, 'data-item': opts.edit ? i : null });
     if (opts.edit) gg.append(s('rect', { x: blk.x0 - 8, y: 4, width: blk.w, height: 92, rx: 10, class: 'gl-pic-hit' }));
     ap(gg, glPaths(set, blk.strokes, color)); g.append(gg); grow(it.x + (blk.x0 - 10) * sc, it.y); grow(it.x + (blk.x0 - 10 + blk.w) * sc, it.y + 100 * sc);
     if (opts.edit) cache[i] = cache[i] || glAnchors(blk.strokes); });
-  pic.stars.forEach((st, k) => { g.append(s('circle', { cx: st.x, cy: st.y, r: 4.5, fill: color })); grow(st.x - 6, st.y - 6); grow(st.x + 6, st.y + 6); });
+  pic.stars.forEach((st) => { ap(g, glPaths(set, glNode(st.t || 'dot', st.x, st.y, 4.5), color)); grow(st.x - 8, st.y - 8); grow(st.x + 8, st.y + 8); });
   if (opts.edit) { // points to link
     pic.items.forEach((it, i) => (cache[i] || []).forEach((p, k) => g.append(s('circle', { cx: it.x + p[0] * (it.s || 1), cy: it.y + p[1] * (it.s || 1), r: 6, class: 'gl-pic-pt' + (opts.pend && opts.pend[0] === i && opts.pend[1] === k ? ' is-pend' : ''), 'data-pt': `${i},${k}` }))));
     pic.stars.forEach((st, k) => g.append(s('circle', { cx: st.x, cy: st.y, r: 7, class: 'gl-pic-pt' + (opts.pend && opts.pend[0] === -1 && opts.pend[1] === k ? ' is-pend' : ''), 'data-pt': `-1,${k}` })));
@@ -205,7 +223,7 @@ function glPictureSvg(set, pic, opts = {}) {
 function glComposer(f, spec, st, rerender) {
   const set = glSet(spec); const pics = arr(S.fm(f).pictures);
   st.pic = st.pic || null; const wrap = h('div', { class: 'cl-card gl-composer' });
-  const save = async (p) => { await S.write(f, (x) => { const list = arr(x.pictures).filter((y) => y.id !== p.id); const clean = JSON.parse(JSON.stringify({ id: p.id, name: p.name, text: p.text, items: p.items, links: p.links, stars: p.stars })); x.pictures = [...list, clean].sort((a, b) => String(a.name).localeCompare(String(b.name))); }); toast(`Saved “${p.name}”`); };
+  const save = async (p) => { await S.write(f, (x) => { const list = arr(x.pictures).filter((y) => y.id !== p.id); const clean = JSON.parse(JSON.stringify({ id: p.id, name: p.name, text: p.text, items: p.items, links: p.links.map((l) => (l.k && l.k !== 'line' ? l : { a: l.a, b: l.b })), stars: p.stars })); x.pictures = [...list, clean].sort((a, b) => String(a.name).localeCompare(String(b.name))); }); toast(`Saved “${p.name}”`); };
   const head = h('div', { class: 'gl-chart-head' }, h('h4', {}, 'Pictures'), h('span', { class: 'cd-spacer' }),
     h('button', { onclick: () => prompt2('New picture', 'A sentence to join, e.g. The river remembers the stars', (t) => { st.pic = Object.assign(glAutoPicture(set, t, 1), { id: uid(), name: t.slice(0, 40), seed: 1 }); st.picSel = null; st.picPend = null; rerender(); }) }, '+ New picture'));
   ap(wrap, head, h('div', { class: 'cs-hint' }, 'Join the words of a sentence into one figure, like stars in a constellation. Storyguild sets the words down and links them; then drag words, link any two points and add stars of your own.'));
@@ -221,9 +239,9 @@ function glComposer(f, spec, st, rerender) {
     const pt = (e) => { const m = svg.getScreenCTM(); if (!m) return [0, 0]; const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const q = p.matrixTransform(m.inverse()); return [q.x, q.y]; };
     svg.addEventListener('pointerdown', (e) => {
       const ptEl = e.target.closest('[data-pt]'); const wEl = e.target.closest('[data-item]'); const lEl = e.target.closest('[data-link]');
-      if (st.picMode === 'link' && ptEl) { const [i, k] = ptEl.dataset.pt.split(',').map(Number); if (st.picPend && !(st.picPend[0] === i && st.picPend[1] === k)) { P2.links.push({ a: st.picPend, b: [i, k] }); st.picPend = null; } else st.picPend = [i, k]; draw(); return; }
+      if (st.picMode === 'link' && ptEl) { const [i, k] = ptEl.dataset.pt.split(',').map(Number); if (st.picPend && !(st.picPend[0] === i && st.picPend[1] === k)) { P2.links.push({ a: st.picPend, b: [i, k], k: st.picLine || glJoinRules(set).line }); st.picPend = null; } else st.picPend = [i, k]; draw(); return; }
       if (st.picMode === 'link' && lEl) { P2.links.splice(+lEl.dataset.link, 1); draw(); return; }
-      if (st.picMode === 'star') { const [x, y] = pt(e); P2.stars.push({ x: glN(x), y: glN(y) }); draw(); return; }
+      if (st.picMode === 'star') { const [x, y] = pt(e); P2.stars.push({ x: glN(x), y: glN(y), t: st.picStar || glJoinRules(set).star }); draw(); return; }
       if (st.picMode === 'move' && ptEl && ptEl.dataset.pt.startsWith('-1,')) { const k = +ptEl.dataset.pt.split(',')[1]; drag = { star: k, from: pt(e), o: [P2.stars[k].x, P2.stars[k].y], vb: svg.getAttribute('viewBox') }; return; }
       if (wEl) { const i = +wEl.dataset.item; st.picSel = i; drag = { item: i, from: pt(e), o: [P2.items[i].x, P2.items[i].y], vb: svg.getAttribute('viewBox') }; draw(); return; }
       st.picSel = null; draw();
@@ -236,10 +254,12 @@ function glComposer(f, spec, st, rerender) {
   draw();
   const modes = h('div', { class: 'cs-seg' }, ...[['move', '✋ Move'], ['link', '🔗 Link points'], ['star', '✦ Add star']].map(([k, l]) => h('button', { class: st.picMode === k ? 'is-on' : '', onclick: () => { st.picMode = k; st.picPend = null; rerender(); } }, l)));
   const help = { move: 'Drag words and stars. Click a word to select it.', link: 'Click a point, then another to join them. Click a line to remove it.', star: 'Click anywhere to add a star.' }[st.picMode];
+  const lineSel = h('select', { class: 'dropdown', title: 'Line for new links' }, ...GL_LINE_KINDS.map(([k, l]) => h('option', { value: k, selected: (st.picLine || glJoinRules(set).line) === k }, l))); lineSel.addEventListener('change', () => { st.picLine = lineSel.value; });
+  const starSel = h('select', { class: 'dropdown', title: 'Kind of star to add' }, ...GL_STAR_KINDS.map(([k, l]) => h('option', { value: k, selected: (st.picStar || glJoinRules(set).star) === k }, l))); starSel.addEventListener('change', () => { st.picStar = starSel.value; });
   const name = h('input', { type: 'text', value: P2.name || '', placeholder: 'Name' }); name.addEventListener('change', () => { P2.name = name.value.trim() || P2.name; });
   const addW = h('input', { type: 'text', placeholder: 'Add a word…', list: 'gl-pic-words' }); const dl = h('datalist', { id: 'gl-pic-words' }, ...spec.lexicon.slice(0, 400).map((e) => h('option', { value: e.word }, e.meaning || '')));
   const sel = st.picSel != null ? P2.items[st.picSel] : null;
-  ap(wrap, h('div', { class: 'gl-pic-tools' }, name, modes, h('span', { class: 'cs-hint' }, help)), canvas,
+  ap(wrap, h('div', { class: 'gl-pic-tools' }, name, modes, st.picMode === 'link' ? lineSel : st.picMode === 'star' ? starSel : null, h('span', { class: 'cs-hint' }, help)), canvas,
     h('div', { class: 'gl-pic-tools' }, addW, dl, h('button', { onclick: () => { const w = addW.value.trim(); if (!w) return; const last = P2.items[P2.items.length - 1]; P2.items.push({ w, x: last ? last.x + 160 : 0, y: last ? last.y : 0, s: 1 }); rerender(); } }, '+ Word'),
       sel ? [h('button', { onclick: () => { sel.s = glN(Math.min(3, (sel.s || 1) * 1.2)); rerender(); } }, 'Bigger'), h('button', { onclick: () => { sel.s = glN(Math.max(0.3, (sel.s || 1) / 1.2)); rerender(); } }, 'Smaller'),
         h('button', { class: 'mod-warning', onclick: () => { const i = st.picSel; P2.items.splice(i, 1); P2.links = P2.links.filter((l) => l.a[0] !== i && l.b[0] !== i).map((l) => ({ a: [l.a[0] > i ? l.a[0] - 1 : l.a[0], l.a[1]], b: [l.b[0] > i ? l.b[0] - 1 : l.b[0], l.b[1]] })); st.picSel = null; rerender(); } }, 'Remove word')] : null,
